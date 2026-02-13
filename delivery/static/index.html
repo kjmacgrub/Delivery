@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <title>Delivery Check-In</title>
+    <link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+    <div id="app">
+        <!-- Header -->
+        <header id="app-header">
+            <div class="header-left">
+                <button id="back-btn" class="icon-btn hidden" onclick="goBack()">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M15 18l-6-6 6-6"/>
+                    </svg>
+                </button>
+                <h1 id="page-title">Deliveries</h1>
+            </div>
+            <div class="header-right">
+                <span id="status-badge" class="badge"></span>
+                <button id="refresh-btn" class="icon-btn" onclick="refreshData()">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M23 4v6h-6"/><path d="M1 20v-6h6"/>
+                        <path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/>
+                    </svg>
+                </button>
+            </div>
+        </header>
+
+        <!-- View: Delivery List -->
+        <div id="view-deliveries" class="view active">
+            <div class="action-bar">
+                <button class="btn btn-primary btn-lg" onclick="showStorageFiles()">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/>
+                        <polyline points="14,2 14,8 20,8"/>
+                    </svg>
+                    Import from Storage
+                </button>
+            </div>
+            <div id="delivery-list" class="card-list">
+                <div class="empty-state">
+                    <p>No deliveries yet</p>
+                    <p class="subtitle">Import a worksheet from Firebase Storage to get started</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- View: Storage Files -->
+        <div id="view-storage" class="view">
+            <div id="storage-list" class="card-list">
+                <div class="loading">Loading files...</div>
+            </div>
+        </div>
+
+        <!-- View: Delivery Detail (Supplier List) -->
+        <div id="view-detail" class="view">
+            <div id="delivery-summary" class="summary-bar"></div>
+            <div id="supplier-list" class="card-list"></div>
+        </div>
+
+        <!-- View: Supplier Items (Check-in) -->
+        <div id="view-checkin" class="view">
+            <div id="supplier-summary" class="summary-bar"></div>
+            <div id="checkin-actions" class="action-bar">
+                <button class="btn btn-success btn-lg" onclick="checkInAllOk()">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M22 11.08V12a10 10 0 11-5.93-9.14"/>
+                        <polyline points="22,4 12,14.01 9,11.01"/>
+                    </svg>
+                    All OK
+                </button>
+            </div>
+            <div id="item-list" class="card-list"></div>
+        </div>
+
+        <!-- Modal: Check-in Item -->
+        <div id="checkin-modal" class="modal hidden">
+            <div class="modal-backdrop" onclick="closeModal()"></div>
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h2 id="modal-item-name">Item</h2>
+                    <button class="icon-btn" onclick="closeModal()">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <div class="form-group">
+                        <label>Expected Quantity</label>
+                        <div id="modal-expected" class="info-value"></div>
+                    </div>
+                    <div class="form-group">
+                        <label>Quantity Received</label>
+                        <div class="qty-input-row">
+                            <button class="qty-btn" onclick="adjustQty(-1)">-</button>
+                            <input type="number" id="modal-qty" min="0" inputmode="numeric">
+                            <button class="qty-btn" onclick="adjustQty(1)">+</button>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>Status</label>
+                        <div class="status-grid">
+                            <button class="status-btn active" data-status="ok" onclick="selectStatus('ok')">OK</button>
+                            <button class="status-btn" data-status="short" onclick="selectStatus('short')">Short</button>
+                            <button class="status-btn" data-status="over" onclick="selectStatus('over')">Over</button>
+                            <button class="status-btn" data-status="damaged" onclick="selectStatus('damaged')">Damaged</button>
+                            <button class="status-btn" data-status="missing" onclick="selectStatus('missing')">Missing</button>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>Notes (optional)</label>
+                        <textarea id="modal-notes" rows="2" placeholder="Any issues..."></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+                    <button class="btn btn-primary" onclick="submitCheckIn()">Confirm</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Toast notifications -->
+        <div id="toast-container"></div>
+    </div>
+
+    <script src="/static/app.js"></script>
+</body>
+</html>
