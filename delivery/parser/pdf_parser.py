@@ -122,6 +122,9 @@ class PDFWorksheetParser(WorksheetParser):
                 blocks = self._parse_page(page, page_num, bold_ys, shaded_ys)
                 worksheet.supplier_blocks.extend(blocks)
 
+        # Merge duplicate supplier blocks (same supplier spanning columns/pages)
+        worksheet.supplier_blocks = self._merge_supplier_blocks(worksheet.supplier_blocks)
+
         # Renumber block sequences globally
         for i, block in enumerate(worksheet.supplier_blocks):
             block.block_sequence = i + 1
@@ -317,10 +320,11 @@ class PDFWorksheetParser(WorksheetParser):
             if current_block is None:
                 continue
 
-            # Floor-pull pattern: "0 1 * VEG Beets..."
+            # Floor-pull pattern: "3 6 * FLOWERS Flowers-lancaster bouquet"
+            # group(1) = cases expected (3), group(2) = pull number (6, ignored)
             fm = self.FLOOR_PULL_PATTERN.match(text)
             if fm:
-                qty = int(fm.group(2))
+                qty = int(fm.group(1))
                 cat = fm.group(3)
                 desc = fm.group(4).strip()
                 parsed = self.product_parser.parse(desc)
@@ -365,6 +369,36 @@ class PDFWorksheetParser(WorksheetParser):
                 prev.parsed = self.product_parser.parse(prev.raw_description)
 
         return blocks
+
+    def _merge_supplier_blocks(self, blocks: List[SupplierBlock]) -> List[SupplierBlock]:
+        """
+        Merge consecutive blocks with the same supplier name.
+
+        When a supplier's items span multiple columns or pages, they appear
+        as separate blocks with the same name. This merges them into one block,
+        combining their items and using the cases count from the first occurrence.
+        """
+        if not blocks:
+            return blocks
+
+        merged = []
+        seen = {}  # supplier_name -> index in merged list
+
+        for block in blocks:
+            if block.supplier_name in seen:
+                # Merge items into existing block
+                existing = merged[seen[block.supplier_name]]
+                # Re-sequence the appended items
+                base_seq = max((it.line_sequence for it in existing.items), default=0)
+                for item in block.items:
+                    item.line_sequence = base_seq + item.line_sequence
+                existing.items.extend(block.items)
+            else:
+                # First occurrence of this supplier
+                seen[block.supplier_name] = len(merged)
+                merged.append(block)
+
+        return merged
 
     def _is_noise(self, text: str) -> bool:
         """Return True if line is header/footer noise."""

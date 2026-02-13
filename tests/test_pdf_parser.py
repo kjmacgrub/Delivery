@@ -44,7 +44,13 @@ class TestHeader:
 
 class TestSupplierBlocks:
     def test_has_suppliers(self, parsed):
-        assert len(parsed['supplier_blocks']) >= 10
+        # After merging, we should have 7 unique suppliers
+        assert len(parsed['supplier_blocks']) == 7
+
+    def test_no_duplicate_suppliers(self, parsed):
+        """Each supplier should appear exactly once after merging."""
+        names = [b['supplier_name'] for b in parsed['supplier_blocks']]
+        assert len(names) == len(set(names))
 
     def test_ace_natural(self, parsed):
         blocks = parsed['supplier_blocks']
@@ -58,33 +64,38 @@ class TestSupplierBlocks:
         assert len(baldor) == 1
         assert baldor[0]['expected_cases'] == 205
 
-    def test_four_seasons_multiple_blocks(self, parsed):
+    def test_four_seasons_merged(self, parsed):
         blocks = parsed['supplier_blocks']
         fs = [b for b in blocks if b['supplier_name'] == 'Four Seasons Produce']
-        # Should have multiple blocks (418, 418, 213, 130, 244, 244)
-        assert len(fs) >= 4
-        case_counts = [b['expected_cases'] for b in fs]
-        assert 418 in case_counts
-        assert 213 in case_counts
-        assert 130 in case_counts
-        assert 244 in case_counts
+        # All 6 blocks should be merged into 1
+        assert len(fs) == 1
+        # Cases from first occurrence
+        assert fs[0]['expected_cases'] == 418
+        # Combined items from all blocks
+        assert len(fs[0]['items']) == 109
 
-    def test_lancaster_multiple_blocks(self, parsed):
+    def test_lancaster_merged(self, parsed):
         blocks = parsed['supplier_blocks']
         lfc = [b for b in blocks if b['supplier_name'] == 'Lancaster Farm Fresh Coop']
-        assert len(lfc) >= 2
-        assert all(b['expected_cases'] == 430 for b in lfc)
+        # All 3 blocks merged into 1
+        assert len(lfc) == 1
+        assert lfc[0]['expected_cases'] == 430
+        # Combined items from all blocks
+        assert len(lfc[0]['items']) == 65
+
+    def test_myers_merged(self, parsed):
+        blocks = parsed['supplier_blocks']
+        myers = [b for b in blocks if b['supplier_name'] == 'Myers Produce']
+        # 2 blocks merged into 1
+        assert len(myers) == 1
+        assert myers[0]['expected_cases'] == 137
+        assert len(myers[0]['items']) == 37
 
     def test_jedda(self, parsed):
         blocks = parsed['supplier_blocks']
         jedda = [b for b in blocks if b['supplier_name'] == 'Jedda']
         assert len(jedda) == 1
         assert jedda[0]['expected_cases'] == 432
-
-    def test_myers(self, parsed):
-        blocks = parsed['supplier_blocks']
-        myers = [b for b in blocks if b['supplier_name'] == 'Myers Produce']
-        assert len(myers) >= 1
 
     def test_dartagnan(self, parsed):
         blocks = parsed['supplier_blocks']
@@ -174,6 +185,31 @@ class TestFormattingDetection:
                     )
                     return
         pytest.fail("Flowers-lancaster bouquet not found in parsed items")
+
+    def test_floor_pull_uses_cases_not_pull_number(self, parsed):
+        """Floor-pull items should use the cases count (first number), not the pull number."""
+        for block in parsed['supplier_blocks']:
+            for item in block['items']:
+                if 'Flowers' in item['raw_description'] and 'lancaster' in item['raw_description']:
+                    # "3 6 * FLOWERS Flowers-lancaster bouquet"
+                    # 3 = cases expected, 6 = pull number (ignore)
+                    assert item['quantity_expected'] == 3, (
+                        f"Flowers-lancaster should have qty=3 (cases), got {item['quantity_expected']}"
+                    )
+                    return
+        pytest.fail("Flowers-lancaster bouquet not found")
+
+    def test_floor_pull_zero_qty(self, parsed):
+        """Floor-pull items with 0 cases should have quantity_expected=0."""
+        for block in parsed['supplier_blocks']:
+            for item in block['items']:
+                if 'Beets' in item['raw_description'] and 'bunch various' in item['raw_description']:
+                    # "0 1 * VEG Beets- bunch various organic"
+                    assert item['quantity_expected'] == 0, (
+                        f"Beets bunch various should have qty=0, got {item['quantity_expected']}"
+                    )
+                    return
+        pytest.fail("Beets bunch various not found")
 
 
 class TestSpecificItems:
