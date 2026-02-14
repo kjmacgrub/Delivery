@@ -57,25 +57,68 @@
             </div>
         </div>
 
-        <!-- View: Delivery Detail (Supplier List) -->
+        <!-- View: Delivery Detail (Item/Supplier toggle) -->
         <div id="view-detail" class="view">
             <div id="delivery-summary" class="summary-bar"></div>
-            <div id="supplier-list" class="card-list"></div>
+            <div class="toggle-bar">
+                <button id="tab-items" class="toggle-btn active" onclick="switchTab('items')">Items</button>
+                <button id="tab-suppliers" class="toggle-btn" onclick="switchTab('suppliers')">Suppliers</button>
+            </div>
+            <!-- Item tab: flat list of all items -->
+            <div id="tab-content-items">
+                <div id="item-supplier-header" class="supplier-header hidden">
+                    <button class="supplier-back-btn" onclick="clearSupplierFilter()">
+                        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M15 18l-6-6 6-6"/>
+                        </svg>
+                    </button>
+                    <span id="item-supplier-header-name"></span>
+                </div>
+                <div id="item-supplier-summary" class="summary-bar hidden"></div>
+                <div class="search-bar">
+                    <svg class="search-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/>
+                    </svg>
+                    <input type="text" id="item-search" placeholder="Search items..." oninput="onSearchInput()" autocomplete="off" autocorrect="off" spellcheck="false">
+                    <button id="search-clear-btn" class="search-clear hidden" onclick="clearSearch()">&times;</button>
+                </div>
+                <div class="sort-bar">
+                    <span class="sort-label">Sort:</span>
+                    <button id="sort-alpha" class="sort-btn active" onclick="setItemSort('alpha')">A-Z</button>
+                    <button id="sort-qty" class="sort-btn" onclick="setItemSort('qty')">Cases</button>
+                    <span id="item-receive-all-btn" class="receive-all-slot"></span>
+                </div>
+                <div id="flat-item-list" class="compact-list"></div>
+            </div>
+            <!-- Supplier tab: supplier cards -->
+            <div id="tab-content-suppliers" class="hidden">
+                <div class="sort-bar">
+                    <span class="sort-label">Sort:</span>
+                    <button id="supplier-list-sort-alpha" class="sort-btn active" onclick="setSupplierListSort('alpha')">A-Z</button>
+                    <button id="supplier-list-sort-qty" class="sort-btn" onclick="setSupplierListSort('qty')">Cases</button>
+                </div>
+                <div id="supplier-list" class="card-list"></div>
+            </div>
         </div>
 
-        <!-- View: Supplier Items (Check-in) -->
+        <!-- View: Supplier Items drill-in (from Supplier tab) -->
         <div id="view-checkin" class="view">
-            <div id="supplier-summary" class="summary-bar"></div>
-            <div id="checkin-actions" class="action-bar">
-                <button class="btn btn-success btn-lg" onclick="checkInAllOk()">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M22 11.08V12a10 10 0 11-5.93-9.14"/>
-                        <polyline points="22,4 12,14.01 9,11.01"/>
+            <div id="supplier-header" class="supplier-header">
+                <button class="supplier-back-btn" onclick="goBack()">
+                    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M15 18l-6-6 6-6"/>
                     </svg>
-                    All OK
                 </button>
+                <span id="supplier-header-name"></span>
             </div>
-            <div id="item-list" class="card-list"></div>
+            <div id="supplier-summary" class="summary-bar"></div>
+            <div class="sort-bar">
+                <span class="sort-label">Sort:</span>
+                <button id="supplier-sort-alpha" class="sort-btn active" onclick="setSupplierItemSort('alpha')">A-Z</button>
+                <button id="supplier-sort-qty" class="sort-btn" onclick="setSupplierItemSort('qty')">Cases</button>
+                <span id="supplier-receive-all-btn" class="receive-all-slot"></span>
+            </div>
+            <div id="item-list" class="compact-list"></div>
         </div>
 
         <!-- Modal: Check-in Item -->
@@ -100,13 +143,10 @@
                         </div>
                     </div>
                     <div class="form-group">
-                        <label>Status</label>
-                        <div class="status-grid">
-                            <button class="status-btn active" data-status="ok" onclick="selectStatus('ok')">OK</button>
-                            <button class="status-btn" data-status="short" onclick="selectStatus('short')">Short</button>
-                            <button class="status-btn" data-status="over" onclick="selectStatus('over')">Over</button>
-                            <button class="status-btn" data-status="damaged" onclick="selectStatus('damaged')">Damaged</button>
-                            <button class="status-btn" data-status="missing" onclick="selectStatus('missing')">Missing</button>
+                        <div class="status-grid status-grid-3">
+                            <button id="status-short" class="status-btn" data-status="short" onclick="selectReason('short')">Short</button>
+                            <button id="status-over" class="status-btn" data-status="over" onclick="selectReason('over')">Over</button>
+                            <button id="status-return" class="status-btn" data-status="return" onclick="selectReason('return')">Return</button>
                         </div>
                     </div>
                     <div class="form-group">
@@ -116,10 +156,41 @@
                 </div>
                 <div class="modal-footer">
                     <button class="btn btn-secondary" onclick="closeModal()">Cancel</button>
-                    <button class="btn btn-primary" onclick="submitCheckIn()">Confirm</button>
+                    <button id="modal-ok-btn" class="btn btn-ok-neutral" onclick="submitCheckIn()">OK</button>
                 </div>
             </div>
         </div>
+
+        <!-- Modal: Delivery Complete -->
+        <div id="complete-modal" class="modal hidden">
+            <div class="modal-backdrop"></div>
+            <div class="modal-content complete-modal-content">
+                <div class="modal-header">
+                    <h2>All items received!</h2>
+                </div>
+                <div class="modal-body">
+                    <p class="complete-subtitle">See exceptions below. Continue to confirm delivery over?</p>
+                    <div id="exception-list" class="exception-list"></div>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-secondary" onclick="dismissCompletionModal()">Continue Checking In</button>
+                    <button class="btn btn-success" onclick="confirmDeliveryComplete()">Confirm Delivery Complete</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- View: Delivery Complete (post-confirmation) -->
+        <div id="view-complete" class="view">
+            <div class="complete-screen">
+                <div class="complete-checkmark">&#10003;</div>
+                <h1 class="complete-heading">Delivery Over</h1>
+                <p id="complete-date" class="complete-date"></p>
+                <button class="btn btn-primary btn-lg" onclick="loadNewDelivery()">Load New Delivery</button>
+            </div>
+        </div>
+
+        <!-- Fireworks Canvas (overlay) -->
+        <canvas id="fireworks-canvas"></canvas>
 
         <!-- Toast notifications -->
         <div id="toast-container"></div>

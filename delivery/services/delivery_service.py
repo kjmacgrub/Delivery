@@ -16,6 +16,7 @@ from delivery.models import (
     SupplierEntry, SupplierStatus,
     LineItem, ReceivedStatus,
     LineItemCheckIn,
+    ExceptionReport, ExceptionItem,
 )
 
 
@@ -30,6 +31,7 @@ class DeliveryService:
     """
 
     COLLECTION = "deliveries"
+    REPORTS_COLLECTION = "delivery_reports"
 
     def __init__(self, firestore_client=None):
         self.pdf_parser = PDFWorksheetParser()
@@ -194,6 +196,163 @@ class DeliveryService:
         # Persist changes
         self._save_delivery(delivery)
         return item
+
+    def check_in_all_ok(
+        self, delivery_id: str, supplier_idx: int
+    ) -> int:
+        """
+        Bulk check-in: mark all pending items in a supplier as received OK.
+        Saves to Firestore only once at the end.
+
+        Returns the number of items updated.
+        """
+        delivery = self._load_delivery(delivery_id)
+        if not delivery:
+            return 0
+
+        if supplier_idx >= len(delivery.suppliers):
+            return 0
+
+        supplier = delivery.suppliers[supplier_idx]
+        count = 0
+        for item in supplier.items:
+            if item.received_status == ReceivedStatus.PENDING:
+                item.quantity_received = item.quantity_expected
+                item.received_status = ReceivedStatus.OK
+                item.checked_in_at = datetime.utcnow()
+                count += 1
+
+        # Update supplier status
+        all_checked = all(
+            it.received_status != ReceivedStatus.PENDING
+            for it in supplier.items
+        )
+        if all_checked:
+            supplier.status = SupplierStatus.COMPLETE
+        else:
+            supplier.status = SupplierStatus.CHECKED_IN
+
+        # Update delivery status
+        all_suppliers_done = all(
+            s.status == SupplierStatus.COMPLETE
+            for s in delivery.suppliers
+        )
+        if all_suppliers_done:
+            delivery.status = DeliveryStatus.COMPLETED
+        else:
+            delivery.status = DeliveryStatus.IN_PROGRESS
+
+        # Single Firestore write
+        self._save_delivery(delivery)
+        return count
+
+    def unreceive_all(
+        self, delivery_id: str, supplier_idx: int
+    ) -> int:
+        """
+        Bulk unreceive: reset all received items in a supplier back to pending.
+        Saves to Firestore only once at the end.
+
+        Returns the number of items updated.
+        """
+        delivery = self._load_delivery(delivery_id)
+        if not delivery:
+            return 0
+
+        if supplier_idx >= len(delivery.suppliers):
+            return 0
+
+        supplier = delivery.suppliers[supplier_idx]
+        count = 0
+        for item in supplier.items:
+            if item.received_status != ReceivedStatus.PENDING:
+                item.quantity_received = 0
+                item.received_status = ReceivedStatus.PENDING
+                item.received_notes = None
+                item.checked_in_at = None
+                count += 1
+
+        # Update supplier status
+        supplier.status = SupplierStatus.PENDING
+
+        # Update delivery status
+        all_suppliers_done = all(
+            s.status == SupplierStatus.COMPLETE
+            for s in delivery.suppliers
+        )
+        if all_suppliers_done:
+            delivery.status = DeliveryStatus.COMPLETED
+        elif any(
+            s.status != SupplierStatus.PENDING
+            for s in delivery.suppliers
+        ):
+            delivery.status = DeliveryStatus.IN_PROGRESS
+        else:
+            delivery.status = DeliveryStatus.PARSED
+
+        # Single Firestore write
+        self._save_delivery(delivery)
+        return count
+
+    def complete_delivery(self, delivery_id: str) -> Optional[ExceptionReport]:
+        """
+        Mark delivery as complete and generate an exception report.
+
+        Validates all items are checked in, then creates a report
+        of items with discrepancies (short, over, return).
+        """
+        delivery = self._load_delivery(delivery_id)
+        if not delivery:
+            return None
+
+        # Validate: all items must be non-pending
+        for supplier in delivery.suppliers:
+            for item in supplier.items:
+                if item.received_status == ReceivedStatus.PENDING:
+                    raise ValueError(
+                        f"Cannot complete: item '{item.raw_description}' "
+                        f"in {supplier.supplier_name} is still pending"
+                    )
+
+        # Build exception list
+        exceptions = []
+        total_items = 0
+        for supplier in delivery.suppliers:
+            for item in supplier.items:
+                total_items += 1
+                if item.received_status != ReceivedStatus.OK:
+                    exceptions.append(ExceptionItem(
+                        supplier_name=supplier.supplier_name,
+                        raw_description=item.raw_description,
+                        quantity_expected=item.quantity_expected,
+                        quantity_received=item.quantity_received,
+                        received_status=item.received_status,
+                        received_notes=item.received_notes,
+                    ))
+
+        report_id = str(uuid.uuid4())[:8]
+        report = ExceptionReport(
+            id=report_id,
+            delivery_id=delivery_id,
+            delivery_date=delivery.delivery_date,
+            day_of_week=delivery.day_of_week,
+            source_filename=delivery.source_filename,
+            completed_at=datetime.utcnow(),
+            total_items=total_items,
+            total_exceptions=len(exceptions),
+            exception_items=exceptions,
+        )
+
+        # Save report to Firestore
+        if self._use_firestore:
+            doc_ref = self._db.collection(self.REPORTS_COLLECTION).document(report_id)
+            doc_ref.set(report.model_dump(mode="json"))
+
+        # Update delivery status
+        delivery.status = DeliveryStatus.COMPLETED
+        self._save_delivery(delivery)
+
+        return report
 
     def delete_delivery(self, delivery_id: str) -> bool:
         """Delete a delivery."""

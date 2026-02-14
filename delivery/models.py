@@ -35,8 +35,7 @@ class ReceivedStatus(str, Enum):
     OK = "ok"
     SHORT = "short"
     OVER = "over"
-    DAMAGED = "damaged"
-    MISSING = "missing"
+    RETURN = "return"
 
 
 class DeliveryStatus(str, Enum):
@@ -165,3 +164,28 @@ class StorageFile(BaseModel):
     size: Optional[int] = None
     updated: Optional[datetime] = None
     content_type: Optional[str] = None
+
+
+# ---- Exception Reports ----
+
+class ExceptionItem(BaseModel):
+    """A single item with a discrepancy from expected."""
+    supplier_name: str
+    raw_description: str
+    quantity_expected: int
+    quantity_received: Optional[int] = None
+    received_status: ReceivedStatus
+    received_notes: Optional[str] = None
+
+
+class ExceptionReport(BaseModel):
+    """Report of delivery exceptions for buyer review."""
+    id: str = ""
+    delivery_id: str
+    delivery_date: Optional[date] = None
+    day_of_week: str = ""
+    source_filename: str = ""
+    completed_at: Optional[datetime] = None
+    total_items: int = 0
+    total_exceptions: int = 0
+    exception_items: List[ExceptionItem] = Field(default_factory=list)

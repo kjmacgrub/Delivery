@@ -51,3 +51,10 @@ class CheckInResponse(BaseModel):
     """Response after checking in item(s)."""
     message: str
     items_updated: int
+
+
+class CompleteDeliveryResponse(BaseModel):
+    """Response after completing a delivery and generating an exception report."""
+    message: str
+    report_id: str
+    total_exceptions: int

@@ -2,6 +2,7 @@
 Firebase Storage service for listing and downloading delivery files.
 """
 
+import json
 import os
 from pathlib import Path
 from typing import List, Optional
@@ -73,3 +74,17 @@ class FirebaseStorageService:
         """Get the most recently uploaded file in incoming."""
         files = self.list_incoming_files()
         return files[0] if files else None
+
+    def upload_exception_report(self, delivery_id: str, report_data: dict) -> str:
+        """
+        Upload an exception report JSON file to Firebase Storage.
+
+        Returns the storage path.
+        """
+        path = f"delivery-files/reports/{delivery_id}/exception_report.json"
+        blob = self.bucket.blob(path)
+        blob.upload_from_string(
+            json.dumps(report_data, indent=2, default=str),
+            content_type="application/json",
+        )
+        return path

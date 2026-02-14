@@ -5,7 +5,7 @@ Check-in workflow endpoints for receiving deliveries.
 from fastapi import APIRouter, HTTPException, Request
 
 from delivery.models import LineItemCheckIn
-from delivery.schemas import CheckInResponse
+from delivery.schemas import CheckInResponse, CompleteDeliveryResponse
 
 router = APIRouter()
 
@@ -53,26 +53,86 @@ async def check_in_all_ok(delivery_id: str, supplier_idx: int, request: Request)
     Bulk check-in: mark all items in a supplier block as received OK.
 
     Convenience endpoint for when an entire supplier delivery is correct.
+    Uses a single Firestore write for performance.
     """
     service = _get_service(request)
+    count = service.check_in_all_ok(delivery_id, supplier_idx)
+    if count == 0:
+        delivery = service.get_delivery(delivery_id)
+        if not delivery:
+            raise HTTPException(status_code=404, detail="Delivery not found")
+        if supplier_idx >= len(delivery.suppliers):
+            raise HTTPException(status_code=404, detail="Supplier not found")
+
     delivery = service.get_delivery(delivery_id)
-    if not delivery:
-        raise HTTPException(status_code=404, detail="Delivery not found")
-
-    if supplier_idx >= len(delivery.suppliers):
-        raise HTTPException(status_code=404, detail="Supplier not found")
-
-    supplier = delivery.suppliers[supplier_idx]
-    count = 0
-    for i, item in enumerate(supplier.items):
-        check_in_data = LineItemCheckIn(
-            quantity_received=item.quantity_expected,
-            received_status="ok",
-        )
-        service.check_in_item(delivery_id, supplier_idx, i, check_in_data)
-        count += 1
+    supplier_name = delivery.suppliers[supplier_idx].supplier_name
 
     return CheckInResponse(
-        message=f"All {count} items for {supplier.supplier_name} marked as OK",
+        message=f"All {count} items for {supplier_name} marked as OK",
         items_updated=count,
+    )
+
+
+@router.patch(
+    "/deliveries/{delivery_id}/suppliers/{supplier_idx}/unreceive-all",
+    response_model=CheckInResponse,
+)
+async def unreceive_all(delivery_id: str, supplier_idx: int, request: Request):
+    """
+    Bulk unreceive: reset all received items in a supplier back to pending.
+
+    Uses a single Firestore write for performance.
+    """
+    service = _get_service(request)
+    count = service.unreceive_all(delivery_id, supplier_idx)
+    if count == 0:
+        delivery = service.get_delivery(delivery_id)
+        if not delivery:
+            raise HTTPException(status_code=404, detail="Delivery not found")
+        if supplier_idx >= len(delivery.suppliers):
+            raise HTTPException(status_code=404, detail="Supplier not found")
+
+    delivery = service.get_delivery(delivery_id)
+    supplier_name = delivery.suppliers[supplier_idx].supplier_name
+
+    return CheckInResponse(
+        message=f"All {count} items for {supplier_name} reset to pending",
+        items_updated=count,
+    )
+
+
+@router.post(
+    "/deliveries/{delivery_id}/complete",
+    response_model=CompleteDeliveryResponse,
+)
+async def complete_delivery(delivery_id: str, request: Request):
+    """
+    Complete a delivery: validate all items checked in, generate
+    exception report, store in Firestore and Firebase Storage.
+    """
+    service = _get_service(request)
+
+    try:
+        report = service.complete_delivery(delivery_id)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+    if not report:
+        raise HTTPException(status_code=404, detail="Delivery not found")
+
+    # Also upload to Firebase Storage for archival
+    storage_service = getattr(request.app.state, 'storage_service', None)
+    if storage_service:
+        try:
+            storage_service.upload_exception_report(
+                delivery_id,
+                report.model_dump(mode="json"),
+            )
+        except Exception:
+            pass  # Non-fatal: Firestore is the primary store
+
+    return CompleteDeliveryResponse(
+        message="Delivery completed successfully",
+        report_id=report.id,
+        total_exceptions=report.total_exceptions,
     )
