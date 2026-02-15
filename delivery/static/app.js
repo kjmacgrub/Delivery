@@ -10,17 +10,15 @@ let currentView = 'deliveries';
 let currentDelivery = null;
 let currentSupplierIdx = null;
 let checkInItem = null; // { supplierIdx, itemIdx }
-let detailTab = 'items'; // 'items' or 'suppliers'
 let supplierFilter = null; // null = show all, or { idx, name } to filter to one supplier
-let itemSortMode = 'alpha'; // 'alpha' or 'qty'
-let supplierItemSortMode = 'alpha'; // 'alpha' or 'qty' for supplier drill-in view
-let supplierListSortMode = 'alpha'; // 'alpha' or 'qty' for supplier cards list
+let itemSortMode = 'alpha'; // 'alpha', 'qty', or 'supplier'
 let showReceived = false; // false = show pending items, true = show received items
 let searchQuery = ''; // search filter for item list
 let completionShown = false; // prevent duplicate completion modal
+let expandedSuppliers = new Set(); // supplier indices expanded in accordion view
 
 // ---- Navigation ----
-const views = ['deliveries', 'storage', 'detail', 'checkin', 'complete', 'reports'];
+const views = ['deliveries', 'storage', 'detail', 'complete', 'reports'];
 
 function showView(name) {
     views.forEach(v => {
@@ -34,8 +32,8 @@ function showView(name) {
     const title = document.getElementById('page-title');
     const badge = document.getElementById('status-badge');
 
-    // Show/hide the top header bar — hidden in detail and checkin views
-    if (name === 'checkin' || name === 'detail') {
+    // Show/hide the top header bar — hidden in detail view
+    if (name === 'detail') {
         appHeader.classList.add('hidden');
     } else {
         appHeader.classList.remove('hidden');
@@ -55,9 +53,6 @@ function showView(name) {
             badge.className = 'badge';
             break;
         case 'detail':
-            break;
-        case 'checkin':
-            // Header handled by supplier-header in the view itself
             break;
         case 'complete':
             backBtn.classList.add('hidden');
@@ -87,10 +82,6 @@ function goBack() {
             }
             showView('deliveries');
             loadDeliveries();
-            break;
-        case 'checkin':
-            showView('detail');
-            renderDetail();
             break;
         case 'complete':
             showView('deliveries');
@@ -213,7 +204,10 @@ async function showReports() {
     }
 }
 
+let cachedReports = [];
+
 function renderReportList(reports) {
+    cachedReports = reports;
     const container = document.getElementById('report-list');
     container.innerHTML = reports.map((r, idx) => {
         const completedDate = r.completed_at ? new Date(r.completed_at).toLocaleDateString('en-US', {
@@ -259,6 +253,7 @@ function renderReportList(reports) {
             </div>
             <div class="report-detail" id="report-detail-${idx}" style="display:none;">
                 ${hasExceptions ? exceptionRows : '<div class="report-all-good">✓ Everything matched — no exceptions</div>'}
+                <button class="report-delete-btn" onclick="event.stopPropagation(); deleteReport(${idx})">Delete Report</button>
             </div>
         </div>`;
     }).join('');
@@ -268,6 +263,30 @@ function toggleReportDetail(idx) {
     const detail = document.getElementById(`report-detail-${idx}`);
     if (detail) {
         detail.style.display = detail.style.display === 'none' ? 'block' : 'none';
+    }
+}
+
+async function deleteReport(idx) {
+    const report = cachedReports[idx];
+    if (!report) return;
+    const label = `${report.day_of_week} ${report.delivery_date || ''}`.trim();
+    if (!confirm(`Delete report for "${label}"?`)) return;
+
+    try {
+        await apiDelete(`/reports/${report.id}`);
+        cachedReports.splice(idx, 1);
+        if (cachedReports.length === 0) {
+            document.getElementById('report-list').innerHTML = `
+                <div class="empty-state">
+                    <p>No reports yet</p>
+                    <p class="subtitle">Exception reports are created when deliveries are completed</p>
+                </div>`;
+        } else {
+            renderReportList(cachedReports);
+        }
+        showToast('Report deleted', 'success');
+    } catch (e) {
+        showToast('Failed to delete report', 'error');
     }
 }
 
@@ -333,8 +352,8 @@ async function openDelivery(id) {
             return;
         }
 
-        detailTab = 'items'; // always default to items tab
         supplierFilter = null; // reset filter
+        expandedSuppliers = new Set(); // reset accordion
         showReceived = false; // reset to pending view
         searchQuery = ''; // reset search
         // Reset supplier filter UI
@@ -362,59 +381,21 @@ function renderDetail() {
     if (supplierFilter !== null) {
         // Supplier-filtered: show supplier stats and name
         const supplier = delivery.suppliers[supplierFilter.idx];
-        const doneCount = supplier.items.filter(i => i.received_status !== 'pending').length;
-        const pct = supplier.items.length > 0 ? Math.round((doneCount / supplier.items.length) * 100) : 0;
+        const supRcv = casesReceived(supplier.items);
+        const supExp = casesExpected(supplier.items);
         document.getElementById('detail-title-text').textContent = supplier.supplier_name;
         document.getElementById('detail-title').setAttribute('onclick', 'clearSupplierFilter()');
-        document.getElementById('delivery-summary').innerHTML = `
-            <div class="summary-stat">
-                <div class="value">${fmtNum(supplier.expected_cases)}</div>
-                <div class="label">Cases</div>
-            </div>
-            <div class="summary-stat">
-                <div class="value">${supplier.items.length}</div>
-                <div class="label">Items</div>
-            </div>
-            <div class="${receivedToggleClass}" onclick="toggleReceivedView()">
-                <div class="value">${doneCount}/${supplier.items.length}</div>
-                <div class="label">Received</div>
-            </div>
-            <div class="summary-stat">
-                <div class="value">${pct}%</div>
-                <div class="label">Complete</div>
-            </div>
-        `;
+        document.getElementById('delivery-summary').innerHTML =
+            progressBar(supRcv, supExp, receivedToggleClass);
     } else {
         // Normal delivery view
         document.getElementById('detail-title-text').textContent = `${delivery.day_of_week} ${formatDate(delivery.delivery_date)}`;
         document.getElementById('detail-title').setAttribute('onclick', 'goBack()');
-        document.getElementById('delivery-summary').innerHTML = `
-            <div class="summary-stat">
-                <div class="value">${delivery.suppliers.length}</div>
-                <div class="label">Suppliers</div>
-            </div>
-            <div class="summary-stat">
-                <div class="value">${totalItems}</div>
-                <div class="label">Items</div>
-            </div>
-            <div class="${receivedToggleClass}" onclick="toggleReceivedView()">
-                <div class="value">${checkedIn}/${totalItems}</div>
-                <div class="label">Received</div>
-            </div>
-            <div class="summary-stat">
-                <div class="value">${fmtNum(totalCases)}</div>
-                <div class="label">Cases</div>
-            </div>
-        `;
+        const allItems = delivery.suppliers.flatMap(s => s.items);
+        const rcvCases = casesReceived(allItems);
+        document.getElementById('delivery-summary').innerHTML =
+            progressBar(rcvCases, totalCases, receivedToggleClass);
     }
-
-    // Toggle buttons
-    document.getElementById('tab-items').classList.toggle('active', detailTab === 'items');
-    document.getElementById('tab-suppliers').classList.toggle('active', detailTab === 'suppliers');
-
-    // Show/hide tab content
-    document.getElementById('tab-content-items').classList.toggle('hidden', detailTab !== 'items');
-    document.getElementById('tab-content-suppliers').classList.toggle('hidden', detailTab !== 'suppliers');
 
     // Sync search input with state
     const searchInput = document.getElementById('item-search');
@@ -423,38 +404,13 @@ function renderDetail() {
         document.getElementById('search-clear-btn').classList.toggle('hidden', !searchQuery);
     }
 
-    if (detailTab === 'items') {
-        renderItemList();
-    } else {
-        renderSupplierList();
-    }
-}
-
-function switchTab(tab) {
-    detailTab = tab;
-    if (supplierFilter !== null) {
-        supplierFilter = null;
-        document.querySelector('.toggle-bar').classList.remove('hidden');
-        document.getElementById('detail-title').setAttribute('onclick', 'goBack()');
-        document.getElementById('item-receive-all-btn').innerHTML = '';
-    }
-    showReceived = false; // reset to pending view
-    renderDetail();
+    renderItemList();
 }
 
 function toggleReceivedView() {
     showReceived = !showReceived;
     updateReceivedToggle();
-    if (currentView === 'checkin') {
-        renderCheckIn();
-    } else {
-        // Always switch to Items tab since received view shows individual items
-        if (showReceived && detailTab !== 'items') {
-            detailTab = 'items';
-            supplierFilter = null;
-        }
-        renderDetail();
-    }
+    renderDetail();
 }
 
 function updateReceivedToggle() {
@@ -509,7 +465,37 @@ function renderItemList() {
         flatItems = flatItems.filter(item => item.supplierIdx === supplierFilter.idx);
     }
 
-    // Filter by search query
+    // Update sort button states
+    const isSupplierSort = itemSortMode === 'supplier';
+    document.getElementById('sort-alpha').classList.toggle('active', itemSortMode === 'alpha');
+    const casesBtn = document.getElementById('sort-qty');
+    casesBtn.classList.toggle('active', itemSortMode === 'qty');
+    casesBtn.classList.toggle('hidden', isSupplierSort);
+    const supplierBtn = document.getElementById('sort-supplier');
+    supplierBtn.classList.toggle('active', isSupplierSort);
+    supplierBtn.classList.toggle('hidden', supplierFilter !== null);
+
+    // Show expand/collapse toggle only in supplier accordion mode
+    const expandBtn = document.getElementById('expand-collapse-btn');
+    if (isSupplierSort && supplierFilter === null) {
+        const allExpanded = currentDelivery.suppliers.length > 0 &&
+            currentDelivery.suppliers.every((s, idx) => expandedSuppliers.has(idx));
+        expandBtn.textContent = allExpanded ? 'Collapse All' : 'Expand All';
+        expandBtn.classList.remove('hidden');
+    } else {
+        expandBtn.classList.add('hidden');
+    }
+
+    const container = document.getElementById('flat-item-list');
+    container.classList.toggle('show-received', showReceived);
+
+    // Supplier accordion mode (search handled inside accordion)
+    if (itemSortMode === 'supplier' && supplierFilter === null) {
+        renderSupplierAccordion(container, flatItems);
+        return;
+    }
+
+    // Filter by search query (for flat list modes)
     if (searchQuery) {
         flatItems = flatItems.filter(item =>
             item.raw_description.toLowerCase().includes(searchQuery) ||
@@ -524,24 +510,11 @@ function renderItemList() {
             if (diff !== 0) return diff;
             return a.raw_description.toLowerCase().localeCompare(b.raw_description.toLowerCase());
         });
-    } else if (itemSortMode === 'supplier') {
-        flatItems.sort((a, b) => {
-            const sup = a.supplierName.toLowerCase().localeCompare(b.supplierName.toLowerCase());
-            if (sup !== 0) return sup;
-            return a.raw_description.toLowerCase().localeCompare(b.raw_description.toLowerCase());
-        });
     } else {
         flatItems.sort((a, b) => {
             return a.raw_description.toLowerCase().localeCompare(b.raw_description.toLowerCase());
         });
     }
-
-    // Update sort button states
-    document.getElementById('sort-alpha').classList.toggle('active', itemSortMode === 'alpha');
-    document.getElementById('sort-qty').classList.toggle('active', itemSortMode === 'qty');
-    document.getElementById('sort-supplier').classList.toggle('active', itemSortMode === 'supplier');
-
-    const container = document.getElementById('flat-item-list');
 
     if (!flatItems.length) {
         let emptyMsg;
@@ -556,62 +529,162 @@ function renderItemList() {
         return;
     }
 
-    container.innerHTML = flatItems.map(item => {
-        const isPending = item.received_status === 'pending';
-        const statusClass = isPending ? '' : `checked-${item.received_status}`;
-        const processingClass = item.needs_processing ? 'needs-processing' : '';
-        const floorClass = item.pull_for_floor ? 'pull-for-floor' : '';
+    container.innerHTML = flatItems.map(item => renderCompactRow(item, true)).join('');
+}
 
-        const checkIcon = isPending
-            ? '<div class="compact-check pending"></div>'
-            : `<div class="compact-check done">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
-                    <polyline points="20,6 9,17 4,12"/>
-                </svg>
-               </div>`;
+function renderCompactRow(item, showSupplier) {
+    const isPending = item.received_status === 'pending';
+    const statusClass = isPending ? '' : `checked-${item.received_status}`;
+    const processingClass = item.needs_processing ? 'needs-processing' : '';
+    const floorClass = item.pull_for_floor ? 'pull-for-floor' : '';
 
-        const pullQty = item.pull_quantity != null ? `<span class="pull-qty">(${item.pull_quantity})</span> ` : '';
+    const checkIcon = isPending
+        ? '<div class="compact-check pending"></div>'
+        : `<div class="compact-check done">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
+                <polyline points="20,6 9,17 4,12"/>
+            </svg>
+           </div>`;
 
-        return `
-        <div class="compact-row ${statusClass} ${processingClass} ${floorClass}"
-             onclick="openCheckInModalFlat(${item.supplierIdx}, ${item.itemIdx})">
-            <div class="compact-qty">${pullQty}${item.quantity_expected}</div>
-            <div class="compact-name">${item.raw_description}</div>
-            <div class="compact-supplier" onclick="event.stopPropagation(); filterBySupplier(${item.supplierIdx})">${item.supplierAbbrev}</div>
-            ${checkIcon}
+    const pullQty = item.pull_quantity != null ? `<span class="pull-qty">(${item.pull_quantity})</span> ` : '';
+    const supplierChip = showSupplier
+        ? `<div class="compact-supplier" onclick="event.stopPropagation(); filterBySupplier(${item.supplierIdx})">${item.supplierAbbrev}</div>`
+        : '';
+
+    return `
+    <div class="compact-row ${statusClass} ${processingClass} ${floorClass}${showSupplier ? '' : ' accordion-item'}"
+         onclick="openCheckInModalFlat(${item.supplierIdx}, ${item.itemIdx})">
+        <div class="compact-qty">${pullQty}${item.quantity_expected}</div>
+        <div class="compact-name">${item.raw_description}</div>
+        ${supplierChip}
+        ${checkIcon}
+    </div>`;
+}
+
+function renderSupplierAccordion(container, flatItems) {
+    const delivery = currentDelivery;
+    if (!delivery) return;
+
+    // Build sorted supplier list (alphabetical)
+    let supplierIndices = delivery.suppliers.map((s, idx) => idx);
+    supplierIndices.sort((a, b) =>
+        delivery.suppliers[a].supplier_name.toLowerCase().localeCompare(
+            delivery.suppliers[b].supplier_name.toLowerCase()
+        )
+    );
+
+    let html = '';
+    let anyVisible = false;
+
+    supplierIndices.forEach(sIdx => {
+        const supplier = delivery.suppliers[sIdx];
+        const isExpanded = expandedSuppliers.has(sIdx);
+
+        // Get items for this supplier from the flat list (already filtered by showReceived)
+        let supplierItems = flatItems.filter(item => item.supplierIdx === sIdx);
+
+        // Apply search filter
+        if (searchQuery) {
+            supplierItems = supplierItems.filter(item =>
+                item.raw_description.toLowerCase().includes(searchQuery) ||
+                item.supplierName.toLowerCase().includes(searchQuery)
+            );
+        }
+
+        // Skip suppliers with no matching items when searching
+        if (searchQuery && supplierItems.length === 0) return;
+
+        anyVisible = true;
+
+        // Sort items within supplier alphabetically
+        supplierItems.sort((a, b) =>
+            a.raw_description.toLowerCase().localeCompare(b.raw_description.toLowerCase())
+        );
+
+        // Compute stats from ALL supplier items (not just filtered)
+        const allItems = supplier.items;
+        const totalItems = allItems.length;
+        const doneItems = allItems.filter(i => i.received_status !== 'pending').length;
+        const rcvCases = casesReceived(allItems);
+        const expCases = casesExpected(allItems);
+        const allDone = doneItems === totalItems;
+        const someDone = doneItems > 0 && !allDone;
+
+        const statusClass = allDone ? 'supplier-complete' : '';
+        const chevronClass = isExpanded ? 'accordion-chevron expanded' : 'accordion-chevron';
+        const pct = expCases > 0 ? Math.round((rcvCases / expCases) * 100) : 0;
+
+        // Receive All / Unreceive All button (only when expanded)
+        let receiveBtn = '';
+        if (isExpanded) {
+            const pendingCount = allItems.filter(i => i.received_status === 'pending').length;
+            receiveBtn = pendingCount === 0
+                ? `<button class="receive-all-btn unreceive" onclick="event.stopPropagation(); unreceiveAllSupplier(${sIdx})">Unreceive All</button>`
+                : `<button class="receive-all-btn" onclick="event.stopPropagation(); receiveAllSupplier(${sIdx})">Receive All</button>`;
+        }
+
+        html += `
+        <div class="supplier-accordion-header ${statusClass}" onclick="toggleSupplierAccordion(${sIdx})">
+            <span class="${chevronClass}">&#9654;</span>
+            <span class="accordion-supplier-name">${supplier.supplier_name}</span>
+            <span class="accordion-progress">
+                <span class="accordion-progress-track">
+                    <span class="accordion-progress-fill" style="width: ${pct}%"></span>
+                </span>
+                <span class="accordion-progress-label">${fmtNum(rcvCases)}/${fmtNum(expCases)}</span>
+            </span>
+            ${receiveBtn ? `<span class="accordion-receive-all">${receiveBtn}</span>` : ''}
         </div>`;
-    }).join('');
+
+        if (isExpanded && supplierItems.length > 0) {
+            html += supplierItems.map(item => renderCompactRow(item, false)).join('');
+        }
+    });
+
+    if (!anyVisible) {
+        container.innerHTML = `<div class="empty-state"><p>${searchQuery ? 'No items match your search' : 'All items received!'}</p></div>`;
+    } else {
+        container.innerHTML = html;
+    }
+}
+
+function toggleSupplierAccordion(supplierIdx) {
+    if (expandedSuppliers.has(supplierIdx)) {
+        expandedSuppliers.delete(supplierIdx);
+    } else {
+        expandedSuppliers.add(supplierIdx);
+    }
+    renderItemList();
+}
+
+function toggleExpandAll() {
+    if (!currentDelivery) return;
+    const allExpanded = currentDelivery.suppliers.every((s, idx) => expandedSuppliers.has(idx));
+    if (allExpanded) {
+        expandedSuppliers.clear();
+    } else {
+        currentDelivery.suppliers.forEach((s, idx) => expandedSuppliers.add(idx));
+    }
+    renderItemList();
 }
 
 function filterBySupplier(supplierIdx) {
     const supplier = currentDelivery.suppliers[supplierIdx];
     supplierFilter = { idx: supplierIdx, name: supplier.supplier_name };
 
-    // Hide toggle bar, replace summary and title with supplier info
-    document.querySelector('.toggle-bar').classList.add('hidden');
+    // Switch away from supplier sort (irrelevant with single supplier)
+    if (itemSortMode === 'supplier') {
+        itemSortMode = 'alpha';
+    }
+
+    // Replace summary and title with supplier info
 
     // Reuse the top-level summary bar with supplier stats
-    const doneCount = supplier.items.filter(i => i.received_status !== 'pending').length;
-    const pct = supplier.items.length > 0 ? Math.round((doneCount / supplier.items.length) * 100) : 0;
+    const supRcvF = casesReceived(supplier.items);
+    const supExpF = casesExpected(supplier.items);
     const rcvClass = showReceived ? 'summary-stat clickable active-stat' : 'summary-stat clickable';
-    document.getElementById('delivery-summary').innerHTML = `
-        <div class="summary-stat">
-            <div class="value">${fmtNum(supplier.expected_cases)}</div>
-            <div class="label">Cases</div>
-        </div>
-        <div class="summary-stat">
-            <div class="value">${supplier.items.length}</div>
-            <div class="label">Items</div>
-        </div>
-        <div class="${rcvClass}" onclick="toggleReceivedView()">
-            <div class="value">${doneCount}/${supplier.items.length}</div>
-            <div class="label">Received</div>
-        </div>
-        <div class="summary-stat">
-            <div class="value">${pct}%</div>
-            <div class="label">Complete</div>
-        </div>
-    `;
+    document.getElementById('delivery-summary').innerHTML =
+        progressBar(supRcvF, supExpF, rcvClass);
 
     // Reuse the detail-title with supplier name, make it go back to clear filter
     document.getElementById('detail-title-text').textContent = supplier.supplier_name;
@@ -629,8 +702,7 @@ function filterBySupplier(supplierIdx) {
 function clearSupplierFilter() {
     supplierFilter = null;
     searchQuery = '';
-    // Restore toggle bar and detail-title onclick
-    document.querySelector('.toggle-bar').classList.remove('hidden');
+    // Restore detail-title onclick
     document.getElementById('detail-title').setAttribute('onclick', 'goBack()');
     document.getElementById('item-receive-all-btn').innerHTML = '';
     // Reset search input
@@ -644,28 +716,11 @@ function clearSupplierFilter() {
 function updateFilteredSupplierSummary() {
     if (supplierFilter === null) return;
     const supplier = currentDelivery.suppliers[supplierFilter.idx];
-    const doneCount = supplier.items.filter(i => i.received_status !== 'pending').length;
-    const pct = supplier.items.length > 0 ? Math.round((doneCount / supplier.items.length) * 100) : 0;
+    const supRcvU = casesReceived(supplier.items);
+    const supExpU = casesExpected(supplier.items);
     const rcvClass2 = showReceived ? 'summary-stat clickable active-stat' : 'summary-stat clickable';
     const summaryEl = document.getElementById('delivery-summary');
-    summaryEl.innerHTML = `
-        <div class="summary-stat">
-            <div class="value">${fmtNum(supplier.expected_cases)}</div>
-            <div class="label">Cases</div>
-        </div>
-        <div class="summary-stat">
-            <div class="value">${supplier.items.length}</div>
-            <div class="label">Items</div>
-        </div>
-        <div class="${rcvClass2}" onclick="toggleReceivedView()">
-            <div class="value">${doneCount}/${supplier.items.length}</div>
-            <div class="label">Received</div>
-        </div>
-        <div class="summary-stat">
-            <div class="value">${pct}%</div>
-            <div class="label">Complete</div>
-        </div>
-    `;
+    summaryEl.innerHTML = progressBar(supRcvU, supExpU, rcvClass2);
 }
 
 function onSearchInput() {
@@ -687,165 +742,6 @@ function clearSearch() {
 function setItemSort(mode) {
     itemSortMode = mode;
     renderItemList();
-}
-
-// ---- Supplier List (Suppliers tab) ----
-function renderSupplierList() {
-    const delivery = currentDelivery;
-    if (!delivery) return;
-
-    // Update sort button states
-    document.getElementById('supplier-list-sort-alpha').classList.toggle('active', supplierListSortMode === 'alpha');
-    document.getElementById('supplier-list-sort-qty').classList.toggle('active', supplierListSortMode === 'qty');
-
-    // Build sorted list with original indices
-    let sorted = delivery.suppliers.map((s, idx) => ({ ...s, originalIdx: idx }));
-
-    if (supplierListSortMode === 'qty') {
-        sorted.sort((a, b) => {
-            const diff = b.expected_cases - a.expected_cases;
-            if (diff !== 0) return diff;
-            return a.supplier_name.toLowerCase().localeCompare(b.supplier_name.toLowerCase());
-        });
-    } else {
-        sorted.sort((a, b) =>
-            a.supplier_name.toLowerCase().localeCompare(b.supplier_name.toLowerCase())
-        );
-    }
-
-    const container = document.getElementById('supplier-list');
-    container.innerHTML = sorted.map(s => {
-        const itemCount = s.items.length;
-        const doneCount = s.items.filter(i => i.received_status !== 'pending').length;
-        const pct = itemCount > 0 ? Math.round((doneCount / itemCount) * 100) : 0;
-
-        return `
-        <div class="card supplier-${s.status}" onclick="openSupplier(${s.originalIdx})">
-            <div class="card-header">
-                <div>
-                    <div class="card-title">${s.supplier_name}</div>
-                    <div class="card-subtitle">${s.expected_cases} cases &middot; ${itemCount} items</div>
-                </div>
-                <span class="badge badge-${s.status}">${s.status.replace('_', ' ')}</span>
-            </div>
-            <div class="progress-bar">
-                <div class="progress-fill" style="width: ${pct}%"></div>
-            </div>
-        </div>`;
-    }).join('');
-}
-
-function setSupplierListSort(mode) {
-    supplierListSortMode = mode;
-    renderSupplierList();
-}
-
-// ---- Supplier Check-in (drill-in from Supplier tab) ----
-function openSupplier(idx) {
-    currentSupplierIdx = idx;
-    supplierItemSortMode = 'alpha'; // reset sort when opening a supplier
-    renderCheckIn();
-    showView('checkin');
-    // Scroll to top since we're hiding the app header
-    document.body.scrollTop = 0;
-    document.documentElement.scrollTop = 0;
-}
-
-function renderCheckIn() {
-    const supplier = currentDelivery.suppliers[currentSupplierIdx];
-    const doneCount = supplier.items.filter(i => i.received_status !== 'pending').length;
-    const pct = supplier.items.length > 0
-        ? Math.round((doneCount / supplier.items.length) * 100) : 0;
-
-    // Large supplier name header
-    document.getElementById('supplier-header-name').textContent = supplier.supplier_name;
-
-    const receivedClass = showReceived ? 'summary-stat clickable active-stat' : 'summary-stat clickable';
-    document.getElementById('supplier-summary').innerHTML = `
-        <div class="summary-stat">
-            <div class="value">${fmtNum(supplier.expected_cases)}</div>
-            <div class="label">Cases</div>
-        </div>
-        <div class="summary-stat">
-            <div class="value">${supplier.items.length}</div>
-            <div class="label">Items</div>
-        </div>
-        <div class="${receivedClass}" onclick="toggleReceivedView()">
-            <div class="value">${doneCount}/${supplier.items.length}</div>
-            <div class="label">Received</div>
-        </div>
-        <div class="summary-stat">
-            <div class="value">${pct}%</div>
-            <div class="label">Complete</div>
-        </div>
-    `;
-
-    // Receive All / Unreceive All button in sort bar
-    renderReceiveAllButton(currentSupplierIdx, 'supplier-receive-all-btn');
-
-    // Update sort button states
-    document.getElementById('supplier-sort-alpha').classList.toggle('active', supplierItemSortMode === 'alpha');
-    document.getElementById('supplier-sort-qty').classList.toggle('active', supplierItemSortMode === 'qty');
-
-    // Update received toggle state
-    updateReceivedToggle();
-
-    // Build sorted item list with original indices preserved for check-in API
-    let sortedItems = supplier.items.map((item, idx) => ({ ...item, originalIdx: idx }));
-
-    // Filter: off = pending only, on = show all items
-    if (!showReceived) {
-        sortedItems = sortedItems.filter(item => item.received_status === 'pending');
-    }
-
-    if (supplierItemSortMode === 'qty') {
-        sortedItems.sort((a, b) => {
-            const diff = b.quantity_expected - a.quantity_expected;
-            if (diff !== 0) return diff;
-            return a.raw_description.toLowerCase().localeCompare(b.raw_description.toLowerCase());
-        });
-    } else {
-        sortedItems.sort((a, b) =>
-            a.raw_description.toLowerCase().localeCompare(b.raw_description.toLowerCase())
-        );
-    }
-
-    const container = document.getElementById('item-list');
-
-    if (!sortedItems.length) {
-        container.innerHTML = '<div class="empty-state"><p>All items received!</p></div>';
-        return;
-    }
-
-    container.innerHTML = sortedItems.map(item => {
-        const isPending = item.received_status === 'pending';
-        const statusClass = isPending ? '' : `checked-${item.received_status}`;
-        const processingClass = item.needs_processing ? 'needs-processing' : '';
-        const floorClass = item.pull_for_floor ? 'pull-for-floor' : '';
-
-        const checkIcon = isPending
-            ? '<div class="compact-check pending"></div>'
-            : `<div class="compact-check done">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
-                    <polyline points="20,6 9,17 4,12"/>
-                </svg>
-               </div>`;
-
-        const pullQty = item.pull_quantity != null ? `<span class="pull-qty">(${item.pull_quantity})</span> ` : '';
-
-        return `
-        <div class="compact-row ${statusClass} ${processingClass} ${floorClass}"
-             onclick="openCheckInModal(${item.originalIdx})">
-            <div class="compact-qty">${pullQty}${item.quantity_expected}</div>
-            <div class="compact-name">${item.raw_description}</div>
-            ${checkIcon}
-        </div>`;
-    }).join('');
-}
-
-function setSupplierItemSort(mode) {
-    supplierItemSortMode = mode;
-    renderCheckIn();
 }
 
 // ---- Check-in Modal ----
@@ -1030,17 +926,11 @@ async function submitCheckIn() {
 
         closeModal();
 
-        // Re-render the appropriate view
-        if (currentView === 'detail') {
-            if (supplierFilter !== null) {
-                // Update the supplier-specific summary bar
-                updateFilteredSupplierSummary();
-            }
-            renderDetail();
-        } else if (currentView === 'checkin') {
-            renderCheckIn();
-            showView('checkin'); // refresh badge
+        // Re-render
+        if (supplierFilter !== null) {
+            updateFilteredSupplierSummary();
         }
+        renderDetail();
         showToast('Item checked in', 'success');
 
         // Check if all items are now received
@@ -1096,24 +986,11 @@ async function receiveAllSupplier(supplierIdx) {
         });
 
         // Re-render
-        if (currentView === 'checkin') {
-            // Go back to supplier list after Receive All
-            showToast(`All ${pendingItems.length} items received`, 'success');
-            showView('detail');
-            renderDetail();
-            // Check completion after navigating back
-            if (!completionShown && checkAllItemsReceived()) {
-                completionShown = true;
-                showCompletionModal();
-            }
-            return;
-        } else if (currentView === 'detail') {
-            if (supplierFilter !== null) {
-                updateFilteredSupplierSummary();
-                renderReceiveAllButton(supplierIdx, 'item-receive-all-btn');
-            }
-            renderDetail();
+        if (supplierFilter !== null) {
+            updateFilteredSupplierSummary();
+            renderReceiveAllButton(supplierIdx, 'item-receive-all-btn');
         }
+        renderDetail();
         showToast(`All ${pendingItems.length} items received`, 'success');
 
         // Check if all items are now received
@@ -1142,22 +1019,18 @@ async function unreceiveAllSupplier(supplierIdx) {
         // Update local state
         supplier.items.forEach(item => {
             if (item.received_status !== 'pending') {
-                item.quantity_received = 0;
+                item.quantity_received = null;
                 item.received_status = 'pending';
                 item.received_notes = null;
             }
         });
 
         // Re-render
-        if (currentView === 'checkin') {
-            renderCheckIn();
-        } else if (currentView === 'detail') {
-            if (supplierFilter !== null) {
-                updateFilteredSupplierSummary();
-                renderReceiveAllButton(supplierIdx, 'item-receive-all-btn');
-            }
-            renderDetail();
+        if (supplierFilter !== null) {
+            updateFilteredSupplierSummary();
+            renderReceiveAllButton(supplierIdx, 'item-receive-all-btn');
         }
+        renderDetail();
         showToast(`All ${receivedItems.length} items unreceived`, 'success');
     } catch (e) {
         showToast('Failed to unreceive items', 'error');
@@ -1167,6 +1040,37 @@ async function unreceiveAllSupplier(supplierIdx) {
 // ---- Utilities ----
 function fmtNum(n) {
     return Number(n).toLocaleString();
+}
+
+function casesReceived(items) {
+    return items.reduce((sum, item) => {
+        if (item.received_status === 'pending') return sum;
+        return sum + (item.quantity_received != null ? item.quantity_received : item.quantity_expected);
+    }, 0);
+}
+
+function casesExpected(items) {
+    return items.reduce((sum, item) => sum + item.quantity_expected, 0);
+}
+
+function progressBar(done, total, toggleClass) {
+    const pct = total > 0 ? Math.round((done / total) * 100) : 0;
+    const cls = toggleClass || '';
+    const onclick = toggleClass ? ' onclick="toggleReceivedView()"' : '';
+    const toggleLabel = toggleClass
+        ? `<div class="progress-bar-toggle"${onclick}>${showReceived ? 'Hide Received' : 'Show All'}</div>`
+        : '';
+    return `
+    <div class="progress-bar-summary ${cls}">
+        ${toggleLabel}
+        <div class="progress-bar-label"${onclick}>
+            <span class="progress-bar-count">${fmtNum(done)} / ${fmtNum(total)}</span>
+            <span class="progress-bar-title">Received</span>
+        </div>
+        <div class="progress-bar-track"${onclick}>
+            <div class="progress-bar-fill" style="width: ${pct}%; transition: width 0.4s ease"></div>
+        </div>
+    </div>`;
 }
 
 function formatDate(dateStr) {
@@ -1208,15 +1112,6 @@ function refreshData() {
         case 'detail':
             if (currentDelivery) {
                 openDelivery(currentDelivery.id);
-            }
-            break;
-        case 'checkin':
-            if (currentDelivery) {
-                openDelivery(currentDelivery.id).then(() => {
-                    if (currentSupplierIdx !== null) {
-                        openSupplier(currentSupplierIdx);
-                    }
-                });
             }
             break;
         case 'storage':

@@ -381,6 +381,13 @@ class DeliveryService:
             reports.append(doc.to_dict())
         return reports
 
+    def delete_report(self, report_id: str) -> bool:
+        """Delete a single exception report."""
+        if not self._use_firestore:
+            return False
+        self._db.collection(self.REPORTS_COLLECTION).document(report_id).delete()
+        return True
+
     def _raw_to_delivery(self, raw: dict) -> Delivery:
         """Convert raw parser output dict to Delivery model."""
         header = raw['header']

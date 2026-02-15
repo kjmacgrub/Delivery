@@ -362,12 +362,12 @@ html, body {
 /* ---- Summary Bar ---- */
 .summary-bar {
     background: var(--surface);
-    border-radius: var(--radius);
-    padding: 16px;
+    border-radius: 0;
+    padding: 12px 16px;
     margin-bottom: 0;
     box-shadow: var(--shadow);
     display: flex;
-    flex-wrap: wrap;
+    align-items: center;
     gap: 16px;
     position: sticky;
     top: 0;
@@ -430,6 +430,68 @@ html, body {
 
 .summary-stat.active-stat .label {
     color: var(--success-dark);
+}
+
+/* ---- Progress Bar (summary) ---- */
+.progress-bar-summary {
+    width: 100%;
+    -webkit-tap-highlight-color: transparent;
+}
+
+.progress-bar-toggle {
+    text-align: center;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--primary);
+    cursor: pointer;
+    padding: 2px 0 6px;
+    -webkit-tap-highlight-color: transparent;
+}
+
+.progress-bar-toggle:active {
+    opacity: 0.6;
+}
+
+.progress-bar-label {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    margin-bottom: 6px;
+    cursor: pointer;
+}
+
+.progress-bar-count {
+    font-size: 28px;
+    font-weight: 700;
+    color: var(--text);
+}
+
+.progress-bar-title {
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--text-secondary);
+}
+
+.progress-bar-track {
+    width: 100%;
+    height: 10px;
+    background: #e0e0e0;
+    border-radius: 5px;
+    overflow: hidden;
+}
+
+.progress-bar-fill {
+    height: 100%;
+    background: var(--success);
+    border-radius: 5px;
+}
+
+.progress-bar-summary.active-stat .progress-bar-count {
+    color: var(--success-dark);
+}
+
+.progress-bar-summary.active-stat .progress-bar-track {
+    background: #c8e6c9;
 }
 
 /* ---- Card List ---- */
@@ -679,6 +741,14 @@ html, body {
 .compact-row.checked-ok {
     border-left-color: var(--success);
     opacity: 0.7;
+}
+
+/* Faint green highlight on received rows when Show All is active */
+.compact-list.show-received .compact-row.checked-ok,
+.compact-list.show-received .compact-row.checked-short,
+.compact-list.show-received .compact-row.checked-over,
+.compact-list.show-received .compact-row.checked-return {
+    background: #e8f5e9;
 }
 
 .compact-row.checked-short { border-left-color: var(--warning); }
@@ -1338,6 +1408,24 @@ textarea {
     color: #2e7d32;
 }
 
+.report-delete-btn {
+    display: block;
+    margin: 12px auto 4px;
+    padding: 8px 24px;
+    background: #fff;
+    color: #c62828;
+    border: 1px solid #e57373;
+    border-radius: var(--radius-sm);
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+}
+
+.report-delete-btn:active {
+    background: #ffebee;
+}
+
 /* ---- Fireworks Canvas ---- */
 #fireworks-canvas {
     position: fixed;
@@ -1386,6 +1474,91 @@ textarea {
     font-size: 18px;
     color: var(--text-secondary);
     margin-bottom: 24px;
+}
+
+/* ---- Supplier Accordion ---- */
+.supplier-accordion-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 12px;
+    background: var(--surface);
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+    border-left: 4px solid var(--pending);
+    min-height: 44px;
+}
+
+.supplier-accordion-header:active {
+    background: var(--bg);
+}
+
+.supplier-accordion-header.supplier-complete {
+    border-left-color: var(--success);
+    background: #e8f5e9;
+    opacity: 0.75;
+}
+
+.accordion-chevron {
+    font-size: 12px;
+    color: var(--text-secondary);
+    transition: transform 0.2s;
+    flex-shrink: 0;
+    width: 16px;
+    text-align: center;
+}
+
+.accordion-chevron.expanded {
+    transform: rotate(90deg);
+}
+
+.accordion-supplier-name {
+    font-size: 15px;
+    font-weight: 600;
+    flex: 1;
+    min-width: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.accordion-progress {
+    flex-shrink: 0;
+    width: 33%;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.accordion-progress-track {
+    flex: 1;
+    height: 8px;
+    background: #e0e0e0;
+    border-radius: 4px;
+    overflow: hidden;
+}
+
+.accordion-progress-fill {
+    display: block;
+    height: 100%;
+    background: var(--success);
+    border-radius: 4px;
+    transition: width 0.3s ease;
+}
+
+.accordion-progress-label {
+    font-size: 11px;
+    color: var(--text-secondary);
+    white-space: nowrap;
+    min-width: 0;
+}
+
+.accordion-receive-all {
+    flex-shrink: 0;
+}
+
+.compact-row.accordion-item {
+    padding-left: 20px;
 }
 
 .hidden {

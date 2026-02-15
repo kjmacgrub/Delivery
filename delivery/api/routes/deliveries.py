@@ -84,3 +84,11 @@ async def list_reports(request: Request):
     service = _get_service(request)
     reports = service.list_reports()
     return {"reports": reports, "total": len(reports)}
+
+
+@router.delete("/reports/{report_id}")
+async def delete_report(report_id: str, request: Request):
+    """Delete a single exception report."""
+    service = _get_service(request)
+    service.delete_report(report_id)
+    return {"message": f"Report {report_id} deleted"}

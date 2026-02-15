@@ -6,7 +6,7 @@
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <title>Delivery Check-In</title>
-    <link rel="stylesheet" href="/static/styles.css?v=1.20">
+    <link rel="stylesheet" href="/static/styles.css?v=1.28">
 </head>
 <body>
     <div id="app">
@@ -80,17 +80,13 @@
                 </svg>
                 <span id="detail-title-text"></span>
             </div>
-            <div class="toggle-bar">
-                <button id="tab-items" class="toggle-btn active" onclick="switchTab('items')">Items</button>
-                <button id="tab-suppliers" class="toggle-btn" onclick="switchTab('suppliers')">Suppliers</button>
-            </div>
-            <!-- Item tab: flat list of all items -->
             <div id="tab-content-items">
                 <div class="sort-bar">
                     <span class="sort-label">Sort:</span>
-                    <button id="sort-alpha" class="sort-btn active" onclick="setItemSort('alpha')">A-Z</button>
+                    <button id="sort-alpha" class="sort-btn active" onclick="setItemSort('alpha')">Items</button>
                     <button id="sort-qty" class="sort-btn" onclick="setItemSort('qty')">Cases</button>
                     <button id="sort-supplier" class="sort-btn" onclick="setItemSort('supplier')">Supplier</button>
+                    <button id="expand-collapse-btn" class="sort-btn hidden" onclick="toggleExpandAll()">Expand All</button>
                     <div class="sort-search-wrapper">
                         <svg class="search-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                             <circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/>
@@ -102,34 +98,8 @@
                 </div>
                 <div id="flat-item-list" class="compact-list"></div>
             </div>
-            <!-- Supplier tab: supplier cards -->
-            <div id="tab-content-suppliers" class="hidden">
-                <div class="sort-bar">
-                    <span class="sort-label">Sort:</span>
-                    <button id="supplier-list-sort-alpha" class="sort-btn active" onclick="setSupplierListSort('alpha')">A-Z</button>
-                    <button id="supplier-list-sort-qty" class="sort-btn" onclick="setSupplierListSort('qty')">Cases</button>
-                </div>
-                <div id="supplier-list" class="card-list"></div>
-            </div>
         </div>
 
-        <!-- View: Supplier Items drill-in (from Supplier tab) -->
-        <div id="view-checkin" class="view">
-            <div id="supplier-summary" class="summary-bar"></div>
-            <div id="supplier-title" class="detail-title" onclick="goBack()">
-                <svg class="detail-back-arrow" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path d="M15 18l-6-6 6-6"/>
-                </svg>
-                <span id="supplier-header-name"></span>
-            </div>
-            <div class="sort-bar">
-                <span class="sort-label">Sort:</span>
-                <button id="supplier-sort-alpha" class="sort-btn active" onclick="setSupplierItemSort('alpha')">A-Z</button>
-                <button id="supplier-sort-qty" class="sort-btn" onclick="setSupplierItemSort('qty')">Cases</button>
-                <span id="supplier-receive-all-btn" class="receive-all-slot"></span>
-            </div>
-            <div id="item-list" class="compact-list"></div>
-        </div>
 
         <!-- Modal: Check-in Item -->
         <div id="checkin-modal" class="modal hidden">
@@ -206,9 +176,9 @@
         <div id="toast-container"></div>
 
         <!-- Version -->
-        <div id="app-version">v1.20</div>
+        <div id="app-version">v1.28</div>
     </div>
 
-    <script src="/static/app.js?v=1.20"></script>
+    <script src="/static/app.js?v=1.28"></script>
 </body>
 </html>
