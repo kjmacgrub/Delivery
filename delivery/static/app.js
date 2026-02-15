@@ -5,6 +5,19 @@
 
 const API = '/api/v1';
 
+// ---- Firebase Real-time ----
+const FIREBASE_CONFIG = {
+    apiKey: "AIzaSyAwLYQgXOfYo9wXh8IWJgMldPpxsKU_p50",
+    authDomain: "delivery-worksheet-app.firebaseapp.com",
+    projectId: "delivery-worksheet-app",
+    storageBucket: "delivery-worksheet-app.firebasestorage.app",
+    messagingSenderId: "481756503401",
+    appId: "1:481756503401:web:d0b31495ce5af4824a31f8"
+};
+
+firebase.initializeApp(FIREBASE_CONFIG);
+const db = firebase.firestore();
+
 // ---- State ----
 let currentView = 'deliveries';
 let currentDelivery = null;
@@ -16,6 +29,11 @@ let showReceived = false; // false = show pending items, true = show received it
 let searchQuery = ''; // search filter for item list
 let completionShown = false; // prevent duplicate completion modal
 let expandedSuppliers = new Set(); // supplier indices expanded in accordion view
+
+// ---- Real-time Listener State ----
+let activeUnsubscribes = [];       // functions to call to tear down listeners
+let pendingDeliveryUpdate = null;  // snapshot data waiting for modal to close
+let lastWriteTimestamp = 0;        // to debounce our own writes
 
 // ---- Navigation ----
 const views = ['deliveries', 'storage', 'detail', 'complete', 'reports'];
@@ -80,10 +98,12 @@ function goBack() {
                 clearSupplierFilter();
                 return;
             }
+            cleanupListeners();
             showView('deliveries');
             loadDeliveries();
             break;
         case 'complete':
+            cleanupListeners();
             showView('deliveries');
             loadDeliveries();
             break;
@@ -122,11 +142,118 @@ async function apiDelete(path) {
     return res.json();
 }
 
+// ---- Real-time Listener Helpers ----
+
+function cleanupListeners() {
+    activeUnsubscribes.forEach(unsub => unsub());
+    activeUnsubscribes = [];
+    pendingDeliveryUpdate = null;
+}
+
+function isModalOpen() {
+    const checkinModal = document.getElementById('checkin-modal');
+    const completeModal = document.getElementById('complete-modal');
+    return (checkinModal && !checkinModal.classList.contains('hidden')) ||
+           (completeModal && !completeModal.classList.contains('hidden'));
+}
+
+function applyDeliveryUpdate(data) {
+    // Preserve scroll position
+    const scrollY = window.scrollY || document.documentElement.scrollTop;
+
+    // Replace delivery data (client-side state like sort/filter/expanded is preserved)
+    currentDelivery = data;
+
+    // Re-render
+    renderDetail();
+
+    // Restore scroll position
+    window.scrollTo(0, scrollY);
+}
+
+function listenToDelivery(deliveryId) {
+    const unsub = db.collection('deliveries').doc(deliveryId)
+        .onSnapshot((doc) => {
+            if (!doc.exists) return;
+            if (!currentDelivery || currentDelivery.id !== deliveryId) return;
+
+            // Skip if this is likely our own write echoing back
+            if (Date.now() - lastWriteTimestamp < 2000) {
+                lastWriteTimestamp = 0;
+                return;
+            }
+
+            const data = doc.data();
+
+            if (isModalOpen()) {
+                pendingDeliveryUpdate = data;
+                return;
+            }
+
+            applyDeliveryUpdate(data);
+        }, (error) => {
+            console.error('Firestore listener error:', error);
+        });
+
+    activeUnsubscribes.push(unsub);
+}
+
+function applyPendingUpdate() {
+    if (pendingDeliveryUpdate) {
+        const update = pendingDeliveryUpdate;
+        pendingDeliveryUpdate = null;
+        applyDeliveryUpdate(update);
+    }
+}
+
+function listenToDeliveryList() {
+    const unsub = db.collection('deliveries')
+        .onSnapshot((snapshot) => {
+            if (currentView !== 'deliveries') return;
+
+            const deliveries = [];
+            snapshot.forEach((doc) => {
+                const d = doc.data();
+                const totalItems = d.suppliers
+                    ? d.suppliers.reduce((sum, s) => sum + (s.items ? s.items.length : 0), 0)
+                    : 0;
+                const checkedIn = d.suppliers
+                    ? d.suppliers.reduce((sum, s) =>
+                        sum + (s.items ? s.items.filter(i => i.received_status !== 'pending').length : 0), 0)
+                    : 0;
+                deliveries.push({
+                    id: d.id || doc.id,
+                    day_of_week: d.day_of_week || '',
+                    delivery_date: d.delivery_date,
+                    source_filename: d.source_filename || '',
+                    status: d.status || 'parsed',
+                    supplier_count: d.suppliers ? d.suppliers.length : 0,
+                    item_count: totalItems,
+                    checked_in_count: checkedIn,
+                    parsed_at: d.parsed_at || '',
+                });
+            });
+
+            // Sort by parsed_at descending (newest first)
+            deliveries.sort((a, b) => (b.parsed_at || '').localeCompare(a.parsed_at || ''));
+
+            renderDeliveryList(deliveries);
+        }, (error) => {
+            console.error('Delivery list listener error:', error);
+        });
+
+    activeUnsubscribes.push(unsub);
+}
+
 // ---- Delivery List ----
 async function loadDeliveries() {
     try {
         const data = await apiGet('/deliveries');
         renderDeliveryList(data.deliveries);
+
+        // Attach real-time listener for live updates from other iPads
+        cleanupListeners();
+        listenToDeliveryList();
     } catch (e) {
         showToast('Failed to load deliveries', 'error');
     }
@@ -361,6 +488,10 @@ async function openDelivery(id) {
         document.getElementById('detail-title').setAttribute('onclick', 'goBack()');
         renderDetail();
         showView('detail');
+
+        // Subscribe to real-time updates for this delivery
+        cleanupListeners();
+        listenToDelivery(id);
     } catch (e) {
         console.error('openDelivery error:', e);
         showToast('Failed to load delivery', 'error');
@@ -782,6 +913,7 @@ function closeModal() {
     document.getElementById('checkin-modal').classList.add('hidden');
     checkInItem = null;
     selectedReason = null;
+    applyPendingUpdate();
 }
 
 // Update status button labels and states based on current qty vs expected
@@ -917,6 +1049,7 @@ async function submitCheckIn() {
                 received_notes: notes,
             }
         );
+        lastWriteTimestamp = Date.now();
 
         // Update local state
         const item = currentDelivery.suppliers[supplierIdx].items[itemIdx];
@@ -976,6 +1109,7 @@ async function receiveAllSupplier(supplierIdx) {
             `/deliveries/${currentDelivery.id}/suppliers/${supplierIdx}/checkin-all-ok`,
             {}
         );
+        lastWriteTimestamp = Date.now();
 
         // Update local state
         supplier.items.forEach(item => {
@@ -1015,6 +1149,7 @@ async function unreceiveAllSupplier(supplierIdx) {
             `/deliveries/${currentDelivery.id}/suppliers/${supplierIdx}/unreceive-all`,
             {}
         );
+        lastWriteTimestamp = Date.now();
 
         // Update local state
         supplier.items.forEach(item => {
@@ -1187,6 +1322,7 @@ function showCompletionModal() {
 function dismissCompletionModal() {
     document.getElementById('complete-modal').classList.add('hidden');
     completionShown = false;
+    applyPendingUpdate();
 }
 
 async function confirmDeliveryComplete() {

@@ -6,7 +6,7 @@
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <title>Delivery Check-In</title>
-    <link rel="stylesheet" href="/static/styles.css?v=1.28">
+    <link rel="stylesheet" href="/static/styles.css?v=1.29">
 </head>
 <body>
     <div id="app">
@@ -176,9 +176,13 @@
         <div id="toast-container"></div>
 
         <!-- Version -->
-        <div id="app-version">v1.28</div>
+        <div id="app-version">v1.29</div>
     </div>
 
-    <script src="/static/app.js?v=1.28"></script>
+    <!-- Firebase SDK (compat for vanilla JS) -->
+    <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+
+    <script src="/static/app.js?v=1.29"></script>
 </body>
 </html>
