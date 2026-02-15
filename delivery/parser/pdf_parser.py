@@ -29,6 +29,7 @@ class LineItem:
     parsed: Optional[ParsedProduct] = None
     needs_processing: bool = False
     pull_for_floor: bool = False
+    pull_quantity: Optional[int] = None
     line_sequence: int = 0
 
 
@@ -321,10 +322,11 @@ class PDFWorksheetParser(WorksheetParser):
                 continue
 
             # Floor-pull pattern: "3 6 * FLOWERS Flowers-lancaster bouquet"
-            # group(1) = cases expected (3), group(2) = pull number (6, ignored)
+            # group(1) = cases expected (3), group(2) = pull quantity (6)
             fm = self.FLOOR_PULL_PATTERN.match(text)
             if fm:
                 qty = int(fm.group(1))
+                pull_qty = int(fm.group(2))
                 cat = fm.group(3)
                 desc = fm.group(4).strip()
                 parsed = self.product_parser.parse(desc)
@@ -333,7 +335,8 @@ class PDFWorksheetParser(WorksheetParser):
                     quantity_expected=qty, category=cat,
                     raw_description=desc, parsed=parsed,
                     needs_processing=line_info.get('has_shading', False),
-                    pull_for_floor=True, line_sequence=line_seq,
+                    pull_for_floor=True, pull_quantity=pull_qty,
+                    line_sequence=line_seq,
                 ))
                 continue
 
@@ -474,6 +477,7 @@ class PDFWorksheetParser(WorksheetParser):
                             'special_notes': it.parsed.special_notes if it.parsed else None,
                             'needs_processing': it.needs_processing,
                             'pull_for_floor': it.pull_for_floor,
+                            'pull_quantity': it.pull_quantity,
                             'line_sequence': it.line_sequence,
                         }
                         for it in b.items

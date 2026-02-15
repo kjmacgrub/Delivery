@@ -355,13 +355,31 @@ class DeliveryService:
         return report
 
     def delete_delivery(self, delivery_id: str) -> bool:
-        """Delete a delivery."""
+        """Delete a delivery and any associated exception reports."""
         if delivery_id in self._cache:
             del self._cache[delivery_id]
         if self._use_firestore:
             self._db.collection(self.COLLECTION).document(delivery_id).delete()
+            # Clean up any exception reports for this delivery
+            reports = self._db.collection(self.REPORTS_COLLECTION).where(
+                "delivery_id", "==", delivery_id
+            ).stream()
+            for report_doc in reports:
+                report_doc.reference.delete()
             return True
         return True
+
+    def list_reports(self) -> list:
+        """List all exception reports, newest first."""
+        if not self._use_firestore:
+            return []
+        docs = self._db.collection(self.REPORTS_COLLECTION).order_by(
+            "completed_at", direction="DESCENDING"
+        ).stream()
+        reports = []
+        for doc in docs:
+            reports.append(doc.to_dict())
+        return reports
 
     def _raw_to_delivery(self, raw: dict) -> Delivery:
         """Convert raw parser output dict to Delivery model."""
@@ -389,6 +407,7 @@ class DeliveryService:
                     special_notes=it.get('special_notes'),
                     needs_processing=it.get('needs_processing', False),
                     pull_for_floor=it.get('pull_for_floor', False),
+                    pull_quantity=it.get('pull_quantity'),
                     line_sequence=it.get('line_sequence', 0),
                 ))
 

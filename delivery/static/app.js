@@ -20,7 +20,7 @@ let searchQuery = ''; // search filter for item list
 let completionShown = false; // prevent duplicate completion modal
 
 // ---- Navigation ----
-const views = ['deliveries', 'storage', 'detail', 'checkin', 'complete'];
+const views = ['deliveries', 'storage', 'detail', 'checkin', 'complete', 'reports'];
 
 function showView(name) {
     views.forEach(v => {
@@ -34,8 +34,8 @@ function showView(name) {
     const title = document.getElementById('page-title');
     const badge = document.getElementById('status-badge');
 
-    // Show/hide the top header bar — hidden in checkin view (supplier has its own large header)
-    if (name === 'checkin') {
+    // Show/hide the top header bar — hidden in detail and checkin views
+    if (name === 'checkin' || name === 'detail') {
         appHeader.classList.add('hidden');
     } else {
         appHeader.classList.remove('hidden');
@@ -55,12 +55,6 @@ function showView(name) {
             badge.className = 'badge';
             break;
         case 'detail':
-            backBtn.classList.remove('hidden');
-            if (currentDelivery) {
-                title.textContent = `${currentDelivery.day_of_week} ${formatDate(currentDelivery.delivery_date)}`;
-                badge.textContent = currentDelivery.status.replace('_', ' ');
-                badge.className = `badge badge-${currentDelivery.status.replace('_', '-')}`;
-            }
             break;
         case 'checkin':
             // Header handled by supplier-header in the view itself
@@ -70,6 +64,12 @@ function showView(name) {
             title.textContent = 'Delivery Complete';
             badge.textContent = 'completed';
             badge.className = 'badge badge-completed';
+            break;
+        case 'reports':
+            backBtn.classList.remove('hidden');
+            title.textContent = 'Exception Reports';
+            badge.textContent = '';
+            badge.className = 'badge';
             break;
     }
 }
@@ -95,6 +95,9 @@ function goBack() {
         case 'complete':
             showView('deliveries');
             loadDeliveries();
+            break;
+        case 'reports':
+            showView('deliveries');
             break;
     }
 }
@@ -122,6 +125,12 @@ async function apiPatch(path, body) {
     return res.json();
 }
 
+async function apiDelete(path) {
+    const res = await fetch(API + path, { method: 'DELETE' });
+    if (!res.ok) throw new Error(`API error: ${res.status}`);
+    return res.json();
+}
+
 // ---- Delivery List ----
 async function loadDeliveries() {
     try {
@@ -145,14 +154,18 @@ function renderDeliveryList(deliveries) {
 
     container.innerHTML = deliveries.map(d => {
         const pct = d.item_count > 0 ? Math.round((d.checked_in_count / d.item_count) * 100) : 0;
+        const label = `${d.day_of_week} ${formatDate(d.delivery_date)}`;
         return `
         <div class="card" onclick="openDelivery('${d.id}')">
             <div class="card-header">
                 <div>
-                    <div class="card-title">${d.day_of_week} ${formatDate(d.delivery_date)}</div>
+                    <div class="card-title">${label}</div>
                     <div class="card-subtitle">${d.source_filename}</div>
                 </div>
-                <span class="badge badge-${d.status.replace('_', '-')}">${d.status.replace('_', ' ')}</span>
+                <div class="card-header-right">
+                    <span class="badge badge-${d.status.replace('_', '-')}">${d.status.replace('_', ' ')}</span>
+                    <button class="delete-btn" onclick="event.stopPropagation(); deleteDelivery('${d.id}', '${label}')" title="Delete delivery">&times;</button>
+                </div>
             </div>
             <div class="card-meta">
                 <span class="card-meta-item">${d.supplier_count} suppliers</span>
@@ -164,6 +177,98 @@ function renderDeliveryList(deliveries) {
             </div>
         </div>`;
     }).join('');
+}
+
+async function deleteDelivery(id, name) {
+    if (!confirm(`Delete delivery "${name}"?\n\nThis cannot be undone.`)) return;
+    try {
+        await apiDelete(`/deliveries/${id}`);
+        showToast('Delivery deleted');
+        loadDeliveries();
+    } catch (e) {
+        showToast('Failed to delete delivery', 'error');
+    }
+}
+
+// ---- Exception Reports ----
+async function showReports() {
+    showView('reports');
+    const container = document.getElementById('report-list');
+    container.innerHTML = '<div class="loading">Loading reports...</div>';
+
+    try {
+        const data = await apiGet('/reports');
+        if (!data.reports || !data.reports.length) {
+            container.innerHTML = `
+                <div class="empty-state">
+                    <p>No reports yet</p>
+                    <p class="subtitle">Exception reports are created when deliveries are completed</p>
+                </div>`;
+            return;
+        }
+        renderReportList(data.reports);
+    } catch (e) {
+        container.innerHTML = `<div class="empty-state"><p>Failed to load reports</p></div>`;
+        showToast('Failed to load reports', 'error');
+    }
+}
+
+function renderReportList(reports) {
+    const container = document.getElementById('report-list');
+    container.innerHTML = reports.map((r, idx) => {
+        const completedDate = r.completed_at ? new Date(r.completed_at).toLocaleDateString('en-US', {
+            month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit'
+        }) : '';
+        const deliveryDate = r.delivery_date ? formatDate(r.delivery_date) : '';
+        const hasExceptions = r.total_exceptions > 0;
+        const exceptionBadge = hasExceptions
+            ? `<span class="report-exception-count">${r.total_exceptions} exception${r.total_exceptions !== 1 ? 's' : ''}</span>`
+            : `<span class="report-no-exceptions">No exceptions</span>`;
+
+        const exceptionRows = (r.exception_items || []).map(item => {
+            const statusClass = item.received_status;
+            const received = item.quantity_received != null ? item.quantity_received : '?';
+            return `
+                <div class="report-exception-row">
+                    <div class="report-exception-left-bar status-${statusClass}"></div>
+                    <div class="report-exception-info">
+                        <div class="report-exception-name">${item.raw_description}</div>
+                        <div class="report-exception-supplier">${item.supplier_name}</div>
+                    </div>
+                    <div class="report-exception-qty">
+                        ${item.quantity_expected} → ${received}
+                    </div>
+                    <span class="report-status-badge status-${statusClass}">${item.received_status}</span>
+                </div>`;
+        }).join('');
+
+        return `
+        <div class="card report-card" onclick="toggleReportDetail(${idx})">
+            <div class="card-header">
+                <div>
+                    <div class="card-title">${r.day_of_week} ${deliveryDate}</div>
+                    <div class="card-subtitle">Completed ${completedDate}</div>
+                </div>
+                <div class="card-header-right">
+                    ${exceptionBadge}
+                </div>
+            </div>
+            <div class="card-meta">
+                <span class="card-meta-item">${r.total_items} items</span>
+                <span class="card-meta-item">${r.source_filename}</span>
+            </div>
+            <div class="report-detail" id="report-detail-${idx}" style="display:none;">
+                ${hasExceptions ? exceptionRows : '<div class="report-all-good">✓ Everything matched — no exceptions</div>'}
+            </div>
+        </div>`;
+    }).join('');
+}
+
+function toggleReportDetail(idx) {
+    const detail = document.getElementById(`report-detail-${idx}`);
+    if (detail) {
+        detail.style.display = detail.style.display === 'none' ? 'block' : 'none';
+    }
 }
 
 // ---- Storage Files ----
@@ -232,13 +337,13 @@ async function openDelivery(id) {
         supplierFilter = null; // reset filter
         showReceived = false; // reset to pending view
         searchQuery = ''; // reset search
-        // Ensure supplier filter header and summary are hidden
-        document.getElementById('item-supplier-header').classList.add('hidden');
-        document.getElementById('item-supplier-summary').classList.add('hidden');
+        // Reset supplier filter UI
         document.getElementById('item-receive-all-btn').innerHTML = '';
+        document.getElementById('detail-title').setAttribute('onclick', 'goBack()');
         renderDetail();
         showView('detail');
     } catch (e) {
+        console.error('openDelivery error:', e);
         showToast('Failed to load delivery', 'error');
     }
 }
@@ -252,26 +357,56 @@ function renderDetail() {
         sum + s.items.filter(i => i.received_status !== 'pending').length, 0);
     const totalCases = delivery.total_cases_expected;
 
-    // Summary bar — "Checked In" stat is clickable to toggle received view
-    const checkedInClass = showReceived ? 'summary-stat clickable active-stat' : 'summary-stat clickable';
-    document.getElementById('delivery-summary').innerHTML = `
-        <div class="summary-stat">
-            <div class="value">${delivery.suppliers.length}</div>
-            <div class="label">Suppliers</div>
-        </div>
-        <div class="summary-stat">
-            <div class="value">${totalItems}</div>
-            <div class="label">Items</div>
-        </div>
-        <div class="${checkedInClass}" onclick="toggleReceivedView()">
-            <div class="value">${checkedIn}/${totalItems}</div>
-            <div class="label">Checked In</div>
-        </div>
-        <div class="summary-stat">
-            <div class="value">${totalCases}</div>
-            <div class="label">Cases</div>
-        </div>
-    `;
+    const receivedToggleClass = showReceived ? 'summary-stat clickable active-stat' : 'summary-stat clickable';
+
+    if (supplierFilter !== null) {
+        // Supplier-filtered: show supplier stats and name
+        const supplier = delivery.suppliers[supplierFilter.idx];
+        const doneCount = supplier.items.filter(i => i.received_status !== 'pending').length;
+        const pct = supplier.items.length > 0 ? Math.round((doneCount / supplier.items.length) * 100) : 0;
+        document.getElementById('detail-title-text').textContent = supplier.supplier_name;
+        document.getElementById('detail-title').setAttribute('onclick', 'clearSupplierFilter()');
+        document.getElementById('delivery-summary').innerHTML = `
+            <div class="summary-stat">
+                <div class="value">${fmtNum(supplier.expected_cases)}</div>
+                <div class="label">Cases</div>
+            </div>
+            <div class="summary-stat">
+                <div class="value">${supplier.items.length}</div>
+                <div class="label">Items</div>
+            </div>
+            <div class="${receivedToggleClass}" onclick="toggleReceivedView()">
+                <div class="value">${doneCount}/${supplier.items.length}</div>
+                <div class="label">Received</div>
+            </div>
+            <div class="summary-stat">
+                <div class="value">${pct}%</div>
+                <div class="label">Complete</div>
+            </div>
+        `;
+    } else {
+        // Normal delivery view
+        document.getElementById('detail-title-text').textContent = `${delivery.day_of_week} ${formatDate(delivery.delivery_date)}`;
+        document.getElementById('detail-title').setAttribute('onclick', 'goBack()');
+        document.getElementById('delivery-summary').innerHTML = `
+            <div class="summary-stat">
+                <div class="value">${delivery.suppliers.length}</div>
+                <div class="label">Suppliers</div>
+            </div>
+            <div class="summary-stat">
+                <div class="value">${totalItems}</div>
+                <div class="label">Items</div>
+            </div>
+            <div class="${receivedToggleClass}" onclick="toggleReceivedView()">
+                <div class="value">${checkedIn}/${totalItems}</div>
+                <div class="label">Received</div>
+            </div>
+            <div class="summary-stat">
+                <div class="value">${fmtNum(totalCases)}</div>
+                <div class="label">Cases</div>
+            </div>
+        `;
+    }
 
     // Toggle buttons
     document.getElementById('tab-items').classList.toggle('active', detailTab === 'items');
@@ -299,12 +434,8 @@ function switchTab(tab) {
     detailTab = tab;
     if (supplierFilter !== null) {
         supplierFilter = null;
-        // Restore app header, summary, toggle when leaving supplier filter
-        document.getElementById('app-header').classList.remove('hidden');
-        document.getElementById('delivery-summary').classList.remove('hidden');
         document.querySelector('.toggle-bar').classList.remove('hidden');
-        document.getElementById('item-supplier-header').classList.add('hidden');
-        document.getElementById('item-supplier-summary').classList.add('hidden');
+        document.getElementById('detail-title').setAttribute('onclick', 'goBack()');
         document.getElementById('item-receive-all-btn').innerHTML = '';
     }
     showReceived = false; // reset to pending view
@@ -313,16 +444,25 @@ function switchTab(tab) {
 
 function toggleReceivedView() {
     showReceived = !showReceived;
-    // Always switch to Items tab since received view shows individual items
-    if (showReceived && detailTab !== 'items') {
-        detailTab = 'items';
-        supplierFilter = null;
+    updateReceivedToggle();
+    if (currentView === 'checkin') {
+        renderCheckIn();
+    } else {
+        // Always switch to Items tab since received view shows individual items
+        if (showReceived && detailTab !== 'items') {
+            detailTab = 'items';
+            supplierFilter = null;
+        }
+        renderDetail();
     }
-    // If clearing supplier filter, restore headers
-    if (supplierFilter !== null && showReceived) {
-        // Keep supplier filter but that's fine — received view can still filter by supplier
-    }
-    renderDetail();
+}
+
+function updateReceivedToggle() {
+    // Update toggle button state in both sort bars
+    const btn1 = document.getElementById('toggle-received');
+    const btn2 = document.getElementById('supplier-toggle-received');
+    if (btn1) btn1.classList.toggle('active', showReceived);
+    if (btn2) btn2.classList.toggle('active', showReceived);
 }
 
 // ---- Supplier abbreviation ----
@@ -359,10 +499,8 @@ function renderItemList() {
         });
     });
 
-    // Filter by received status
-    if (showReceived) {
-        flatItems = flatItems.filter(item => item.received_status !== 'pending');
-    } else {
+    // Filter by received status: off = pending only, on = show all items
+    if (!showReceived) {
         flatItems = flatItems.filter(item => item.received_status === 'pending');
     }
 
@@ -386,6 +524,12 @@ function renderItemList() {
             if (diff !== 0) return diff;
             return a.raw_description.toLowerCase().localeCompare(b.raw_description.toLowerCase());
         });
+    } else if (itemSortMode === 'supplier') {
+        flatItems.sort((a, b) => {
+            const sup = a.supplierName.toLowerCase().localeCompare(b.supplierName.toLowerCase());
+            if (sup !== 0) return sup;
+            return a.raw_description.toLowerCase().localeCompare(b.raw_description.toLowerCase());
+        });
     } else {
         flatItems.sort((a, b) => {
             return a.raw_description.toLowerCase().localeCompare(b.raw_description.toLowerCase());
@@ -395,33 +539,24 @@ function renderItemList() {
     // Update sort button states
     document.getElementById('sort-alpha').classList.toggle('active', itemSortMode === 'alpha');
     document.getElementById('sort-qty').classList.toggle('active', itemSortMode === 'qty');
+    document.getElementById('sort-supplier').classList.toggle('active', itemSortMode === 'supplier');
 
     const container = document.getElementById('flat-item-list');
-
-    // Build filter bars
-    let filterBarHtml = '';
-    if (showReceived) {
-        filterBarHtml += `
-        <div class="received-filter-bar">
-            <span>Received Items (${flatItems.length})</span>
-            <button class="clear-filter" onclick="toggleReceivedView()">Back to Pending</button>
-        </div>`;
-    }
 
     if (!flatItems.length) {
         let emptyMsg;
         if (searchQuery) {
             emptyMsg = 'No items match your search';
-        } else if (showReceived) {
-            emptyMsg = 'No items received yet';
-        } else {
+        } else if (!showReceived) {
             emptyMsg = 'All items received!';
+        } else {
+            emptyMsg = 'No items yet';
         }
-        container.innerHTML = filterBarHtml + `<div class="empty-state"><p>${emptyMsg}</p></div>`;
+        container.innerHTML = `<div class="empty-state"><p>${emptyMsg}</p></div>`;
         return;
     }
 
-    container.innerHTML = filterBarHtml + flatItems.map(item => {
+    container.innerHTML = flatItems.map(item => {
         const isPending = item.received_status === 'pending';
         const statusClass = isPending ? '' : `checked-${item.received_status}`;
         const processingClass = item.needs_processing ? 'needs-processing' : '';
@@ -435,10 +570,12 @@ function renderItemList() {
                 </svg>
                </div>`;
 
+        const pullQty = item.pull_quantity != null ? `<span class="pull-qty">(${item.pull_quantity})</span> ` : '';
+
         return `
         <div class="compact-row ${statusClass} ${processingClass} ${floorClass}"
              onclick="openCheckInModalFlat(${item.supplierIdx}, ${item.itemIdx})">
-            <div class="compact-qty">${item.quantity_expected}</div>
+            <div class="compact-qty">${pullQty}${item.quantity_expected}</div>
             <div class="compact-name">${item.raw_description}</div>
             <div class="compact-supplier" onclick="event.stopPropagation(); filterBySupplier(${item.supplierIdx})">${item.supplierAbbrev}</div>
             ${checkIcon}
@@ -449,31 +586,26 @@ function renderItemList() {
 function filterBySupplier(supplierIdx) {
     const supplier = currentDelivery.suppliers[supplierIdx];
     supplierFilter = { idx: supplierIdx, name: supplier.supplier_name };
-    // Hide app header, summary, and toggle — show large supplier header instead
-    document.getElementById('app-header').classList.add('hidden');
-    document.getElementById('delivery-summary').classList.add('hidden');
-    document.querySelector('.toggle-bar').classList.add('hidden');
-    const header = document.getElementById('item-supplier-header');
-    header.classList.remove('hidden');
-    document.getElementById('item-supplier-header-name').textContent = supplier.supplier_name;
 
-    // Show supplier summary bar
+    // Hide toggle bar, replace summary and title with supplier info
+    document.querySelector('.toggle-bar').classList.add('hidden');
+
+    // Reuse the top-level summary bar with supplier stats
     const doneCount = supplier.items.filter(i => i.received_status !== 'pending').length;
     const pct = supplier.items.length > 0 ? Math.round((doneCount / supplier.items.length) * 100) : 0;
-    const summaryEl = document.getElementById('item-supplier-summary');
-    summaryEl.classList.remove('hidden');
-    summaryEl.innerHTML = `
+    const rcvClass = showReceived ? 'summary-stat clickable active-stat' : 'summary-stat clickable';
+    document.getElementById('delivery-summary').innerHTML = `
         <div class="summary-stat">
-            <div class="value">${supplier.expected_cases}</div>
+            <div class="value">${fmtNum(supplier.expected_cases)}</div>
             <div class="label">Cases</div>
         </div>
         <div class="summary-stat">
             <div class="value">${supplier.items.length}</div>
             <div class="label">Items</div>
         </div>
-        <div class="summary-stat">
+        <div class="${rcvClass}" onclick="toggleReceivedView()">
             <div class="value">${doneCount}/${supplier.items.length}</div>
-            <div class="label">Done</div>
+            <div class="label">Received</div>
         </div>
         <div class="summary-stat">
             <div class="value">${pct}%</div>
@@ -481,11 +613,15 @@ function filterBySupplier(supplierIdx) {
         </div>
     `;
 
+    // Reuse the detail-title with supplier name, make it go back to clear filter
+    document.getElementById('detail-title-text').textContent = supplier.supplier_name;
+    document.getElementById('detail-title').setAttribute('onclick', 'clearSupplierFilter()');
+
     // Receive All / Unreceive All button in sort bar
     renderReceiveAllButton(supplierIdx, 'item-receive-all-btn');
 
     renderItemList();
-    // Scroll to top since we're hiding the app header
+    // Scroll to top
     document.body.scrollTop = 0;
     document.documentElement.scrollTop = 0;
 }
@@ -493,18 +629,16 @@ function filterBySupplier(supplierIdx) {
 function clearSupplierFilter() {
     supplierFilter = null;
     searchQuery = '';
-    // Restore app header, summary, and toggle bar
-    document.getElementById('app-header').classList.remove('hidden');
-    document.getElementById('delivery-summary').classList.remove('hidden');
+    // Restore toggle bar and detail-title onclick
     document.querySelector('.toggle-bar').classList.remove('hidden');
-    document.getElementById('item-supplier-header').classList.add('hidden');
-    document.getElementById('item-supplier-summary').classList.add('hidden');
+    document.getElementById('detail-title').setAttribute('onclick', 'goBack()');
     document.getElementById('item-receive-all-btn').innerHTML = '';
     // Reset search input
     const searchInput = document.getElementById('item-search');
     searchInput.value = '';
     document.getElementById('search-clear-btn').classList.add('hidden');
-    renderItemList();
+    // Re-render restores delivery summary and title
+    renderDetail();
 }
 
 function updateFilteredSupplierSummary() {
@@ -512,19 +646,20 @@ function updateFilteredSupplierSummary() {
     const supplier = currentDelivery.suppliers[supplierFilter.idx];
     const doneCount = supplier.items.filter(i => i.received_status !== 'pending').length;
     const pct = supplier.items.length > 0 ? Math.round((doneCount / supplier.items.length) * 100) : 0;
-    const summaryEl = document.getElementById('item-supplier-summary');
+    const rcvClass2 = showReceived ? 'summary-stat clickable active-stat' : 'summary-stat clickable';
+    const summaryEl = document.getElementById('delivery-summary');
     summaryEl.innerHTML = `
         <div class="summary-stat">
-            <div class="value">${supplier.expected_cases}</div>
+            <div class="value">${fmtNum(supplier.expected_cases)}</div>
             <div class="label">Cases</div>
         </div>
         <div class="summary-stat">
             <div class="value">${supplier.items.length}</div>
             <div class="label">Items</div>
         </div>
-        <div class="summary-stat">
+        <div class="${rcvClass2}" onclick="toggleReceivedView()">
             <div class="value">${doneCount}/${supplier.items.length}</div>
-            <div class="label">Done</div>
+            <div class="label">Received</div>
         </div>
         <div class="summary-stat">
             <div class="value">${pct}%</div>
@@ -625,18 +760,19 @@ function renderCheckIn() {
     // Large supplier name header
     document.getElementById('supplier-header-name').textContent = supplier.supplier_name;
 
+    const receivedClass = showReceived ? 'summary-stat clickable active-stat' : 'summary-stat clickable';
     document.getElementById('supplier-summary').innerHTML = `
         <div class="summary-stat">
-            <div class="value">${supplier.expected_cases}</div>
+            <div class="value">${fmtNum(supplier.expected_cases)}</div>
             <div class="label">Cases</div>
         </div>
         <div class="summary-stat">
             <div class="value">${supplier.items.length}</div>
             <div class="label">Items</div>
         </div>
-        <div class="summary-stat">
+        <div class="${receivedClass}" onclick="toggleReceivedView()">
             <div class="value">${doneCount}/${supplier.items.length}</div>
-            <div class="label">Done</div>
+            <div class="label">Received</div>
         </div>
         <div class="summary-stat">
             <div class="value">${pct}%</div>
@@ -651,11 +787,16 @@ function renderCheckIn() {
     document.getElementById('supplier-sort-alpha').classList.toggle('active', supplierItemSortMode === 'alpha');
     document.getElementById('supplier-sort-qty').classList.toggle('active', supplierItemSortMode === 'qty');
 
+    // Update received toggle state
+    updateReceivedToggle();
+
     // Build sorted item list with original indices preserved for check-in API
     let sortedItems = supplier.items.map((item, idx) => ({ ...item, originalIdx: idx }));
 
-    // Filter out received items (same as flat list behavior)
-    sortedItems = sortedItems.filter(item => item.received_status === 'pending');
+    // Filter: off = pending only, on = show all items
+    if (!showReceived) {
+        sortedItems = sortedItems.filter(item => item.received_status === 'pending');
+    }
 
     if (supplierItemSortMode === 'qty') {
         sortedItems.sort((a, b) => {
@@ -690,10 +831,12 @@ function renderCheckIn() {
                 </svg>
                </div>`;
 
+        const pullQty = item.pull_quantity != null ? `<span class="pull-qty">(${item.pull_quantity})</span> ` : '';
+
         return `
         <div class="compact-row ${statusClass} ${processingClass} ${floorClass}"
              onclick="openCheckInModal(${item.originalIdx})">
-            <div class="compact-qty">${item.quantity_expected}</div>
+            <div class="compact-qty">${pullQty}${item.quantity_expected}</div>
             <div class="compact-name">${item.raw_description}</div>
             ${checkIcon}
         </div>`;
@@ -756,9 +899,9 @@ function updateModalStatusButtons() {
     const okBtn = document.getElementById('modal-ok-btn');
 
     // Reset all buttons
-    shortBtn.classList.remove('active');
-    overBtn.classList.remove('active');
-    returnBtn.classList.remove('active');
+    shortBtn.classList.remove('active', 'needs-choice');
+    overBtn.classList.remove('active', 'needs-choice');
+    returnBtn.classList.remove('active', 'needs-choice');
     okBtn.classList.remove('ok-ready');
 
     if (qty === modalExpectedQty) {
@@ -780,8 +923,11 @@ function updateModalStatusButtons() {
         } else if (selectedReason === 'return') {
             returnBtn.classList.add('active');
             okBtn.classList.add('ok-ready');
+        } else {
+            // No reason selected yet — highlight both to prompt user to choose
+            shortBtn.classList.add('needs-choice');
+            returnBtn.classList.add('needs-choice');
         }
-        // If no reason selected yet, OK stays dim (user must pick Short or Return)
     } else {
         // Over: auto-highlight Over, OK is ready
         const overAmt = qty - modalExpectedQty;
@@ -951,7 +1097,16 @@ async function receiveAllSupplier(supplierIdx) {
 
         // Re-render
         if (currentView === 'checkin') {
-            renderCheckIn();
+            // Go back to supplier list after Receive All
+            showToast(`All ${pendingItems.length} items received`, 'success');
+            showView('detail');
+            renderDetail();
+            // Check completion after navigating back
+            if (!completionShown && checkAllItemsReceived()) {
+                completionShown = true;
+                showCompletionModal();
+            }
+            return;
         } else if (currentView === 'detail') {
             if (supplierFilter !== null) {
                 updateFilteredSupplierSummary();
@@ -1010,6 +1165,10 @@ async function unreceiveAllSupplier(supplierIdx) {
 }
 
 // ---- Utilities ----
+function fmtNum(n) {
+    return Number(n).toLocaleString();
+}
+
 function formatDate(dateStr) {
     if (!dateStr) return '';
     const d = new Date(dateStr + 'T00:00:00');
@@ -1179,28 +1338,39 @@ function playFireworks(onComplete) {
     canvas.height = window.innerHeight;
 
     const particles = [];
-    const colors = ['#ff3b30', '#ff9500', '#ffcc00', '#34c759', '#007aff', '#af52de', '#ff2d55'];
+    const colors = ['#ff3b30', '#ff9500', '#ffcc00', '#34c759', '#007aff', '#af52de', '#ff2d55', '#00d4ff', '#ff6b6b', '#ffd93d'];
 
-    function createBurst(x, y) {
-        for (let i = 0; i < 40; i++) {
-            const angle = (Math.PI * 2 * i) / 40 + (Math.random() - 0.5) * 0.5;
-            const speed = 2 + Math.random() * 4;
+    function createBurst(x, y, count) {
+        const n = count || 60;
+        for (let i = 0; i < n; i++) {
+            const angle = (Math.PI * 2 * i) / n + (Math.random() - 0.5) * 0.5;
+            const speed = 2 + Math.random() * 6;
             particles.push({
                 x, y,
                 vx: Math.cos(angle) * speed,
                 vy: Math.sin(angle) * speed,
                 color: colors[Math.floor(Math.random() * colors.length)],
                 life: 1.0,
-                decay: 0.008 + Math.random() * 0.012,
-                size: 2 + Math.random() * 3,
+                decay: 0.005 + Math.random() * 0.008,
+                size: 2.5 + Math.random() * 4,
             });
         }
     }
 
-    // Stagger 3 bursts across the screen
-    setTimeout(() => createBurst(canvas.width * 0.3, canvas.height * 0.35), 0);
-    setTimeout(() => createBurst(canvas.width * 0.7, canvas.height * 0.3), 400);
-    setTimeout(() => createBurst(canvas.width * 0.5, canvas.height * 0.25), 800);
+    // Wave 1: three bursts across the screen
+    setTimeout(() => createBurst(canvas.width * 0.25, canvas.height * 0.3, 70), 0);
+    setTimeout(() => createBurst(canvas.width * 0.75, canvas.height * 0.25, 70), 300);
+    setTimeout(() => createBurst(canvas.width * 0.5, canvas.height * 0.2, 80), 600);
+    // Wave 2: more bursts
+    setTimeout(() => createBurst(canvas.width * 0.15, canvas.height * 0.4, 50), 1200);
+    setTimeout(() => createBurst(canvas.width * 0.85, canvas.height * 0.35, 50), 1500);
+    setTimeout(() => createBurst(canvas.width * 0.5, canvas.height * 0.15, 90), 1800);
+    // Wave 3: grand finale
+    setTimeout(() => createBurst(canvas.width * 0.3, canvas.height * 0.25, 60), 2500);
+    setTimeout(() => createBurst(canvas.width * 0.7, canvas.height * 0.2, 60), 2700);
+    setTimeout(() => createBurst(canvas.width * 0.5, canvas.height * 0.3, 100), 3000);
+    setTimeout(() => createBurst(canvas.width * 0.2, canvas.height * 0.15, 50), 3200);
+    setTimeout(() => createBurst(canvas.width * 0.8, canvas.height * 0.15, 50), 3400);
 
     function animate() {
         ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -1209,7 +1379,8 @@ function playFireworks(onComplete) {
             const p = particles[i];
             p.x += p.vx;
             p.y += p.vy;
-            p.vy += 0.06; // gravity
+            p.vy += 0.05; // gravity
+            p.vx *= 0.995; // air resistance
             p.life -= p.decay;
 
             if (p.life <= 0) {
@@ -1222,6 +1393,14 @@ function playFireworks(onComplete) {
             ctx.beginPath();
             ctx.arc(p.x, p.y, p.size * p.life, 0, Math.PI * 2);
             ctx.fill();
+
+            // Sparkle trail
+            if (p.life > 0.3 && Math.random() < 0.3) {
+                ctx.globalAlpha = p.life * 0.4;
+                ctx.beginPath();
+                ctx.arc(p.x - p.vx * 2, p.y - p.vy * 2, p.size * p.life * 0.5, 0, Math.PI * 2);
+                ctx.fill();
+            }
         }
 
         ctx.globalAlpha = 1;
@@ -1231,7 +1410,8 @@ function playFireworks(onComplete) {
         } else {
             canvas.classList.remove('active');
             ctx.clearRect(0, 0, canvas.width, canvas.height);
-            if (onComplete) onComplete();
+            // Pause on celebration screen before transitioning
+            if (onComplete) setTimeout(onComplete, 3000);
         }
     }
 

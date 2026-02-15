@@ -71,12 +71,11 @@ async def parse_storage_file(file_name: str, request: Request):
             detail=f"Parse error: {str(e)}",
         )
 
-    try:
-        # Move to processed folder
-        storage.move_to_processed(firebase_path)
-    except Exception as e:
-        # Non-fatal: file is already parsed
-        pass
+    # TODO: re-enable move_to_processed after development
+    # try:
+    #     storage.move_to_processed(firebase_path)
+    # except Exception:
+    #     pass
 
     total_items = sum(len(s.items) for s in delivery.suppliers)
     return ParseResponse(

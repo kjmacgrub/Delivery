@@ -80,10 +80,17 @@ def create_app(use_firebase: bool = True) -> FastAPI:
     app.include_router(checkin.router, prefix="/api/v1", tags=["checkin"])
     app.include_router(storage.router, prefix="/api/v1", tags=["storage"])
 
-    # Serve static files for the web UI
+    # Serve static files for the web UI (no-cache during development)
     static_dir = Path(__file__).parent.parent / "static"
     if static_dir.exists():
         app.mount("/static", StaticFiles(directory=str(static_dir)), name="static")
+
+        @app.middleware("http")
+        async def no_cache_static(request, call_next):
+            response = await call_next(request)
+            if request.url.path.startswith("/static") or request.url.path == "/":
+                response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+            return response
 
         @app.get("/")
         async def serve_index():

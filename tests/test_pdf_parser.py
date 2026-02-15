@@ -192,9 +192,12 @@ class TestFormattingDetection:
             for item in block['items']:
                 if 'Flowers' in item['raw_description'] and 'lancaster' in item['raw_description']:
                     # "3 6 * FLOWERS Flowers-lancaster bouquet"
-                    # 3 = cases expected, 6 = pull number (ignore)
+                    # 3 = cases expected, 6 = pull quantity
                     assert item['quantity_expected'] == 3, (
                         f"Flowers-lancaster should have qty=3 (cases), got {item['quantity_expected']}"
+                    )
+                    assert item['pull_quantity'] == 6, (
+                        f"Flowers-lancaster should have pull_quantity=6, got {item.get('pull_quantity')}"
                     )
                     return
         pytest.fail("Flowers-lancaster bouquet not found")
@@ -207,6 +210,9 @@ class TestFormattingDetection:
                     # "0 1 * VEG Beets- bunch various organic"
                     assert item['quantity_expected'] == 0, (
                         f"Beets bunch various should have qty=0, got {item['quantity_expected']}"
+                    )
+                    assert item['pull_quantity'] == 1, (
+                        f"Beets bunch various should have pull_quantity=1, got {item.get('pull_quantity')}"
                     )
                     return
         pytest.fail("Beets bunch various not found")

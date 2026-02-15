@@ -76,3 +76,11 @@ async def delete_delivery(delivery_id: str, request: Request):
         raise HTTPException(status_code=404, detail="Delivery not found")
     service.delete_delivery(delivery_id)
     return {"message": f"Delivery {delivery_id} deleted"}
+
+
+@router.get("/reports")
+async def list_reports(request: Request):
+    """List all exception reports from completed deliveries."""
+    service = _get_service(request)
+    reports = service.list_reports()
+    return {"reports": reports, "total": len(reports)}

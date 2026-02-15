@@ -66,6 +66,7 @@ class LineItemBase(BaseModel):
     special_notes: Optional[str] = None
     needs_processing: bool = False
     pull_for_floor: bool = False
+    pull_quantity: Optional[int] = None
     line_sequence: int = 0
 
 
