@@ -1149,10 +1149,19 @@ textarea {
     display: flex;
     justify-content: space-between;
     align-items: center;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
 }
 
-.storage-card .btn {
+.storage-card:active {
+    background: var(--bg);
+}
+
+.storage-parse-label {
     flex-shrink: 0;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--primary);
 }
 
 /* ---- Toast ---- */

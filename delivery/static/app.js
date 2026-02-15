@@ -435,14 +435,12 @@ async function showStorageFiles() {
         }
 
         container.innerHTML = data.files.map(f => `
-            <div class="card storage-card">
+            <div class="card storage-card" onclick="parseStorageFile('${f.name}')">
                 <div>
                     <div class="card-title">${f.name}</div>
                     <div class="card-subtitle">${formatSize(f.size)} &middot; ${formatTimestamp(f.updated)}</div>
                 </div>
-                <button class="btn btn-primary" onclick="parseStorageFile('${f.name}')">
-                    Parse
-                </button>
+                <span class="storage-parse-label">Parse</span>
             </div>
         `).join('');
     } catch (e) {
@@ -459,8 +457,7 @@ async function parseStorageFile(fileName) {
     try {
         const data = await apiPost(`/storage/files/${encodeURIComponent(fileName)}/parse`);
         showToast(`Parsed: ${data.supplier_count} suppliers, ${data.item_count} items`, 'success');
-        showView('deliveries');
-        loadDeliveries();
+        openDelivery(data.delivery_id);
     } catch (e) {
         showToast('Failed to parse file', 'error');
     }
