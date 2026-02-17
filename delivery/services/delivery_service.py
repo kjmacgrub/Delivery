@@ -266,7 +266,7 @@ class DeliveryService:
         count = 0
         for item in supplier.items:
             if item.received_status != ReceivedStatus.PENDING:
-                item.quantity_received = 0
+                item.quantity_received = None
                 item.received_status = ReceivedStatus.PENDING
                 item.received_notes = None
                 item.checked_in_at = None

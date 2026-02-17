@@ -5,34 +5,60 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <title>Delivery Check-In</title>
-    <link rel="stylesheet" href="/static/styles.css?v=1.29">
+    <title>Daily Delivery Tracker</title>
+    <link rel="stylesheet" href="/static/styles.css?v=1.00">
 </head>
 <body>
     <div id="app">
         <!-- Header -->
         <header id="app-header">
-            <div class="header-left">
-                <button id="back-btn" class="icon-btn hidden" onclick="goBack()">
-                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M15 18l-6-6 6-6"/>
-                    </svg>
-                </button>
-                <h1 id="page-title">Deliveries</h1>
-            </div>
-            <div class="header-right">
-                <span id="status-badge" class="badge"></span>
-                <button id="refresh-btn" class="icon-btn" onclick="refreshData()">
-                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M23 4v6h-6"/><path d="M1 20v-6h6"/>
-                        <path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/>
-                    </svg>
-                </button>
+            <div id="header-brand" class="header-brand" onclick="goHome()">Daily Delivery</div>
+            <div class="header-row">
+                <div class="header-left">
+                    <button id="back-btn" class="icon-btn hidden" onclick="goBack()">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M15 18l-6-6 6-6"/>
+                        </svg>
+                    </button>
+                    <h1 id="page-title">Deliveries</h1>
+                </div>
+                <div class="header-right">
+                    <span id="status-badge" class="badge"></span>
+                    <button id="refresh-btn" class="icon-btn" onclick="refreshData()">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M23 4v6h-6"/><path d="M1 20v-6h6"/>
+                            <path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/>
+                        </svg>
+                    </button>
+                </div>
             </div>
         </header>
 
+        <!-- View: Landing -->
+        <div id="view-landing" class="view active">
+            <div class="landing-page">
+                <h1 class="landing-title">Daily Delivery</h1>
+                <span class="landing-version" onclick="showVersionHistory()">v1.00</span>
+
+                <div id="section-files" class="landing-section">
+                    <h2 class="landing-section-title">Available Day(s)</h2>
+                    <div id="landing-files" class="card-list">
+                        <div class="loading">Loading files...</div>
+                    </div>
+                </div>
+
+                <div id="section-deliveries" class="landing-section">
+                    <h2 class="landing-section-title">Existing Deliveries</h2>
+                    <div id="landing-deliveries" class="card-list">
+                        <div class="loading">Loading deliveries...</div>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+
         <!-- View: Delivery List -->
-        <div id="view-deliveries" class="view active">
+        <div id="view-deliveries" class="view">
             <div class="action-bar">
                 <button class="btn btn-primary btn-lg" onclick="showStorageFiles()">
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -165,7 +191,21 @@
                 <div class="complete-checkmark">&#10003;</div>
                 <h1 class="complete-heading">Delivery Over</h1>
                 <p id="complete-date" class="complete-date"></p>
-                <button class="btn btn-primary btn-lg" onclick="loadNewDelivery()">Load New Delivery</button>
+                <button class="btn btn-primary btn-lg" onclick="goHome()">Back to Main Page</button>
+            </div>
+        </div>
+
+        <!-- Modal: Version History -->
+        <div id="version-modal" class="modal hidden">
+            <div class="modal-backdrop" onclick="closeVersionModal()"></div>
+            <div class="modal-content version-modal-content">
+                <div class="modal-header">
+                    <h2>Version History</h2>
+                    <button class="icon-btn" onclick="closeVersionModal()">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <div id="version-list" class="version-list"></div>
+                </div>
             </div>
         </div>
 
@@ -176,13 +216,13 @@
         <div id="toast-container"></div>
 
         <!-- Version -->
-        <div id="app-version">v1.29</div>
+        <div id="app-version" onclick="showVersionHistory()">v1.00</div>
     </div>
 
     <!-- Firebase SDK (compat for vanilla JS) -->
     <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
 
-    <script src="/static/app.js?v=1.29"></script>
+    <script src="/static/app.js?v=1.00"></script>
 </body>
 </html>

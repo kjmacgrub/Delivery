@@ -5,6 +5,17 @@
 
 const API = '/api/v1';
 
+// ---- Version History ----
+const VERSION_HISTORY = [
+    { version: 'v1.00', description: 'Landing page, app title, version history' },
+    { version: 'v0.29', description: 'Firestore real-time listeners for live cross-iPad updates' },
+    { version: 'v0.28', description: 'Supplier accordion, progress bars, expand/collapse, report deletion' },
+    { version: 'v0.27', description: 'Pull quantity, reports viewer, layout redesign, UX improvements' },
+    { version: 'v0.26', description: 'Bulk receive/unreceive, Receive All, Delivery Complete flow' },
+    { version: 'v0.25', description: 'Fix floor-pull quantities and merge duplicate supplier blocks' },
+    { version: 'v0.24', description: 'Initial delivery worksheet parser, API, and iPad check-in UI' },
+];
+
 // ---- Firebase Real-time ----
 const FIREBASE_CONFIG = {
     apiKey: "AIzaSyAwLYQgXOfYo9wXh8IWJgMldPpxsKU_p50",
@@ -19,7 +30,7 @@ firebase.initializeApp(FIREBASE_CONFIG);
 const db = firebase.firestore();
 
 // ---- State ----
-let currentView = 'deliveries';
+let currentView = 'landing';
 let currentDelivery = null;
 let currentSupplierIdx = null;
 let checkInItem = null; // { supplierIdx, itemIdx }
@@ -36,7 +47,7 @@ let pendingDeliveryUpdate = null;  // snapshot data waiting for modal to close
 let lastWriteTimestamp = 0;        // to debounce our own writes
 
 // ---- Navigation ----
-const views = ['deliveries', 'storage', 'detail', 'complete', 'reports'];
+const views = ['landing', 'deliveries', 'storage', 'detail', 'complete', 'reports'];
 
 function showView(name) {
     views.forEach(v => {
@@ -50,35 +61,56 @@ function showView(name) {
     const title = document.getElementById('page-title');
     const badge = document.getElementById('status-badge');
 
-    // Show/hide the top header bar — hidden in detail view
-    if (name === 'detail') {
+    const headerRow = document.querySelector('.header-row');
+    const brand = document.getElementById('header-brand');
+
+    // Hide header on landing (has its own big title)
+    if (name === 'landing') {
         appHeader.classList.add('hidden');
     } else {
         appHeader.classList.remove('hidden');
     }
 
+    // Default brand text; detail view overrides with date
+    brand.textContent = 'Daily Delivery';
+
     switch (name) {
+        case 'landing':
+            badge.textContent = '';
+            badge.className = 'badge';
+            break;
         case 'deliveries':
-            backBtn.classList.add('hidden');
+            headerRow.classList.remove('hidden');
+            backBtn.classList.remove('hidden');
             title.textContent = 'Deliveries';
             badge.textContent = '';
             badge.className = 'badge';
             break;
         case 'storage':
+            headerRow.classList.remove('hidden');
             backBtn.classList.remove('hidden');
             title.textContent = 'Import File';
             badge.textContent = '';
             badge.className = 'badge';
             break;
         case 'detail':
+            headerRow.classList.add('hidden');
+            badge.textContent = '';
+            badge.className = 'badge';
+            // Brand text updated by renderDetail() with delivery date
             break;
         case 'complete':
+            headerRow.classList.remove('hidden');
             backBtn.classList.add('hidden');
             title.textContent = 'Delivery Complete';
             badge.textContent = 'completed';
             badge.className = 'badge badge-completed';
+            if (currentDelivery) {
+                brand.textContent = `Daily Delivery — ${currentDelivery.day_of_week} ${formatDate(currentDelivery.delivery_date)}`;
+            }
             break;
         case 'reports':
+            headerRow.classList.remove('hidden');
             backBtn.classList.remove('hidden');
             title.textContent = 'Exception Reports';
             badge.textContent = '';
@@ -87,10 +119,23 @@ function showView(name) {
     }
 }
 
+function goHome() {
+    if (currentView === 'landing') return;
+    if (currentView === 'detail') cleanupListeners();
+    if (currentView === 'complete') cleanupListeners();
+    showView('landing');
+    loadLanding();
+}
+
 function goBack() {
     switch (currentView) {
+        case 'deliveries':
+            showView('landing');
+            loadLanding();
+            break;
         case 'storage':
-            showView('deliveries');
+            showView('landing');
+            loadLanding();
             break;
         case 'detail':
             // If supplier filter is active, clear it instead of going all the way back
@@ -99,16 +144,17 @@ function goBack() {
                 return;
             }
             cleanupListeners();
-            showView('deliveries');
-            loadDeliveries();
+            showView('landing');
+            loadLanding();
             break;
         case 'complete':
             cleanupListeners();
-            showView('deliveries');
-            loadDeliveries();
+            showView('landing');
+            loadLanding();
             break;
         case 'reports':
-            showView('deliveries');
+            showView('landing');
+            loadLanding();
             break;
     }
 }
@@ -349,12 +395,16 @@ function renderReportList(reports) {
         const exceptionRows = (r.exception_items || []).map(item => {
             const statusClass = item.received_status;
             const received = item.quantity_received != null ? item.quantity_received : '?';
+            const noteHtml = item.received_notes
+                ? `<div class="report-exception-note">${item.received_notes}</div>`
+                : '';
             return `
                 <div class="report-exception-row">
                     <div class="report-exception-left-bar status-${statusClass}"></div>
                     <div class="report-exception-info">
                         <div class="report-exception-name">${item.raw_description}</div>
                         <div class="report-exception-supplier">${item.supplier_name}</div>
+                        ${noteHtml}
                     </div>
                     <div class="report-exception-qty">
                         ${item.quantity_expected} → ${received}
@@ -390,6 +440,30 @@ function toggleReportDetail(idx) {
     const detail = document.getElementById(`report-detail-${idx}`);
     if (detail) {
         detail.style.display = detail.style.display === 'none' ? 'block' : 'none';
+    }
+}
+
+async function showReportById(reportId) {
+    showView('reports');
+    const container = document.getElementById('report-list');
+    container.innerHTML = '<div class="loading">Loading report...</div>';
+
+    try {
+        const data = await apiGet('/reports');
+        if (!data.reports || !data.reports.length) {
+            container.innerHTML = `<div class="empty-state"><p>Report not found</p></div>`;
+            return;
+        }
+        renderReportList(data.reports);
+        // Find and auto-expand the matching report
+        const idx = data.reports.findIndex(r => r.id === reportId);
+        if (idx >= 0) {
+            const detail = document.getElementById(`report-detail-${idx}`);
+            if (detail) detail.style.display = 'block';
+        }
+    } catch (e) {
+        container.innerHTML = `<div class="empty-state"><p>Failed to load report</p></div>`;
+        showToast('Failed to load report', 'error');
     }
 }
 
@@ -506,19 +580,26 @@ function renderDetail() {
 
     const receivedToggleClass = showReceived ? 'summary-stat clickable active-stat' : 'summary-stat clickable';
 
+    // Always show delivery date in header brand
+    const brand = document.getElementById('header-brand');
+    brand.textContent = `Daily Delivery — ${delivery.day_of_week} ${formatDate(delivery.delivery_date)}`;
+
+    const detailTitle = document.getElementById('detail-title');
+
     if (supplierFilter !== null) {
-        // Supplier-filtered: show supplier stats and name
+        // Supplier-filtered: show supplier name in detail-title
         const supplier = delivery.suppliers[supplierFilter.idx];
         const supRcv = casesReceived(supplier.items);
         const supExp = casesExpected(supplier.items);
+        detailTitle.classList.remove('hidden');
         document.getElementById('detail-title-text').textContent = supplier.supplier_name;
-        document.getElementById('detail-title').setAttribute('onclick', 'clearSupplierFilter()');
+        detailTitle.setAttribute('onclick', 'clearSupplierFilter()');
         document.getElementById('delivery-summary').innerHTML =
             progressBar(supRcv, supExp, receivedToggleClass);
     } else {
-        // Normal delivery view
-        document.getElementById('detail-title-text').textContent = `${delivery.day_of_week} ${formatDate(delivery.delivery_date)}`;
-        document.getElementById('detail-title').setAttribute('onclick', 'goBack()');
+        // Normal delivery view — date is in header, hide detail-title
+        detailTitle.classList.add('hidden');
+        detailTitle.setAttribute('onclick', 'goBack()');
         const allItems = delivery.suppliers.flatMap(s => s.items);
         const rcvCases = casesReceived(allItems);
         document.getElementById('delivery-summary').innerHTML =
@@ -1195,9 +1276,10 @@ function progressBar(done, total, toggleClass) {
     return `
     <div class="progress-bar-summary ${cls}">
         ${toggleLabel}
+        <div class="progress-bar-count"${onclick}><span class="${done > 0 ? 'count-green' : ''}">${fmtNum(done)}</span> / ${fmtNum(total)}</div>
         <div class="progress-bar-label"${onclick}>
-            <span class="progress-bar-count">${fmtNum(done)} / ${fmtNum(total)}</span>
             <span class="progress-bar-title">Received</span>
+            <span class="progress-bar-title">Expected</span>
         </div>
         <div class="progress-bar-track"${onclick}>
             <div class="progress-bar-fill" style="width: ${pct}%; transition: width 0.4s ease"></div>
@@ -1238,6 +1320,9 @@ function showToast(message, type = 'info') {
 
 function refreshData() {
     switch (currentView) {
+        case 'landing':
+            loadLanding();
+            break;
         case 'deliveries':
             loadDeliveries();
             break;
@@ -1353,7 +1438,8 @@ function loadNewDelivery() {
     currentDelivery = null;
     currentSupplierIdx = null;
     completionShown = false;
-    showStorageFiles();
+    showView('landing');
+    loadLanding();
 }
 
 // ---- Fireworks Animation ----
@@ -1446,8 +1532,139 @@ function playFireworks(onComplete) {
     requestAnimationFrame(animate);
 }
 
+// ---- Landing Page ----
+
+async function loadLanding() {
+    loadLandingFiles();
+    loadLandingDeliveries();
+}
+
+async function loadLandingFiles() {
+    const container = document.getElementById('landing-files');
+    container.innerHTML = '<div class="loading">Loading files...</div>';
+    try {
+        const data = await apiGet('/storage/files');
+        if (!data.files || !data.files.length) {
+            container.innerHTML = `
+                <div class="empty-state-sm">
+                    <p>No files in incoming folder</p>
+                </div>`;
+            return;
+        }
+        container.innerHTML = data.files.map(f => `
+            <div class="card storage-card" onclick="parseStorageFile('${f.name}')">
+                <div>
+                    <div class="card-title">${f.name}</div>
+                    <div class="card-subtitle">${formatSize(f.size)} &middot; ${formatTimestamp(f.updated)}</div>
+                </div>
+                <span class="storage-parse-label">Import</span>
+            </div>
+        `).join('');
+    } catch (e) {
+        container.innerHTML = `<div class="empty-state-sm"><p>Could not load files</p></div>`;
+    }
+}
+
+async function loadLandingDeliveries() {
+    const container = document.getElementById('landing-deliveries');
+    container.innerHTML = '<div class="loading">Loading deliveries...</div>';
+    try {
+        const [delData, repData] = await Promise.all([
+            apiGet('/deliveries'),
+            apiGet('/reports').catch(() => ({ reports: [] })),
+        ]);
+        if (!delData.deliveries || !delData.deliveries.length) {
+            container.innerHTML = `<div class="empty-state-sm"><p>No deliveries yet</p></div>`;
+            return;
+        }
+        // Move deliveries section above files when deliveries exist
+        const sectionDeliveries = document.getElementById('section-deliveries');
+        const sectionFiles = document.getElementById('section-files');
+        sectionDeliveries.parentNode.insertBefore(sectionDeliveries, sectionFiles);
+
+        // Build a map of delivery_id -> report for completed deliveries
+        const reportsByDeliveryId = {};
+        (repData.reports || []).forEach(r => {
+            reportsByDeliveryId[r.delivery_id] = r;
+        });
+
+        container.innerHTML = delData.deliveries.map(d => {
+            const pct = d.item_count > 0 ? Math.round((d.checked_in_count / d.item_count) * 100) : 0;
+            const label = `${d.day_of_week} ${formatDate(d.delivery_date)}`;
+            const canDelete = d.checked_in_count === 0 || d.status === 'completed';
+            const deleteBtn = canDelete
+                ? `<button class="delete-btn" onclick="event.stopPropagation(); deleteLandingDelivery('${d.id}', '${label}')" title="Delete delivery">&times;</button>`
+                : '';
+
+            // Show "View Report" button on completed deliveries that have a report
+            const report = reportsByDeliveryId[d.id];
+            let reportBtn = '';
+            if (d.status === 'completed' && report) {
+                const excLabel = report.total_exceptions > 0
+                    ? `${report.total_exceptions} exception${report.total_exceptions !== 1 ? 's' : ''}`
+                    : 'No exceptions';
+                reportBtn = `<button class="btn-view-report" onclick="event.stopPropagation(); showReportById('${report.id}')">Report: ${excLabel}</button>`;
+            }
+
+            return `
+            <div class="card" onclick="openDelivery('${d.id}')">
+                <div class="card-header">
+                    <div>
+                        <div class="card-title">${label}</div>
+                        <div class="card-subtitle">${d.source_filename}</div>
+                    </div>
+                    <div class="card-header-right">
+                        <span class="badge badge-${d.status.replace('_', '-')}">${d.status.replace('_', ' ')}</span>
+                        ${deleteBtn}
+                    </div>
+                </div>
+                <div class="card-meta">
+                    <span class="card-meta-item">${d.supplier_count} suppliers</span>
+                    <span class="card-meta-item">${d.checked_in_count}/${d.item_count} checked in</span>
+                </div>
+                <div class="progress-bar">
+                    <div class="progress-fill" style="width: ${pct}%"></div>
+                </div>
+                ${reportBtn}
+            </div>`;
+        }).join('');
+    } catch (e) {
+        container.innerHTML = `<div class="empty-state-sm"><p>Could not load deliveries</p></div>`;
+    }
+}
+
+async function deleteLandingDelivery(id, name) {
+    if (!confirm(`Delete delivery "${name}"?\n\nThis cannot be undone.`)) return;
+    try {
+        await apiDelete(`/deliveries/${id}`);
+        showToast('Delivery deleted');
+        loadLandingDeliveries();
+    } catch (e) {
+        showToast('Failed to delete delivery', 'error');
+    }
+}
+
+
+
+// ---- Version History ----
+
+function showVersionHistory() {
+    const container = document.getElementById('version-list');
+    container.innerHTML = VERSION_HISTORY.map((entry, idx) => `
+        <div class="version-entry${idx === 0 ? ' version-current' : ''}">
+            <span class="version-number">${entry.version}</span>
+            <span class="version-desc">${entry.description}</span>
+        </div>
+    `).join('');
+    document.getElementById('version-modal').classList.remove('hidden');
+}
+
+function closeVersionModal() {
+    document.getElementById('version-modal').classList.add('hidden');
+}
+
 // ---- Init ----
 document.addEventListener('DOMContentLoaded', () => {
-    showView('deliveries');
-    loadDeliveries();
+    showView('landing');
+    loadLanding();
 });
