@@ -65,6 +65,11 @@ async def parse_storage_file(file_name: str, request: Request):
         # Parse the file
         delivery = delivery_service.parse_local_file(local_path)
         delivery.firebase_path = firebase_path
+    except ValueError as e:
+        raise HTTPException(
+            status_code=409,
+            detail=str(e),
+        )
     except Exception as e:
         raise HTTPException(
             status_code=500,

@@ -7,6 +7,7 @@ const API = '/api/v1';
 
 // ---- Version History ----
 const VERSION_HISTORY = [
+    { version: 'v1.01', description: 'Landing page refinements, inline reports, navigation fixes' },
     { version: 'v1.00', description: 'Landing page, app title, version history' },
     { version: 'v0.29', description: 'Firestore real-time listeners for live cross-iPad updates' },
     { version: 'v0.28', description: 'Supplier accordion, progress bars, expand/collapse, report deletion' },
@@ -529,7 +530,14 @@ async function showStorageFiles() {
 async function parseStorageFile(fileName) {
     showToast('Parsing file...', 'info');
     try {
-        const data = await apiPost(`/storage/files/${encodeURIComponent(fileName)}/parse`);
+        const res = await fetch(API + `/storage/files/${encodeURIComponent(fileName)}/parse`, { method: 'POST' });
+        if (!res.ok) {
+            const err = await res.json().catch(() => null);
+            const msg = err && err.detail ? err.detail : 'Failed to parse file';
+            showToast(msg, 'error');
+            return;
+        }
+        const data = await res.json();
         showToast(`Parsed: ${data.supplier_count} suppliers, ${data.item_count} items`, 'success');
         openDelivery(data.delivery_id);
     } catch (e) {

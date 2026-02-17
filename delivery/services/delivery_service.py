@@ -98,6 +98,17 @@ class DeliveryService:
         delivery.source_filename = path.name
         delivery.parsed_at = datetime.utcnow()
 
+        # Check for existing non-completed delivery on the same date
+        if delivery.delivery_date:
+            existing = self.list_deliveries()
+            for d in existing:
+                if (d.delivery_date == delivery.delivery_date
+                        and d.status != DeliveryStatus.COMPLETED):
+                    raise ValueError(
+                        f"Delivery already in progress for {delivery.day_of_week} "
+                        f"{delivery.delivery_date}"
+                    )
+
         # Persist
         self._save_delivery(delivery)
         return delivery

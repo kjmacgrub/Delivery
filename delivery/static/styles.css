@@ -1195,14 +1195,15 @@ textarea {
 /* ---- Toast ---- */
 #toast-container {
     position: fixed;
-    bottom: calc(var(--safe-bottom) + 20px);
+    top: 50%;
     left: 50%;
-    transform: translateX(-50%);
+    transform: translate(-50%, -50%);
     z-index: 300;
     display: flex;
     flex-direction: column;
     gap: 8px;
     align-items: center;
+    pointer-events: none;
 }
 
 .toast {
@@ -1217,7 +1218,13 @@ textarea {
 }
 
 .toast.success { background: var(--success-dark); }
-.toast.error { background: var(--danger); }
+.toast.error {
+    background: var(--danger);
+    font-size: 17px;
+    padding: 20px 32px;
+    max-width: 80vw;
+    text-align: center;
+}
 
 #app-version {
     text-align: center;
