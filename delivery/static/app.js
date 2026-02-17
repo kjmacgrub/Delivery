@@ -7,6 +7,9 @@ const API = '/api/v1';
 
 // ---- Version History ----
 const VERSION_HISTORY = [
+    { version: 'v1.12', description: 'Discrepancies rename, pull confirmation, supplier sort, UI polish' },
+    { version: 'v1.06', description: 'Discrepancies rename, notes in reports, header cleanup' },
+    { version: 'v1.02', description: 'Pull confirmation, auto-detect suppliers, live discrepancies, cross-supplier view' },
     { version: 'v1.01', description: 'Landing page refinements, inline reports, navigation fixes' },
     { version: 'v1.00', description: 'Landing page, app title, version history' },
     { version: 'v0.29', description: 'Firestore real-time listeners for live cross-iPad updates' },
@@ -569,7 +572,6 @@ async function openDelivery(id) {
         searchQuery = ''; // reset search
         // Reset supplier filter UI
         document.getElementById('item-receive-all-btn').innerHTML = '';
-        document.getElementById('detail-title').setAttribute('onclick', 'goBack()');
         renderDetail();
         showView('detail');
 
@@ -607,15 +609,11 @@ function renderDetail() {
         const supExp = casesExpected(supplier.items);
         detailTitle.classList.remove('hidden');
         document.getElementById('detail-title-text').textContent = supplier.supplier_name;
-        document.getElementById('detail-back-text').textContent = 'All Suppliers';
-        detailTitle.setAttribute('onclick', 'clearSupplierFilter()');
         document.getElementById('delivery-summary').innerHTML =
             progressBar(supRcv, supExp, receivedToggleClass);
     } else {
         // Normal delivery view — date is in header, hide detail-title
         detailTitle.classList.add('hidden');
-        document.getElementById('detail-back-text').textContent = '';
-        detailTitle.setAttribute('onclick', 'goBack()');
         const allItems = delivery.suppliers.flatMap(s => s.items);
         const rcvCases = casesReceived(allItems);
         document.getElementById('delivery-summary').innerHTML =
@@ -740,19 +738,16 @@ function renderItemList() {
         flatItems = flatItems.filter(item => item.supplierIdx === supplierFilter.idx);
     }
 
-    // Update sort button states
-    const isSupplierSort = itemSortMode === 'supplier';
+    // Update sort button states — only one active at a time
     document.getElementById('sort-alpha').classList.toggle('active', itemSortMode === 'alpha');
-    const casesBtn = document.getElementById('sort-qty');
-    casesBtn.classList.toggle('active', itemSortMode === 'qty');
-    casesBtn.classList.toggle('hidden', isSupplierSort);
+    document.getElementById('sort-qty').classList.toggle('active', itemSortMode === 'qty');
     const supplierBtn = document.getElementById('sort-supplier');
-    supplierBtn.classList.toggle('active', isSupplierSort);
+    supplierBtn.classList.toggle('active', itemSortMode === 'supplier');
     supplierBtn.classList.toggle('hidden', supplierFilter !== null);
 
     // Show expand/collapse toggle only in supplier accordion mode
     const expandBtn = document.getElementById('expand-collapse-btn');
-    if (isSupplierSort && supplierFilter === null) {
+    if (itemSortMode === 'supplier' && supplierFilter === null) {
         const allExpanded = currentDelivery.suppliers.length > 0 &&
             currentDelivery.suppliers.every((s, idx) => expandedSuppliers.has(idx));
         expandBtn.textContent = allExpanded ? 'Collapse All' : 'Expand All';
@@ -941,7 +936,10 @@ function renderSupplierAccordion(container, flatItems) {
         html += `
         <div class="supplier-accordion-header ${statusClass}" onclick="toggleSupplierAccordion(${sIdx})">
             <span class="${chevronClass}">&#9654;</span>
-            <span class="accordion-supplier-name">${supplier.supplier_name}</span>
+            <span class="accordion-supplier-name">${supplier.supplier_name} <span class="accordion-case-count">${fmtNum(expCases)}</span></span>
+            <span class="accordion-focus" onclick="event.stopPropagation(); filterBySupplier(${sIdx})" title="Focus on ${supplier.supplier_name}">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M9 18l6-6-6-6"/><path d="M16 18l6-6-6-6"/></svg>
+            </span>
             <span class="accordion-progress">
                 <span class="accordion-progress-track">
                     <span class="accordion-progress-fill" style="width: ${pct}%"></span>
@@ -987,7 +985,7 @@ function filterBySupplier(supplierIdx) {
     const supplier = currentDelivery.suppliers[supplierIdx];
     supplierFilter = { idx: supplierIdx, name: supplier.supplier_name };
 
-    // Switch away from supplier sort (irrelevant with single supplier)
+    // Switch to alpha sort when drilling into a single supplier
     if (itemSortMode === 'supplier') {
         itemSortMode = 'alpha';
     }
@@ -1005,8 +1003,6 @@ function filterBySupplier(supplierIdx) {
     const detailTitle = document.getElementById('detail-title');
     detailTitle.classList.remove('hidden');
     document.getElementById('detail-title-text').textContent = supplier.supplier_name;
-    document.getElementById('detail-back-text').textContent = 'All Suppliers';
-    detailTitle.setAttribute('onclick', 'clearSupplierFilter()');
 
     // Receive All / Unreceive All button in sort bar
     renderReceiveAllButton(supplierIdx, 'item-receive-all-btn');
@@ -1020,8 +1016,7 @@ function filterBySupplier(supplierIdx) {
 function clearSupplierFilter() {
     supplierFilter = null;
     searchQuery = '';
-    // Restore detail-title onclick
-    document.getElementById('detail-title').setAttribute('onclick', 'goBack()');
+    itemSortMode = 'supplier'; // return to supplier accordion view
     document.getElementById('item-receive-all-btn').innerHTML = '';
     // Reset search input
     const searchInput = document.getElementById('item-search');
@@ -1695,8 +1690,18 @@ function playFireworks(onComplete) {
 // ---- Landing Page ----
 
 async function loadLanding() {
-    loadLandingFiles();
+    // Reset files section to collapsed
+    document.getElementById('show-files-btn').classList.remove('hidden');
+    document.getElementById('landing-files-header').classList.add('hidden');
+    document.getElementById('landing-files').classList.add('hidden');
     loadLandingDeliveries();
+}
+
+function expandLandingFiles() {
+    document.getElementById('show-files-btn').classList.add('hidden');
+    document.getElementById('landing-files-header').classList.remove('hidden');
+    document.getElementById('landing-files').classList.remove('hidden');
+    loadLandingFiles();
 }
 
 async function loadLandingFiles() {
@@ -1825,6 +1830,11 @@ function closeVersionModal() {
 
 // ---- Init ----
 document.addEventListener('DOMContentLoaded', () => {
+    // Set version from single source of truth
+    const currentVersion = VERSION_HISTORY[0].version;
+    document.querySelector('.landing-version').textContent = currentVersion;
+    document.getElementById('app-version').textContent = currentVersion;
+
     showView('landing');
     loadLanding();
 });

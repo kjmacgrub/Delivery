@@ -379,30 +379,26 @@ html, body {
     align-items: center;
     justify-content: center;
     margin-bottom: 12px;
-    cursor: pointer;
-    -webkit-tap-highlight-color: transparent;
-    position: relative;
+    gap: 8px;
 }
 
-.detail-title:active {
-    opacity: 0.6;
-}
-
-.detail-back-label {
+.detail-nav {
     display: flex;
     align-items: center;
-    position: absolute;
-    left: 0;
-}
-
-.detail-back-arrow {
+    gap: 2px;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+    color: var(--primary);
     flex-shrink: 0;
 }
 
-.detail-back-text {
-    font-size: 20px;
+.detail-nav:active {
+    opacity: 0.5;
+}
+
+.detail-nav-text {
+    font-size: 15px;
     font-weight: 500;
-    color: var(--primary);
 }
 
 #detail-title-text {
@@ -1681,6 +1677,12 @@ textarea {
     text-overflow: ellipsis;
 }
 
+.accordion-case-count {
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--text-secondary);
+}
+
 .accordion-progress {
     flex-shrink: 0;
     width: 33%;
@@ -1714,6 +1716,24 @@ textarea {
 
 .accordion-receive-all {
     flex-shrink: 0;
+}
+
+.accordion-focus {
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    color: var(--text-secondary);
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+}
+
+.accordion-focus:active {
+    background: rgba(0,0,0,0.08);
+    color: var(--primary);
 }
 
 .compact-row.accordion-item {
@@ -1789,6 +1809,23 @@ textarea {
     letter-spacing: 0.5px;
     margin-bottom: 10px;
     padding-left: 4px;
+}
+
+.landing-action {
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--primary);
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+    padding: 12px 16px;
+    background: var(--surface);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    text-align: center;
+}
+
+.landing-action:active {
+    opacity: 0.6;
 }
 
 .empty-state-sm {

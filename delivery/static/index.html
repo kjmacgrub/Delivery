@@ -6,7 +6,7 @@
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <title>Daily Delivery Tracker</title>
-    <link rel="stylesheet" href="/static/styles.css?v=1.08">
+    <link rel="stylesheet" href="/static/styles.css?v=1.18">
 </head>
 <body>
     <div id="app">
@@ -41,13 +41,12 @@
         <div id="view-landing" class="view active">
             <div class="landing-page">
                 <h1 class="landing-title">Daily Delivery</h1>
-                <span class="landing-version" onclick="showVersionHistory()">v1.06</span>
+                <span class="landing-version" onclick="showVersionHistory()"></span>
 
                 <div id="section-files" class="landing-section">
-                    <h2 class="landing-section-title">Available Day(s)</h2>
-                    <div id="landing-files" class="card-list">
-                        <div class="loading">Loading files...</div>
-                    </div>
+                    <div id="show-files-btn" class="landing-action" onclick="expandLandingFiles()">Show available delivery days</div>
+                    <h2 id="landing-files-header" class="landing-section-title hidden">Available Worksheets</h2>
+                    <div id="landing-files" class="card-list hidden"></div>
                 </div>
 
                 <div id="section-deliveries" class="landing-section">
@@ -103,14 +102,16 @@
         <!-- View: Delivery Detail (Item/Supplier toggle) -->
         <div id="view-detail" class="view">
             <div id="delivery-summary" class="summary-bar"></div>
-            <div id="detail-title" class="detail-title" onclick="goBack()">
-                <div class="detail-back-label">
-                    <svg class="detail-back-arrow" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M15 18l-6-6 6-6"/>
-                    </svg>
-                    <span id="detail-back-text" class="detail-back-text"></span>
+            <div id="detail-title" class="detail-title hidden">
+                <div id="detail-nav-left" class="detail-nav" onclick="clearSupplierFilter()">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M15 18l-6-6 6-6"/></svg>
+                    <span class="detail-nav-text">All Suppliers</span>
                 </div>
                 <span id="detail-title-text"></span>
+                <div id="detail-nav-right" class="detail-nav" onclick="clearSupplierFilter()">
+                    <span class="detail-nav-text">All Suppliers</span>
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M9 18l6-6-6-6"/></svg>
+                </div>
             </div>
             <div id="tab-content-items">
                 <div class="sort-bar">
@@ -228,13 +229,13 @@
         <div id="toast-container"></div>
 
         <!-- Version -->
-        <div id="app-version" onclick="showVersionHistory()">v1.06</div>
+        <div id="app-version" onclick="showVersionHistory()"></div>
     </div>
 
     <!-- Firebase SDK (compat for vanilla JS) -->
     <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
 
-    <script src="/static/app.js?v=1.08"></script>
+    <script src="/static/app.js?v=1.18"></script>
 </body>
 </html>
