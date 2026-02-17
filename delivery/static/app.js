@@ -73,7 +73,7 @@ function showView(name) {
     }
 
     // Default brand text; detail view overrides with date
-    brand.textContent = 'Daily Delivery';
+    brand.textContent = '';
 
     // Exceptions button only visible in detail view
     document.getElementById('exceptions-btn').classList.toggle('hidden', name !== 'detail');
@@ -112,13 +112,13 @@ function showView(name) {
             badge.textContent = 'completed';
             badge.className = 'badge badge-completed';
             if (currentDelivery) {
-                brand.textContent = `Daily Delivery — ${currentDelivery.day_of_week} ${formatDate(currentDelivery.delivery_date)}`;
+                brand.textContent = `${currentDelivery.day_of_week} ${formatDate(currentDelivery.delivery_date)}`;
             }
             break;
         case 'reports':
             headerRow.classList.remove('hidden');
             backBtn.classList.remove('hidden');
-            title.textContent = 'Exception Reports';
+            title.textContent = 'Discrepancy Reports';
             badge.textContent = '';
             badge.className = 'badge';
             break;
@@ -360,7 +360,7 @@ async function deleteDelivery(id, name) {
     }
 }
 
-// ---- Exception Reports ----
+// ---- Discrepancy Reports ----
 async function showReports() {
     showView('reports');
     const container = document.getElementById('report-list');
@@ -372,7 +372,7 @@ async function showReports() {
             container.innerHTML = `
                 <div class="empty-state">
                     <p>No reports yet</p>
-                    <p class="subtitle">Exception reports are created when deliveries are completed</p>
+                    <p class="subtitle">Discrepancy reports are created when deliveries are completed</p>
                 </div>`;
             return;
         }
@@ -395,8 +395,8 @@ function renderReportList(reports) {
         const deliveryDate = r.delivery_date ? formatDate(r.delivery_date) : '';
         const hasExceptions = r.total_exceptions > 0;
         const exceptionBadge = hasExceptions
-            ? `<span class="report-exception-count">${r.total_exceptions} exception${r.total_exceptions !== 1 ? 's' : ''}</span>`
-            : `<span class="report-no-exceptions">No exceptions</span>`;
+            ? `<span class="report-exception-count">${r.total_exceptions} discrepanc${r.total_exceptions !== 1 ? 'ies' : 'y'}</span>`
+            : `<span class="report-no-exceptions">No discrepancies</span>`;
 
         const exceptionRows = (r.exception_items || []).map(item => {
             const statusClass = item.received_status;
@@ -435,7 +435,7 @@ function renderReportList(reports) {
                 <span class="card-meta-item">${r.source_filename}</span>
             </div>
             <div class="report-detail" id="report-detail-${idx}" style="display:none;">
-                ${hasExceptions ? exceptionRows : '<div class="report-all-good">✓ Everything matched — no exceptions</div>'}
+                ${hasExceptions ? exceptionRows : '<div class="report-all-good">✓ Everything matched — no discrepancies</div>'}
                 <button class="report-delete-btn" onclick="event.stopPropagation(); deleteReport(${idx})">Delete Report</button>
             </div>
         </div>`;
@@ -486,7 +486,7 @@ async function deleteReport(idx) {
             document.getElementById('report-list').innerHTML = `
                 <div class="empty-state">
                     <p>No reports yet</p>
-                    <p class="subtitle">Exception reports are created when deliveries are completed</p>
+                    <p class="subtitle">Discrepancy reports are created when deliveries are completed</p>
                 </div>`;
         } else {
             renderReportList(cachedReports);
@@ -596,7 +596,7 @@ function renderDetail() {
 
     // Always show delivery date in header brand
     const brand = document.getElementById('header-brand');
-    brand.textContent = `Daily Delivery — ${delivery.day_of_week} ${formatDate(delivery.delivery_date)}`;
+    brand.textContent = `${delivery.day_of_week} ${formatDate(delivery.delivery_date)}`;
 
     const detailTitle = document.getElementById('detail-title');
 
@@ -607,12 +607,14 @@ function renderDetail() {
         const supExp = casesExpected(supplier.items);
         detailTitle.classList.remove('hidden');
         document.getElementById('detail-title-text').textContent = supplier.supplier_name;
+        document.getElementById('detail-back-text').textContent = 'All Suppliers';
         detailTitle.setAttribute('onclick', 'clearSupplierFilter()');
         document.getElementById('delivery-summary').innerHTML =
             progressBar(supRcv, supExp, receivedToggleClass);
     } else {
         // Normal delivery view — date is in header, hide detail-title
         detailTitle.classList.add('hidden');
+        document.getElementById('detail-back-text').textContent = '';
         detailTitle.setAttribute('onclick', 'goBack()');
         const allItems = delivery.suppliers.flatMap(s => s.items);
         const rcvCases = casesReceived(allItems);
@@ -646,16 +648,17 @@ function showLiveExceptions() {
     if (exceptions.length === 0) {
         listEl.innerHTML = `
             <div class="no-exceptions">
-                <p>No exceptions so far</p>
+                <p>No discrepancies so far</p>
             </div>`;
     } else {
         listEl.innerHTML = `
-            <div class="exception-count">${exceptions.length} exception${exceptions.length > 1 ? 's' : ''}</div>
+            <div class="exception-count">${exceptions.length} discrepanc${exceptions.length > 1 ? 'ies' : 'y'}</div>
             ${exceptions.map(ex => `
                 <div class="exception-row exception-${ex.status}">
                     <div class="exception-info">
                         <div class="exception-name">${ex.description}</div>
                         <div class="exception-supplier">${ex.supplierName}</div>
+                        ${ex.notes ? `<div class="exception-note">${ex.notes}</div>` : ''}
                     </div>
                     <div class="exception-qty">
                         <span class="exception-expected">${ex.expected}</span>
@@ -669,10 +672,10 @@ function showLiveExceptions() {
 
     // Reuse the complete modal but with a dismiss button
     const modal = document.getElementById('complete-modal');
-    document.querySelector('.complete-modal-content .modal-header h2').textContent = 'Exceptions';
+    document.querySelector('.complete-modal-content .modal-header h2').textContent = 'Discrepancies';
     document.querySelector('.complete-subtitle').textContent = exceptions.length > 0
         ? `${exceptions.length} item${exceptions.length !== 1 ? 's' : ''} with discrepancies`
-        : 'All received items match expected quantities';
+        : 'All received items match expected quantities — no discrepancies';
     // Hide the confirm button, change continue button text
     document.querySelector('.complete-modal-content .modal-footer').innerHTML = `
         <button class="btn btn-secondary" onclick="dismissCompletionModal()">Close</button>`;
@@ -1002,6 +1005,7 @@ function filterBySupplier(supplierIdx) {
     const detailTitle = document.getElementById('detail-title');
     detailTitle.classList.remove('hidden');
     document.getElementById('detail-title-text').textContent = supplier.supplier_name;
+    document.getElementById('detail-back-text').textContent = 'All Suppliers';
     detailTitle.setAttribute('onclick', 'clearSupplierFilter()');
 
     // Receive All / Unreceive All button in sort bar
@@ -1525,16 +1529,17 @@ function showCompletionModal() {
     if (exceptions.length === 0) {
         listEl.innerHTML = `
             <div class="no-exceptions">
-                <p>No exceptions — everything matched!</p>
+                <p>No discrepancies — everything matched!</p>
             </div>`;
     } else {
         listEl.innerHTML = `
-            <div class="exception-count">${exceptions.length} exception${exceptions.length > 1 ? 's' : ''}</div>
+            <div class="exception-count">${exceptions.length} discrepanc${exceptions.length > 1 ? 'ies' : 'y'}</div>
             ${exceptions.map(ex => `
                 <div class="exception-row exception-${ex.status}">
                     <div class="exception-info">
                         <div class="exception-name">${ex.description}</div>
                         <div class="exception-supplier">${ex.supplierName}</div>
+                        ${ex.notes ? `<div class="exception-note">${ex.notes}</div>` : ''}
                     </div>
                     <div class="exception-qty">
                         <span class="exception-expected">${ex.expected}</span>
@@ -1546,9 +1551,9 @@ function showCompletionModal() {
             `).join('')}`;
     }
 
-    // Restore completion modal header/footer (may have been overridden by live exceptions view)
+    // Restore completion modal header/footer (may have been overridden by live discrepancies view)
     document.querySelector('.complete-modal-content .modal-header h2').textContent = 'All items received!';
-    document.querySelector('.complete-subtitle').textContent = 'See exceptions below. Continue to confirm delivery over?';
+    document.querySelector('.complete-subtitle').textContent = 'See discrepancies below. Continue to confirm delivery over?';
     document.querySelector('.complete-modal-content .modal-footer').innerHTML = `
         <button class="btn btn-secondary" onclick="dismissCompletionModal()">Continue Checking In</button>
         <button class="btn btn-success" onclick="confirmDeliveryComplete()">Confirm Delivery Complete</button>`;
@@ -1756,8 +1761,8 @@ async function loadLandingDeliveries() {
             let reportBtn = '';
             if (d.status === 'completed' && report) {
                 const excLabel = report.total_exceptions > 0
-                    ? `${report.total_exceptions} exception${report.total_exceptions !== 1 ? 's' : ''}`
-                    : 'No exceptions';
+                    ? `${report.total_exceptions} discrepanc${report.total_exceptions !== 1 ? 'ies' : 'y'}`
+                    : 'No discrepancies';
                 reportBtn = `<button class="btn-view-report" onclick="event.stopPropagation(); showReportById('${report.id}')">Report: ${excLabel}</button>`;
             }
 

@@ -6,7 +6,7 @@
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <title>Daily Delivery Tracker</title>
-    <link rel="stylesheet" href="/static/styles.css?v=1.02">
+    <link rel="stylesheet" href="/static/styles.css?v=1.08">
 </head>
 <body>
     <div id="app">
@@ -24,7 +24,7 @@
                 </div>
                 <div class="header-right">
                     <button id="exceptions-btn" class="btn-exceptions hidden" onclick="showLiveExceptions()">
-                        <span id="exceptions-count">0</span> Exceptions
+                        <span id="exceptions-count">0</span> Discrepancies
                     </button>
                     <span id="status-badge" class="badge"></span>
                     <button id="refresh-btn" class="icon-btn" onclick="refreshData()">
@@ -41,7 +41,7 @@
         <div id="view-landing" class="view active">
             <div class="landing-page">
                 <h1 class="landing-title">Daily Delivery</h1>
-                <span class="landing-version" onclick="showVersionHistory()">v1.01</span>
+                <span class="landing-version" onclick="showVersionHistory()">v1.06</span>
 
                 <div id="section-files" class="landing-section">
                     <h2 class="landing-section-title">Available Day(s)</h2>
@@ -104,9 +104,12 @@
         <div id="view-detail" class="view">
             <div id="delivery-summary" class="summary-bar"></div>
             <div id="detail-title" class="detail-title" onclick="goBack()">
-                <svg class="detail-back-arrow" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path d="M15 18l-6-6 6-6"/>
-                </svg>
+                <div class="detail-back-label">
+                    <svg class="detail-back-arrow" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M15 18l-6-6 6-6"/>
+                    </svg>
+                    <span id="detail-back-text" class="detail-back-text"></span>
+                </div>
                 <span id="detail-title-text"></span>
             </div>
             <div id="tab-content-items">
@@ -184,7 +187,7 @@
                     <h2>All items received!</h2>
                 </div>
                 <div class="modal-body">
-                    <p class="complete-subtitle">See exceptions below. Continue to confirm delivery over?</p>
+                    <p class="complete-subtitle">See discrepancies below. Continue to confirm delivery over?</p>
                     <div id="exception-list" class="exception-list"></div>
                 </div>
                 <div class="modal-footer">
@@ -225,13 +228,13 @@
         <div id="toast-container"></div>
 
         <!-- Version -->
-        <div id="app-version" onclick="showVersionHistory()">v1.01</div>
+        <div id="app-version" onclick="showVersionHistory()">v1.06</div>
     </div>
 
     <!-- Firebase SDK (compat for vanilla JS) -->
     <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
 
-    <script src="/static/app.js?v=1.02"></script>
+    <script src="/static/app.js?v=1.08"></script>
 </body>
 </html>
