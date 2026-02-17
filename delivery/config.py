@@ -38,6 +38,7 @@ KNOWN_SUPPLIERS = [
     "Flowering Sun Ecology Center",
     "Four Seasons Produce",
     "Gotham Greens",
+    "Hepworth Farms",
     "Jedda",
     "Lancaster Farm Fresh Coop",
     "Myers Produce",

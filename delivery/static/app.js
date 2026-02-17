@@ -75,6 +75,9 @@ function showView(name) {
     // Default brand text; detail view overrides with date
     brand.textContent = 'Daily Delivery';
 
+    // Exceptions button only visible in detail view
+    document.getElementById('exceptions-btn').classList.toggle('hidden', name !== 'detail');
+
     switch (name) {
         case 'landing':
             badge.textContent = '';
@@ -95,7 +98,9 @@ function showView(name) {
             badge.className = 'badge';
             break;
         case 'detail':
-            headerRow.classList.add('hidden');
+            headerRow.classList.remove('hidden');
+            backBtn.classList.remove('hidden');
+            title.textContent = '';
             badge.textContent = '';
             badge.className = 'badge';
             // Brand text updated by renderDetail() with delivery date
@@ -584,7 +589,8 @@ function renderDetail() {
     const totalItems = delivery.suppliers.reduce((sum, s) => sum + s.items.length, 0);
     const checkedIn = delivery.suppliers.reduce((sum, s) =>
         sum + s.items.filter(i => i.received_status !== 'pending').length, 0);
-    const totalCases = delivery.total_cases_expected;
+    const allItemsFlat = delivery.suppliers.flatMap(s => s.items);
+    const totalCases = casesExpected(allItemsFlat);
 
     const receivedToggleClass = showReceived ? 'summary-stat clickable active-stat' : 'summary-stat clickable';
 
@@ -622,6 +628,55 @@ function renderDetail() {
     }
 
     renderItemList();
+    updateExceptionsButton();
+}
+
+function updateExceptionsButton() {
+    const exceptions = getExceptionItems();
+    const btn = document.getElementById('exceptions-btn');
+    const countEl = document.getElementById('exceptions-count');
+    countEl.textContent = exceptions.length;
+    btn.classList.toggle('has-exceptions', exceptions.length > 0);
+}
+
+function showLiveExceptions() {
+    const exceptions = getExceptionItems();
+    const listEl = document.getElementById('exception-list');
+
+    if (exceptions.length === 0) {
+        listEl.innerHTML = `
+            <div class="no-exceptions">
+                <p>No exceptions so far</p>
+            </div>`;
+    } else {
+        listEl.innerHTML = `
+            <div class="exception-count">${exceptions.length} exception${exceptions.length > 1 ? 's' : ''}</div>
+            ${exceptions.map(ex => `
+                <div class="exception-row exception-${ex.status}">
+                    <div class="exception-info">
+                        <div class="exception-name">${ex.description}</div>
+                        <div class="exception-supplier">${ex.supplierName}</div>
+                    </div>
+                    <div class="exception-qty">
+                        <span class="exception-expected">${ex.expected}</span>
+                        <span class="exception-arrow">&rarr;</span>
+                        <span class="exception-received">${ex.received ?? 0}</span>
+                    </div>
+                    <span class="badge badge-${ex.status}">${ex.status}</span>
+                </div>
+            `).join('')}`;
+    }
+
+    // Reuse the complete modal but with a dismiss button
+    const modal = document.getElementById('complete-modal');
+    document.querySelector('.complete-modal-content .modal-header h2').textContent = 'Exceptions';
+    document.querySelector('.complete-subtitle').textContent = exceptions.length > 0
+        ? `${exceptions.length} item${exceptions.length !== 1 ? 's' : ''} with discrepancies`
+        : 'All received items match expected quantities';
+    // Hide the confirm button, change continue button text
+    document.querySelector('.complete-modal-content .modal-footer').innerHTML = `
+        <button class="btn btn-secondary" onclick="dismissCompletionModal()">Close</button>`;
+    modal.classList.remove('hidden');
 }
 
 function toggleReceivedView() {
@@ -746,7 +801,44 @@ function renderItemList() {
         return;
     }
 
-    container.innerHTML = flatItems.map(item => renderCompactRow(item, true)).join('');
+    // When filtered by supplier, show cross-supplier info for matching items
+    if (supplierFilter !== null) {
+        const crossSupplierMap = buildCrossSupplierMap();
+        container.innerHTML = flatItems.map(item => {
+            let html = renderCompactRow(item, false);
+            const key = item.raw_description.toLowerCase();
+            const others = crossSupplierMap[key];
+            if (others && others.length > 0) {
+                html += others.map(o =>
+                    `<div class="compact-row cross-supplier-row">
+                        <div class="compact-qty cross-supplier-qty">${o.qty}</div>
+                        <div class="compact-name cross-supplier-name">also from ${o.supplierName}</div>
+                    </div>`
+                ).join('');
+            }
+            return html;
+        }).join('');
+    } else {
+        container.innerHTML = flatItems.map(item => renderCompactRow(item, true)).join('');
+    }
+}
+
+function buildCrossSupplierMap() {
+    // Build a map of item description -> [{ supplierName, qty }] for OTHER suppliers
+    if (!currentDelivery || supplierFilter === null) return {};
+    const map = {};
+    currentDelivery.suppliers.forEach((supplier, sIdx) => {
+        if (sIdx === supplierFilter.idx) return; // skip current supplier
+        supplier.items.forEach(item => {
+            const key = item.raw_description.toLowerCase();
+            if (!map[key]) map[key] = [];
+            map[key].push({
+                supplierName: supplier.supplier_name,
+                qty: item.quantity_expected,
+            });
+        });
+    });
+    return map;
 }
 
 function renderCompactRow(item, showSupplier) {
@@ -763,7 +855,10 @@ function renderCompactRow(item, showSupplier) {
             </svg>
            </div>`;
 
-    const pullQty = item.pull_quantity != null ? `<span class="pull-qty">(${item.pull_quantity})</span> ` : '';
+    const pullConfirmedClass = item.pull_confirmed ? 'pull-confirmed' : '';
+    const pullQty = item.pull_quantity != null
+        ? `<span class="pull-qty ${pullConfirmedClass}" onclick="event.stopPropagation(); togglePullFromList(${item.supplierIdx}, ${item.itemIdx})">(${item.pull_quantity})</span> `
+        : '';
     const supplierChip = showSupplier
         ? `<div class="compact-supplier" onclick="event.stopPropagation(); filterBySupplier(${item.supplierIdx})">${item.supplierAbbrev}</div>`
         : '';
@@ -904,8 +999,10 @@ function filterBySupplier(supplierIdx) {
         progressBar(supRcvF, supExpF, rcvClass);
 
     // Reuse the detail-title with supplier name, make it go back to clear filter
+    const detailTitle = document.getElementById('detail-title');
+    detailTitle.classList.remove('hidden');
     document.getElementById('detail-title-text').textContent = supplier.supplier_name;
-    document.getElementById('detail-title').setAttribute('onclick', 'clearSupplierFilter()');
+    detailTitle.setAttribute('onclick', 'clearSupplierFilter()');
 
     // Receive All / Unreceive All button in sort bar
     renderReceiveAllButton(supplierIdx, 'item-receive-all-btn');
@@ -991,6 +1088,18 @@ function openCheckInModal(itemIdx) {
         selectedReason = null;
     }
 
+    // Pull confirmation checkbox
+    const pullGroup = document.getElementById('pull-confirm-group');
+    const pullCheckbox = document.getElementById('pull-confirm-checkbox');
+    const pullQtySpan = document.getElementById('pull-confirm-qty');
+    if (item.pull_quantity != null && item.pull_quantity > 0) {
+        pullGroup.classList.remove('hidden');
+        pullQtySpan.textContent = item.pull_quantity;
+        pullCheckbox.classList.toggle('checked', !!item.pull_confirmed);
+    } else {
+        pullGroup.classList.add('hidden');
+    }
+
     updateModalStatusButtons();
     document.getElementById('checkin-modal').classList.remove('hidden');
 }
@@ -1069,6 +1178,27 @@ function selectReason(reason) {
     updateModalStatusButtons();
 }
 
+function togglePullConfirmed() {
+    const cb = document.getElementById('pull-confirm-checkbox');
+    cb.classList.toggle('checked');
+}
+
+async function togglePullFromList(supplierIdx, itemIdx) {
+    const item = currentDelivery.suppliers[supplierIdx].items[itemIdx];
+    try {
+        await apiPatch(
+            `/deliveries/${currentDelivery.id}/suppliers/${supplierIdx}/items/${itemIdx}/pull-confirm`,
+            {}
+        );
+        lastWriteTimestamp = Date.now();
+        item.pull_confirmed = !item.pull_confirmed;
+        renderItemList();
+        showToast(item.pull_confirmed ? 'Pull confirmed' : 'Pull unconfirmed', 'success');
+    } catch (e) {
+        showToast('Failed to update pull status', 'error');
+    }
+}
+
 function adjustQty(delta) {
     const input = document.getElementById('modal-qty');
     const val = parseInt(input.value) || 0;
@@ -1126,14 +1256,23 @@ async function submitCheckIn() {
 
     const { supplierIdx, itemIdx } = checkInItem;
 
+    // Pull confirmation
+    const pullGroup = document.getElementById('pull-confirm-group');
+    const pullConfirmed = !pullGroup.classList.contains('hidden')
+        ? document.getElementById('pull-confirm-checkbox').classList.contains('checked')
+        : null;
+
     try {
+        const body = {
+            quantity_received: qty,
+            received_status: status,
+            received_notes: notes,
+        };
+        if (pullConfirmed !== null) body.pull_confirmed = pullConfirmed;
+
         await apiPatch(
             `/deliveries/${currentDelivery.id}/suppliers/${supplierIdx}/items/${itemIdx}/checkin`,
-            {
-                quantity_received: qty,
-                received_status: status,
-                received_notes: notes,
-            }
+            body
         );
         lastWriteTimestamp = Date.now();
 
@@ -1142,6 +1281,7 @@ async function submitCheckIn() {
         item.quantity_received = qty;
         item.received_status = status;
         item.received_notes = notes;
+        if (pullConfirmed !== null) item.pull_confirmed = pullConfirmed;
 
         closeModal();
 
@@ -1405,6 +1545,13 @@ function showCompletionModal() {
                 </div>
             `).join('')}`;
     }
+
+    // Restore completion modal header/footer (may have been overridden by live exceptions view)
+    document.querySelector('.complete-modal-content .modal-header h2').textContent = 'All items received!';
+    document.querySelector('.complete-subtitle').textContent = 'See exceptions below. Continue to confirm delivery over?';
+    document.querySelector('.complete-modal-content .modal-footer').innerHTML = `
+        <button class="btn btn-secondary" onclick="dismissCompletionModal()">Continue Checking In</button>
+        <button class="btn btn-success" onclick="confirmDeliveryComplete()">Confirm Delivery Complete</button>`;
 
     document.getElementById('complete-modal').classList.remove('hidden');
 }

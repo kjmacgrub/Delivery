@@ -74,6 +74,28 @@ html, body {
     opacity: 0.6;
 }
 
+.btn-exceptions {
+    padding: 6px 14px;
+    border: 1.5px solid var(--border);
+    border-radius: 100px;
+    background: var(--surface);
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-secondary);
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+}
+
+.btn-exceptions.has-exceptions {
+    border-color: var(--warning);
+    background: #fff3e0;
+    color: #e65100;
+}
+
+.btn-exceptions #exceptions-count {
+    font-weight: 700;
+}
+
 .header-row {
     display: flex;
     align-items: center;
@@ -801,6 +823,67 @@ html, body {
     font-weight: 400;
     font-size: 13px;
     color: #666;
+    cursor: pointer;
+    padding: 2px 4px;
+    border-radius: 4px;
+    -webkit-tap-highlight-color: transparent;
+    transition: background 0.15s;
+}
+
+.pull-qty:active {
+    background: rgba(0,0,0,0.08);
+}
+
+.pull-qty.pull-confirmed {
+    color: var(--success);
+    font-weight: 600;
+    background: #e8f5e9;
+}
+
+.pull-qty.pull-confirmed::after {
+    content: ' \2713';
+    font-size: 11px;
+}
+
+.pull-qty.pull-confirmed:active {
+    background: #c8e6c9;
+}
+
+/* Pull confirmation checkbox in modal */
+.pull-confirm-label {
+    display: flex !important;
+    align-items: center;
+    gap: 10px;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+    font-size: 15px;
+    font-weight: 500;
+    color: var(--text);
+    padding: 10px 0;
+}
+
+.pull-checkbox {
+    width: 26px;
+    height: 26px;
+    border: 2px solid var(--border);
+    border-radius: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    transition: all 0.15s;
+}
+
+.pull-checkbox.checked {
+    background: var(--success);
+    border-color: var(--success);
+}
+
+.pull-checkbox.checked::after {
+    content: '\2713';
+    color: white;
+    font-size: 16px;
+    font-weight: 700;
 }
 
 .compact-name {
@@ -1616,6 +1699,29 @@ textarea {
 
 .compact-row.accordion-item {
     padding-left: 20px;
+}
+
+.compact-row.cross-supplier-row {
+    padding-left: 36px;
+    min-height: 28px;
+    background: var(--bg);
+    border-left-color: transparent;
+    cursor: default;
+}
+
+.compact-row.cross-supplier-row:active {
+    background: var(--bg);
+}
+
+.cross-supplier-qty {
+    color: var(--text-secondary) !important;
+    font-size: 13px !important;
+}
+
+.cross-supplier-name {
+    color: var(--text-secondary);
+    font-size: 12px;
+    font-style: italic;
 }
 
 /* ---- Landing Page ---- */

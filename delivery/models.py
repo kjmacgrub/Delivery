@@ -78,6 +78,7 @@ class LineItem(LineItemBase):
     received_status: ReceivedStatus = ReceivedStatus.PENDING
     received_notes: Optional[str] = None
     checked_in_at: Optional[datetime] = None
+    pull_confirmed: bool = False
 
 
 class LineItemCheckIn(BaseModel):
@@ -85,6 +86,7 @@ class LineItemCheckIn(BaseModel):
     quantity_received: int = Field(ge=0)
     received_status: ReceivedStatus
     received_notes: Optional[str] = None
+    pull_confirmed: Optional[bool] = None
 
 
 # ---- Supplier Entries ----

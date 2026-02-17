@@ -45,6 +45,27 @@ async def check_in_item(
 
 
 @router.patch(
+    "/deliveries/{delivery_id}/suppliers/{supplier_idx}/items/{item_idx}/pull-confirm",
+    response_model=CheckInResponse,
+)
+async def toggle_pull_confirmed(
+    delivery_id: str,
+    supplier_idx: int,
+    item_idx: int,
+    request: Request,
+):
+    """Toggle pull_confirmed on an item without changing its received status."""
+    service = _get_service(request)
+    item = service.toggle_pull_confirmed(delivery_id, supplier_idx, item_idx)
+    if not item:
+        raise HTTPException(status_code=404, detail="Item not found.")
+    return CheckInResponse(
+        message=f"Pull {'confirmed' if item.pull_confirmed else 'unconfirmed'}: {item.raw_description}",
+        items_updated=1,
+    )
+
+
+@router.patch(
     "/deliveries/{delivery_id}/suppliers/{supplier_idx}/checkin-all-ok",
     response_model=CheckInResponse,
 )

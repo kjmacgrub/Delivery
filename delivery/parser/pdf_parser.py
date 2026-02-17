@@ -434,16 +434,51 @@ class PDFWorksheetParser(WorksheetParser):
             return True
         return False
 
+    # Pattern: "Supplier Name 123" — text ending with a case count
+    SUPPLIER_HEADER_PATTERN = re.compile(
+        r'^([A-Z][A-Za-z\'\.\-\&\/ ]+?)\s+(\d+)\s*$'
+    )
+
     def _match_supplier(self, text: str) -> Optional[Tuple[str, int]]:
-        """Try to match a line as 'SupplierName  123'."""
+        """
+        Auto-detect supplier header lines.
+
+        Supplier headers are lines like "Hepworth Farms 76" — they start
+        with a capitalized name (not a number or category keyword) and end
+        with a case count. Item lines start with a number, so they won't match.
+        """
         t = text.strip()
-        for supplier in KNOWN_SUPPLIERS:
-            if t.startswith(supplier):
-                remainder = t[len(supplier):].strip()
-                m = re.match(r'^(\d+)\s*$', remainder)
-                if m:
-                    return supplier, int(m.group(1))
-        return None
+        if not t:
+            return None
+
+        # Item lines start with a digit — not a supplier header
+        if t[0].isdigit():
+            return None
+
+        # Lines starting with * are floor-pull items
+        if t.startswith('*'):
+            return None
+
+        m = self.SUPPLIER_HEADER_PATTERN.match(t)
+        if not m:
+            return None
+
+        name = m.group(1).strip()
+        cases = int(m.group(2))
+
+        # Reject if the "name" is a known noise phrase
+        if name.lower() in ('total', 'total cases', 'day', 'week'):
+            return None
+
+        # Reject very short names (likely parsing artifacts or product codes like "PLU")
+        if len(name) < 4:
+            return None
+
+        # Reject all-caps short names (product codes, not suppliers)
+        if name == name.upper() and len(name.split()) == 1:
+            return None
+
+        return name, cases
 
     # ---- Serialization ----
 

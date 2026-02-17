@@ -183,6 +183,8 @@ class DeliveryService:
         item.received_status = check_in.received_status
         item.received_notes = check_in.received_notes
         item.checked_in_at = datetime.utcnow()
+        if check_in.pull_confirmed is not None:
+            item.pull_confirmed = check_in.pull_confirmed
 
         # Update supplier status
         all_checked = all(
@@ -205,6 +207,24 @@ class DeliveryService:
             delivery.status = DeliveryStatus.IN_PROGRESS
 
         # Persist changes
+        self._save_delivery(delivery)
+        return item
+
+    def toggle_pull_confirmed(
+        self, delivery_id: str, supplier_idx: int, item_idx: int
+    ) -> Optional[LineItem]:
+        """Toggle pull_confirmed on a single item without affecting received status."""
+        delivery = self._load_delivery(delivery_id)
+        if not delivery:
+            return None
+        if supplier_idx >= len(delivery.suppliers):
+            return None
+        supplier = delivery.suppliers[supplier_idx]
+        if item_idx >= len(supplier.items):
+            return None
+
+        item = supplier.items[item_idx]
+        item.pull_confirmed = not item.pull_confirmed
         self._save_delivery(delivery)
         return item
 
