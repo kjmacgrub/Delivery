@@ -66,6 +66,31 @@ async def toggle_pull_confirmed(
 
 
 @router.patch(
+    "/deliveries/{delivery_id}/suppliers/{supplier_idx}/items/{item_idx}/unreceive",
+    response_model=CheckInResponse,
+)
+async def unreceive_item(
+    delivery_id: str,
+    supplier_idx: int,
+    item_idx: int,
+    request: Request,
+):
+    """Unreceive a single line item: reset it back to pending."""
+    service = _get_service(request)
+    item = service.unreceive_item(delivery_id, supplier_idx, item_idx)
+    if not item:
+        raise HTTPException(
+            status_code=404,
+            detail="Item not found. Check delivery_id, supplier_idx, and item_idx.",
+        )
+
+    return CheckInResponse(
+        message=f"Unreceived: {item.raw_description}",
+        items_updated=1,
+    )
+
+
+@router.patch(
     "/deliveries/{delivery_id}/suppliers/{supplier_idx}/checkin-all-ok",
     response_model=CheckInResponse,
 )

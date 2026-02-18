@@ -185,6 +185,17 @@ html, body {
     border: 1px solid var(--border);
 }
 
+.btn-unreceive {
+    background: #fff;
+    color: #c62828;
+    border: 1px solid #e57373;
+    margin-right: auto;
+}
+
+.btn-unreceive:active {
+    background: #ffebee;
+}
+
 .btn-danger {
     background: var(--danger);
     color: white;
@@ -1826,6 +1837,13 @@ textarea {
 
 .landing-action:active {
     opacity: 0.6;
+}
+
+.landing-in-progress {
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--success);
+    margin-top: 2px;
 }
 
 .empty-state-sm {

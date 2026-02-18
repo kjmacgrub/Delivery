@@ -325,6 +325,66 @@ class DeliveryService:
         self._save_delivery(delivery)
         return count
 
+    def unreceive_item(
+        self, delivery_id: str, supplier_idx: int, item_idx: int
+    ) -> Optional[LineItem]:
+        """
+        Unreceive a single line item: reset it back to pending.
+
+        Returns the updated item, or None if not found.
+        """
+        delivery = self._load_delivery(delivery_id)
+        if not delivery:
+            return None
+
+        if supplier_idx >= len(delivery.suppliers):
+            return None
+
+        supplier = delivery.suppliers[supplier_idx]
+        if item_idx >= len(supplier.items):
+            return None
+
+        item = supplier.items[item_idx]
+        item.quantity_received = None
+        item.received_status = ReceivedStatus.PENDING
+        item.received_notes = None
+        item.checked_in_at = None
+        item.pull_confirmed = False
+
+        # Update supplier status
+        all_checked = all(
+            it.received_status != ReceivedStatus.PENDING
+            for it in supplier.items
+        )
+        any_checked = any(
+            it.received_status != ReceivedStatus.PENDING
+            for it in supplier.items
+        )
+        if all_checked:
+            supplier.status = SupplierStatus.COMPLETE
+        elif any_checked:
+            supplier.status = SupplierStatus.CHECKED_IN
+        else:
+            supplier.status = SupplierStatus.PENDING
+
+        # Update delivery status
+        all_suppliers_done = all(
+            s.status == SupplierStatus.COMPLETE
+            for s in delivery.suppliers
+        )
+        if all_suppliers_done:
+            delivery.status = DeliveryStatus.COMPLETED
+        elif any(
+            s.status != SupplierStatus.PENDING
+            for s in delivery.suppliers
+        ):
+            delivery.status = DeliveryStatus.IN_PROGRESS
+        else:
+            delivery.status = DeliveryStatus.PARSED
+
+        self._save_delivery(delivery)
+        return item
+
     def complete_delivery(self, delivery_id: str) -> Optional[ExceptionReport]:
         """
         Mark delivery as complete and generate an exception report.

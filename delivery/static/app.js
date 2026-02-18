@@ -1099,6 +1099,10 @@ function openCheckInModal(itemIdx) {
         pullGroup.classList.add('hidden');
     }
 
+    // Show unreceive button only if item is already received
+    const unreceiveBtn = document.getElementById('modal-unreceive-btn');
+    unreceiveBtn.classList.toggle('hidden', item.received_status === 'pending');
+
     updateModalStatusButtons();
     document.getElementById('checkin-modal').classList.remove('hidden');
 }
@@ -1322,6 +1326,36 @@ function renderReceiveAllButton(supplierIdx, containerId) {
     }
 }
 
+async function unreceiveItem() {
+    if (!checkInItem) return;
+    const { supplierIdx, itemIdx } = checkInItem;
+
+    try {
+        await apiPatch(
+            `/deliveries/${currentDelivery.id}/suppliers/${supplierIdx}/items/${itemIdx}/unreceive`,
+            {}
+        );
+        lastWriteTimestamp = Date.now();
+
+        // Update local state
+        const item = currentDelivery.suppliers[supplierIdx].items[itemIdx];
+        item.quantity_received = null;
+        item.received_status = 'pending';
+        item.received_notes = null;
+        item.pull_confirmed = false;
+
+        closeModal();
+
+        if (supplierFilter !== null) {
+            updateFilteredSupplierSummary();
+        }
+        renderDetail();
+        showToast('Item unreceived', 'success');
+    } catch (e) {
+        showToast('Failed to unreceive item', 'error');
+    }
+}
+
 async function receiveAllSupplier(supplierIdx) {
     const supplier = currentDelivery.suppliers[supplierIdx];
     const pendingItems = supplier.items.filter(i => i.received_status === 'pending');
@@ -1447,6 +1481,24 @@ function formatTimestamp(ts) {
         month: 'short', day: 'numeric',
         hour: 'numeric', minute: '2-digit',
     });
+}
+
+function friendlyFileName(name) {
+    // Strip extension
+    const base = name.replace(/\.[^.]+$/, '');
+    // Try to find a date pattern (MM/DD/YYYY, MM-DD-YYYY, YYYY-MM-DD, MM.DD.YYYY)
+    let m = base.match(/(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{4})/);
+    if (m) {
+        const d = new Date(parseInt(m[3]), parseInt(m[1]) - 1, parseInt(m[2]));
+        if (!isNaN(d)) return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    }
+    m = base.match(/(\d{4})[\/\-.](\d{1,2})[\/\-.](\d{1,2})/);
+    if (m) {
+        const d = new Date(parseInt(m[1]), parseInt(m[2]) - 1, parseInt(m[3]));
+        if (!isNaN(d)) return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    }
+    // Fallback: return filename without extension
+    return base;
 }
 
 function formatSize(bytes) {
@@ -1718,10 +1770,7 @@ async function loadLandingFiles() {
         }
         container.innerHTML = data.files.map(f => `
             <div class="card storage-card" onclick="parseStorageFile('${f.name}')">
-                <div>
-                    <div class="card-title">${f.name}</div>
-                    <div class="card-subtitle">${formatSize(f.size)} &middot; ${formatTimestamp(f.updated)}</div>
-                </div>
+                <div class="card-title">${friendlyFileName(f.name)}</div>
                 <span class="storage-parse-label">Import</span>
             </div>
         `).join('');
@@ -1771,24 +1820,20 @@ async function loadLandingDeliveries() {
                 reportBtn = `<button class="btn-view-report" onclick="event.stopPropagation(); showReportById('${report.id}')">Report: ${excLabel}</button>`;
             }
 
+            const statusLine = d.checked_in_count === 0
+                ? `<div class="card-subtitle">Not yet started</div>`
+                : `<div class="landing-in-progress">In progress</div>`;
+
             return `
             <div class="card" onclick="openDelivery('${d.id}')">
                 <div class="card-header">
                     <div>
-                        <div class="card-title">${label}</div>
-                        <div class="card-subtitle">${d.source_filename}</div>
+                        <div class="card-title">${formatDate(d.delivery_date)}</div>
+                        ${statusLine}
                     </div>
                     <div class="card-header-right">
-                        <span class="badge badge-${d.status.replace('_', '-')}">${d.status.replace('_', ' ')}</span>
                         ${deleteBtn}
                     </div>
-                </div>
-                <div class="card-meta">
-                    <span class="card-meta-item">${d.supplier_count} suppliers</span>
-                    <span class="card-meta-item">${d.checked_in_count}/${d.item_count} checked in</span>
-                </div>
-                <div class="progress-bar">
-                    <div class="progress-fill" style="width: ${pct}%"></div>
                 </div>
                 ${reportBtn}
             </div>`;
