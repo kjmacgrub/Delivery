@@ -7,6 +7,7 @@ const API = '/api/v1';
 
 // ---- Version History ----
 const VERSION_HISTORY = [
+    { version: 'v1.19', description: 'Single-item unreceive, landing page polish, friendly filenames' },
     { version: 'v1.12', description: 'Discrepancies rename, pull confirmation, supplier sort, UI polish' },
     { version: 'v1.06', description: 'Discrepancies rename, notes in reports, header cleanup' },
     { version: 'v1.02', description: 'Pull confirmation, auto-detect suppliers, live discrepancies, cross-supplier view' },
