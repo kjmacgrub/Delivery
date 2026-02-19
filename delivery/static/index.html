@@ -6,25 +6,38 @@
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <title>Daily Delivery Tracker</title>
-    <link rel="stylesheet" href="/static/styles.css?v=1.19">
+    <!-- Google Analytics -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-X5Z5C3Q44"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+      gtag('config', 'G-X5Z5C3Q44');
+    </script>
+    <link rel="stylesheet" href="/static/styles.css?v=1.20">
 </head>
 <body>
     <div id="app">
         <!-- Header -->
         <header id="app-header">
-            <div id="header-brand" class="header-brand" onclick="goHome()">Daily Delivery</div>
+            <div id="header-brand" class="header-brand" onclick="goHome()">
+                <span id="back-chevrons-left" class="brand-chevrons hidden" onclick="event.stopPropagation(); goBack()">
+                    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M15 18l-6-6 6-6"/></svg>
+                    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="margin-left:-14px"><path d="M15 18l-6-6 6-6"/></svg>
+                </span>
+                <span id="header-brand-text">Daily Delivery</span>
+                <span id="back-chevrons-right" class="brand-chevrons hidden" onclick="event.stopPropagation(); goBack()">
+                    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M9 18l6-6-6-6"/></svg>
+                    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="margin-left:-14px"><path d="M9 18l6-6-6-6"/></svg>
+                </span>
+            </div>
             <div class="header-row">
                 <div class="header-left">
-                    <button id="back-btn" class="icon-btn hidden" onclick="goBack()">
-                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <path d="M15 18l-6-6 6-6"/>
-                        </svg>
-                    </button>
                     <h1 id="page-title">Deliveries</h1>
                 </div>
                 <div class="header-right">
                     <button id="exceptions-btn" class="btn-exceptions hidden" onclick="showLiveExceptions()">
-                        <span id="exceptions-count">0</span> Discrepancies
+                        <span id="exceptions-count">0</span> Adjustments
                     </button>
                     <span id="status-badge" class="badge"></span>
                     <button id="refresh-btn" class="icon-btn" onclick="refreshData()">
@@ -41,7 +54,7 @@
         <div id="view-landing" class="view active">
             <div class="landing-page">
                 <h1 class="landing-title">Daily Delivery</h1>
-                <span class="landing-version" onclick="showVersionHistory()"></span>
+
 
                 <div id="section-files" class="landing-section">
                     <div id="show-files-btn" class="landing-action" onclick="expandLandingFiles()">Show available delivery days</div>
@@ -189,7 +202,7 @@
                     <h2>All items received!</h2>
                 </div>
                 <div class="modal-body">
-                    <p class="complete-subtitle">See discrepancies below. Continue to confirm delivery over?</p>
+                    <p class="complete-subtitle">See adjustments below. Continue to confirm delivery over?</p>
                     <div id="exception-list" class="exception-list"></div>
                 </div>
                 <div class="modal-footer">
@@ -237,6 +250,6 @@
     <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
 
-    <script src="/static/app.js?v=1.19"></script>
+    <script src="/static/app.js?v=1.20"></script>
 </body>
 </html>
