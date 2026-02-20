@@ -7,6 +7,7 @@ const API = '/api/v1';
 
 // ---- Version History ----
 const VERSION_HISTORY = [
+    { version: 'v1.24', description: 'Continue Delivery option in hamburger menu' },
     { version: 'v1.23', description: 'Delivery-first nav: auto-open active delivery, hamburger admin menu' },
     { version: 'v1.22', description: 'Floor Pull inline with Qty Received; pull sheet syncs to item list' },
     { version: 'v1.21', description: 'Manual floor pull stepper + Pull Sheet screen' },
@@ -169,6 +170,8 @@ function showNoDeliveryScreen() {
 
 // ---- Admin Menu ----
 function openAdminModal() {
+    const hasActive = currentDelivery && currentDelivery.status !== 'completed';
+    document.getElementById('admin-continue-btn').classList.toggle('hidden', !hasActive);
     document.getElementById('admin-modal').classList.remove('hidden');
 }
 

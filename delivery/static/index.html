@@ -14,7 +14,7 @@
       gtag('js', new Date());
       gtag('config', 'G-6JSKH5XWSC');
     </script>
-    <link rel="stylesheet" href="/static/styles.css?v=1.23">
+    <link rel="stylesheet" href="/static/styles.css?v=1.24">
 </head>
 <body>
     <div id="app">
@@ -250,6 +250,10 @@
                     <button class="icon-btn" onclick="closeAdminModal()">&times;</button>
                 </div>
                 <div class="modal-body admin-modal-body">
+                    <button id="admin-continue-btn" class="admin-menu-btn hidden" onclick="closeAdminModal(); goHome()">
+                        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5,3 19,12 5,21"/></svg>
+                        Continue Delivery
+                    </button>
                     <button class="admin-menu-btn" onclick="closeAdminModal(); showDeliveriesView()">
                         <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></svg>
                         Switch Delivery
@@ -280,6 +284,6 @@
     <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
 
-    <script src="/static/app.js?v=1.23"></script>
+    <script src="/static/app.js?v=1.24"></script>
 </body>
 </html>
