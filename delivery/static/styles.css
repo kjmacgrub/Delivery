@@ -1557,7 +1557,59 @@ textarea {
 .stat-short { color: #ff9500; }
 .stat-over { color: var(--primary); }
 .stat-return { color: var(--danger); }
-.stat-pull { color: var(--primary); }
+.stat-pull { color: var(--success); }
+
+.report-item-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 7px 16px;
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    font-size: 14px;
+}
+
+.report-item-row:last-child {
+    border-bottom: none;
+}
+
+.report-item-info {
+    flex: 1;
+    min-width: 0;
+}
+
+.report-item-name {
+    display: block;
+    font-weight: 500;
+    color: var(--text);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.report-item-supplier {
+    display: block;
+    font-size: 12px;
+    color: var(--text-secondary);
+}
+
+.report-item-diff {
+    font-size: 14px;
+    font-weight: 700;
+    flex-shrink: 0;
+}
+
+.report-item-pending {
+    color: var(--text-secondary);
+    font-size: 18px;
+}
+
+.report-item-cases {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-secondary);
+    flex-shrink: 0;
+}
 
 .report-detail {
     margin-top: 12px;

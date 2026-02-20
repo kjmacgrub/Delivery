@@ -7,6 +7,7 @@ const API = '/api/v1';
 
 // ---- Version History ----
 const VERSION_HISTORY = [
+    { version: 'v1.29', description: 'Report item detail: names and supplier shown below case totals' },
     { version: 'v1.28', description: 'Case-centric reports: show aggregate case totals instead of item rows' },
     { version: 'v1.27', description: 'Pulls included in completion modal and completed delivery reports' },
     { version: 'v1.26', description: 'Live Report section headings; rename View Reports to View Past Deliveries' },
@@ -426,11 +427,20 @@ function renderReportList(reports) {
         const casesOver = excItems.filter(i => i.received_status === 'over')
             .reduce((sum, i) => sum + Math.max(0, (i.quantity_received || 0) - (i.quantity_expected || 0)), 0);
         const returnCount = excItems.filter(i => i.received_status === 'return').length;
+        const adjItems = excItems.map(i => ({
+            name: i.raw_description, supplier: i.supplier_name, status: i.received_status,
+            diff: i.received_status === 'short' ? Math.max(0, (i.quantity_expected || 0) - (i.quantity_received || 0))
+                : i.received_status === 'over' ? Math.max(0, (i.quantity_received || 0) - (i.quantity_expected || 0)) : null,
+        }));
 
         const pulls = r.pull_items || [];
         const totalPullCases = pulls.reduce((sum, i) => sum + (i.pull_quantity || 0), 0);
         const confirmedPullCases = pulls.filter(i => i.pull_confirmed)
             .reduce((sum, i) => sum + (i.pull_quantity || 0), 0);
+        const normPulls = pulls.map(i => ({
+            name: i.raw_description, supplier: i.supplier_name,
+            cases: i.pull_quantity, confirmed: i.pull_confirmed,
+        }));
 
         return `
         <div class="card report-card" onclick="toggleReportDetail(${idx})">
@@ -449,9 +459,9 @@ function renderReportList(reports) {
             </div>
             <div class="report-detail" id="report-detail-${idx}" style="display:none;">
                 <div class="report-section-header">Adjustments</div>
-                ${buildAdjustmentStatsHtml(casesShort, casesOver, returnCount)}
+                ${buildAdjustmentStatsHtml(casesShort, casesOver, returnCount, adjItems)}
                 <div class="report-section-header">Pulls</div>
-                ${buildPullStatsHtml(totalPullCases, confirmedPullCases, pulls.length)}
+                ${buildPullStatsHtml(totalPullCases, confirmedPullCases, pulls.length, normPulls)}
                 <button class="report-delete-btn" onclick="event.stopPropagation(); deleteReport(${idx})">Delete Report</button>
             </div>
         </div>`;
@@ -1018,23 +1028,33 @@ function renderLiveReport() {
     const casesOver = exceptions.filter(e => e.status === 'over')
         .reduce((sum, e) => sum + Math.max(0, (e.received || 0) - (e.expected || 0)), 0);
     const returnCount = exceptions.filter(e => e.status === 'return').length;
+    const adjItems = exceptions.map(e => ({
+        name: e.description, supplier: e.supplierName, status: e.status,
+        diff: e.status === 'short' ? Math.max(0, (e.expected || 0) - (e.received || 0))
+            : e.status === 'over' ? Math.max(0, (e.received || 0) - (e.expected || 0)) : null,
+    }));
 
     html += '<div class="report-section-header">Adjustments</div>';
-    html += buildAdjustmentStatsHtml(casesShort, casesOver, returnCount);
+    html += buildAdjustmentStatsHtml(casesShort, casesOver, returnCount, adjItems);
 
     // --- Pulls section ---
     const pullItems = [];
     currentDelivery.suppliers.forEach(supplier => {
         supplier.items.forEach(item => {
-            if (item.pull_quantity > 0) pullItems.push(item);
+            if (item.pull_quantity > 0)
+                pullItems.push({ ...item, supplierName: supplier.supplier_name });
         });
     });
     const totalPullCases = pullItems.reduce((sum, i) => sum + (i.pull_quantity || 0), 0);
     const confirmedPullCases = pullItems.filter(i => i.pull_confirmed)
         .reduce((sum, i) => sum + (i.pull_quantity || 0), 0);
+    const normPullItems = pullItems.map(i => ({
+        name: i.raw_description, supplier: i.supplierName,
+        cases: i.pull_quantity, confirmed: i.pull_confirmed,
+    }));
 
     html += '<div class="report-section-header">Pulls</div>';
-    html += buildPullStatsHtml(totalPullCases, confirmedPullCases, pullItems.length);
+    html += buildPullStatsHtml(totalPullCases, confirmedPullCases, pullItems.length, normPullItems);
 
     document.getElementById('live-report-content').innerHTML = html;
 }
@@ -1609,7 +1629,7 @@ function getExceptionItems() {
     return exceptions;
 }
 
-function buildAdjustmentStatsHtml(casesShort, casesOver, returnCount) {
+function buildAdjustmentStatsHtml(casesShort, casesOver, returnCount, adjItems = []) {
     if (casesShort === 0 && casesOver === 0 && returnCount === 0) {
         return '<div class="report-section-empty">No adjustments — everything matched!</div>';
     }
@@ -1630,10 +1650,23 @@ function buildAdjustmentStatsHtml(casesShort, casesOver, returnCount) {
             <span class="report-stat-num stat-return">${returnCount} item${returnCount !== 1 ? 's' : ''}</span>
         </div>`;
     html += '</div>';
+    adjItems.forEach(item => {
+        const diffLabel = item.status === 'short' ? `-${item.diff}`
+            : item.status === 'over' ? `+${item.diff}`
+            : 'return';
+        html += `
+        <div class="report-item-row">
+            <div class="report-item-info">
+                <span class="report-item-name">${item.name}</span>
+                <span class="report-item-supplier">${item.supplier}</span>
+            </div>
+            <span class="report-item-diff stat-${item.status}">${diffLabel}</span>
+        </div>`;
+    });
     return html;
 }
 
-function buildPullStatsHtml(totalCases, confirmedCases, itemCount) {
+function buildPullStatsHtml(totalCases, confirmedCases, itemCount, pullItems = []) {
     if (itemCount === 0) {
         return '<div class="report-section-empty">No pull items</div>';
     }
@@ -1654,6 +1687,20 @@ function buildPullStatsHtml(totalCases, confirmedCases, itemCount) {
             <span class="report-stat-num">${pendingCases}</span>
         </div>`;
     html += '</div>';
+    pullItems.forEach(item => {
+        const statusChip = item.confirmed
+            ? `<span class="report-item-diff stat-pull">&#10003;</span>`
+            : `<span class="report-item-diff report-item-pending">•</span>`;
+        html += `
+        <div class="report-item-row">
+            <div class="report-item-info">
+                <span class="report-item-name">${item.name}</span>
+                <span class="report-item-supplier">${item.supplier}</span>
+            </div>
+            <span class="report-item-cases">${item.cases} cases</span>
+            ${statusChip}
+        </div>`;
+    });
     return html;
 }
 
@@ -1664,24 +1711,34 @@ function showCompletionModal() {
     const casesOver = exceptions.filter(e => e.status === 'over')
         .reduce((sum, e) => sum + Math.max(0, (e.received || 0) - (e.expected || 0)), 0);
     const returnCount = exceptions.filter(e => e.status === 'return').length;
+    const adjItems = exceptions.map(e => ({
+        name: e.description, supplier: e.supplierName, status: e.status,
+        diff: e.status === 'short' ? Math.max(0, (e.expected || 0) - (e.received || 0))
+            : e.status === 'over' ? Math.max(0, (e.received || 0) - (e.expected || 0)) : null,
+    }));
 
     const pullItems = [];
     if (currentDelivery) {
         currentDelivery.suppliers.forEach(supplier => {
             supplier.items.forEach(item => {
-                if (item.pull_quantity > 0) pullItems.push(item);
+                if (item.pull_quantity > 0)
+                    pullItems.push({ ...item, supplierName: supplier.supplier_name });
             });
         });
     }
     const totalPullCases = pullItems.reduce((sum, i) => sum + (i.pull_quantity || 0), 0);
     const confirmedPullCases = pullItems.filter(i => i.pull_confirmed)
         .reduce((sum, i) => sum + (i.pull_quantity || 0), 0);
+    const normPullItems = pullItems.map(i => ({
+        name: i.raw_description, supplier: i.supplierName,
+        cases: i.pull_quantity, confirmed: i.pull_confirmed,
+    }));
 
     let html = '';
     html += '<div class="report-section-header">Adjustments</div>';
-    html += buildAdjustmentStatsHtml(casesShort, casesOver, returnCount);
+    html += buildAdjustmentStatsHtml(casesShort, casesOver, returnCount, adjItems);
     html += '<div class="report-section-header">Pulls</div>';
-    html += buildPullStatsHtml(totalPullCases, confirmedPullCases, pullItems.length);
+    html += buildPullStatsHtml(totalPullCases, confirmedPullCases, pullItems.length, normPullItems);
 
     document.getElementById('exception-list').innerHTML = html;
 
