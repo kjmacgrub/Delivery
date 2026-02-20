@@ -7,6 +7,7 @@ const API = '/api/v1';
 
 // ---- Version History ----
 const VERSION_HISTORY = [
+    { version: 'v1.30', description: 'Live Report pulls are interactive: tappable rows to confirm/unconfirm' },
     { version: 'v1.29', description: 'Report item detail: names and supplier shown below case totals' },
     { version: 'v1.28', description: 'Case-centric reports: show aggregate case totals instead of item rows' },
     { version: 'v1.27', description: 'Pulls included in completion modal and completed delivery reports' },
@@ -1039,24 +1040,77 @@ function renderLiveReport() {
 
     // --- Pulls section ---
     const pullItems = [];
-    currentDelivery.suppliers.forEach(supplier => {
-        supplier.items.forEach(item => {
+    currentDelivery.suppliers.forEach((supplier, sIdx) => {
+        supplier.items.forEach((item, iIdx) => {
             if (item.pull_quantity > 0)
-                pullItems.push({ ...item, supplierName: supplier.supplier_name });
+                pullItems.push({ ...item, supplierIdx: sIdx, itemIdx: iIdx, supplierName: supplier.supplier_name });
         });
+    });
+    pullItems.sort((a, b) => {
+        const sup = a.supplierName.toLowerCase().localeCompare(b.supplierName.toLowerCase());
+        return sup !== 0 ? sup : a.raw_description.toLowerCase().localeCompare(b.raw_description.toLowerCase());
     });
     const totalPullCases = pullItems.reduce((sum, i) => sum + (i.pull_quantity || 0), 0);
     const confirmedPullCases = pullItems.filter(i => i.pull_confirmed)
         .reduce((sum, i) => sum + (i.pull_quantity || 0), 0);
-    const normPullItems = pullItems.map(i => ({
-        name: i.raw_description, supplier: i.supplierName,
-        cases: i.pull_quantity, confirmed: i.pull_confirmed,
-    }));
+    const pendingPullCases = totalPullCases - confirmedPullCases;
 
     html += '<div class="report-section-header">Pulls</div>';
-    html += buildPullStatsHtml(totalPullCases, confirmedPullCases, pullItems.length, normPullItems);
+
+    if (pullItems.length === 0) {
+        html += '<div class="report-section-empty">No pull items</div>';
+    } else {
+        html += `<div class="report-stat-block">
+            <div class="report-stat-row">
+                <span class="report-stat-label">Total cases</span>
+                <span class="report-stat-num stat-pull">${totalPullCases}</span>
+            </div>
+            <div class="report-stat-row">
+                <span class="report-stat-label">Confirmed</span>
+                <span class="report-stat-num stat-pull">${confirmedPullCases}</span>
+            </div>
+            ${pendingPullCases > 0 ? `<div class="report-stat-row">
+                <span class="report-stat-label">Pending</span>
+                <span class="report-stat-num">${pendingPullCases}</span>
+            </div>` : ''}
+        </div>`;
+
+        let currentSupplierName = null;
+        pullItems.forEach(item => {
+            if (item.supplierName !== currentSupplierName) {
+                currentSupplierName = item.supplierName;
+                html += `<div class="pull-sheet-supplier">${item.supplierName}</div>`;
+            }
+            const confirmedClass = item.pull_confirmed ? 'pull-confirmed' : '';
+            const statusChip = item.pull_confirmed
+                ? `<span class="pull-confirmed-chip">&#10003;</span>`
+                : `<span class="pull-pending-chip">&bull;</span>`;
+            html += `
+            <div class="pull-sheet-row ${confirmedClass}" onclick="togglePullFromReport(${item.supplierIdx}, ${item.itemIdx})">
+                <span class="pull-sheet-qty">${item.pull_quantity}</span>
+                <span class="pull-sheet-name">${item.raw_description}</span>
+                ${statusChip}
+            </div>`;
+        });
+    }
 
     document.getElementById('live-report-content').innerHTML = html;
+}
+
+async function togglePullFromReport(supplierIdx, itemIdx) {
+    const item = currentDelivery.suppliers[supplierIdx].items[itemIdx];
+    try {
+        await apiPatch(
+            `/deliveries/${currentDelivery.id}/suppliers/${supplierIdx}/items/${itemIdx}/pull-confirm`,
+            {}
+        );
+        lastWriteTimestamp = Date.now();
+        item.pull_confirmed = !item.pull_confirmed;
+        renderLiveReport();
+        renderItemList();
+    } catch (e) {
+        showToast('Failed to update pull status', 'error');
+    }
 }
 
 function onSearchInput() {
