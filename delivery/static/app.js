@@ -7,6 +7,7 @@ const API = '/api/v1';
 
 // ---- Version History ----
 const VERSION_HISTORY = [
+    { version: 'v1.26', description: 'Live Report section headings; rename View Reports to View Past Deliveries' },
     { version: 'v1.25', description: 'Combined Live Report (adjustments + pulls) in hamburger menu' },
     { version: 'v1.24', description: 'Continue Delivery option in hamburger menu' },
     { version: 'v1.23', description: 'Delivery-first nav: auto-open active delivery, hamburger admin menu' },

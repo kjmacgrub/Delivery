@@ -2032,14 +2032,13 @@ textarea {
 
 /* ---- Live Report ---- */
 .report-section-header {
-    padding: 12px 16px 6px;
-    font-size: 12px;
+    padding: 16px 16px 8px;
+    font-size: 20px;
     font-weight: 700;
-    color: var(--text-secondary);
-    text-transform: uppercase;
-    letter-spacing: 0.6px;
+    color: var(--text);
+    text-align: center;
     background: var(--bg);
-    margin-top: 6px;
+    margin-top: 8px;
 }
 
 .report-section-header:first-child {
