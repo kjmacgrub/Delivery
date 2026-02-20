@@ -7,6 +7,7 @@ const API = '/api/v1';
 
 // ---- Version History ----
 const VERSION_HISTORY = [
+    { version: 'v1.28', description: 'Case-centric reports: show aggregate case totals instead of item rows' },
     { version: 'v1.27', description: 'Pulls included in completion modal and completed delivery reports' },
     { version: 'v1.26', description: 'Live Report section headings; rename View Reports to View Past Deliveries' },
     { version: 'v1.25', description: 'Combined Live Report (adjustments + pulls) in hamburger menu' },
@@ -419,44 +420,17 @@ function renderReportList(reports) {
             ? `<span class="report-exception-count">${r.total_exceptions} adjustment${r.total_exceptions !== 1 ? 's' : ''}</span>`
             : `<span class="report-no-exceptions">No adjustments</span>`;
 
-        const exceptionRows = (r.exception_items || []).map(item => {
-            const statusClass = item.received_status;
-            const received = item.quantity_received != null ? item.quantity_received : '?';
-            const noteHtml = item.received_notes
-                ? `<div class="report-exception-note">${item.received_notes}</div>`
-                : '';
-            return `
-                <div class="report-exception-row">
-                    <div class="report-exception-left-bar status-${statusClass}"></div>
-                    <div class="report-exception-info">
-                        <div class="report-exception-name">${item.raw_description}</div>
-                        <div class="report-exception-supplier">${item.supplier_name}</div>
-                        ${noteHtml}
-                    </div>
-                    <div class="report-exception-qty">
-                        ${item.quantity_expected} → ${received}
-                    </div>
-                    <span class="report-status-badge status-${statusClass}">${item.received_status}</span>
-                </div>`;
-        }).join('');
+        const excItems = r.exception_items || [];
+        const casesShort = excItems.filter(i => i.received_status === 'short')
+            .reduce((sum, i) => sum + Math.max(0, (i.quantity_expected || 0) - (i.quantity_received || 0)), 0);
+        const casesOver = excItems.filter(i => i.received_status === 'over')
+            .reduce((sum, i) => sum + Math.max(0, (i.quantity_received || 0) - (i.quantity_expected || 0)), 0);
+        const returnCount = excItems.filter(i => i.received_status === 'return').length;
 
         const pulls = r.pull_items || [];
-        const pullsConfirmed = pulls.filter(i => i.pull_confirmed).length;
-        const pullRows = pulls.map(item => {
-            const statusChip = item.pull_confirmed
-                ? `<span class="pull-confirmed-chip">&#10003;</span>`
-                : `<span class="pull-pending-chip">&bull;</span>`;
-            return `
-                <div class="report-pull-row ${item.pull_confirmed ? 'pull-confirmed' : ''}">
-                    <span class="pull-sheet-qty">${item.pull_quantity}</span>
-                    <span class="pull-sheet-name">${item.raw_description}</span>
-                    ${statusChip}
-                </div>`;
-        }).join('');
-
-        const pullBadge = pulls.length > 0
-            ? `<span class="report-pull-count">${pulls.length} pull${pulls.length !== 1 ? 's' : ''}</span>`
-            : '';
+        const totalPullCases = pulls.reduce((sum, i) => sum + (i.pull_quantity || 0), 0);
+        const confirmedPullCases = pulls.filter(i => i.pull_confirmed)
+            .reduce((sum, i) => sum + (i.pull_quantity || 0), 0);
 
         return `
         <div class="card report-card" onclick="toggleReportDetail(${idx})">
@@ -467,7 +441,6 @@ function renderReportList(reports) {
                 </div>
                 <div class="card-header-right">
                     ${exceptionBadge}
-                    ${pullBadge}
                 </div>
             </div>
             <div class="card-meta">
@@ -475,10 +448,10 @@ function renderReportList(reports) {
                 <span class="card-meta-item">${r.source_filename}</span>
             </div>
             <div class="report-detail" id="report-detail-${idx}" style="display:none;">
-                <div class="report-section-header">Adjustments${hasExceptions ? ` (${r.total_exceptions})` : ''}</div>
-                ${hasExceptions ? exceptionRows : '<div class="report-section-empty">✓ Everything matched — no adjustments</div>'}
-                <div class="report-section-header">Pulls${pulls.length > 0 ? ` (${pullsConfirmed} of ${pulls.length} confirmed)` : ''}</div>
-                ${pulls.length > 0 ? pullRows : '<div class="report-section-empty">No pull items</div>'}
+                <div class="report-section-header">Adjustments</div>
+                ${buildAdjustmentStatsHtml(casesShort, casesOver, returnCount)}
+                <div class="report-section-header">Pulls</div>
+                ${buildPullStatsHtml(totalPullCases, confirmedPullCases, pulls.length)}
                 <button class="report-delete-btn" onclick="event.stopPropagation(); deleteReport(${idx})">Delete Report</button>
             </div>
         </div>`;
@@ -1040,99 +1013,30 @@ function renderLiveReport() {
 
     // --- Adjustments section ---
     const exceptions = getExceptionItems();
-    html += `<div class="report-section-header">Adjustments${exceptions.length > 0 ? ` (${exceptions.length})` : ''}</div>`;
-    if (exceptions.length === 0) {
-        html += `<div class="report-section-empty">No adjustments</div>`;
-    } else {
-        exceptions.forEach(ex => {
-            html += `
-            <div class="exception-row exception-${ex.status}">
-                <div class="exception-info">
-                    <div class="exception-name">${ex.description}</div>
-                    <div class="exception-supplier">${ex.supplierName}</div>
-                    ${ex.notes ? `<div class="exception-note">${ex.notes}</div>` : ''}
-                </div>
-                <div class="exception-qty">
-                    <span class="exception-expected">${ex.expected}</span>
-                    <span class="exception-arrow">&rarr;</span>
-                    <span class="exception-received">${ex.received ?? 0}</span>
-                </div>
-                <span class="badge badge-${ex.status}">${ex.status}</span>
-            </div>`;
-        });
-    }
+    const casesShort = exceptions.filter(e => e.status === 'short')
+        .reduce((sum, e) => sum + Math.max(0, (e.expected || 0) - (e.received || 0)), 0);
+    const casesOver = exceptions.filter(e => e.status === 'over')
+        .reduce((sum, e) => sum + Math.max(0, (e.received || 0) - (e.expected || 0)), 0);
+    const returnCount = exceptions.filter(e => e.status === 'return').length;
+
+    html += '<div class="report-section-header">Adjustments</div>';
+    html += buildAdjustmentStatsHtml(casesShort, casesOver, returnCount);
 
     // --- Pulls section ---
     const pullItems = [];
-    currentDelivery.suppliers.forEach((supplier, sIdx) => {
-        supplier.items.forEach((item, iIdx) => {
-            if (item.pull_quantity > 0) {
-                pullItems.push({ ...item, supplierIdx: sIdx, itemIdx: iIdx, supplierName: supplier.supplier_name });
-            }
+    currentDelivery.suppliers.forEach(supplier => {
+        supplier.items.forEach(item => {
+            if (item.pull_quantity > 0) pullItems.push(item);
         });
     });
-    pullItems.sort((a, b) => {
-        const supCmp = a.supplierName.toLowerCase().localeCompare(b.supplierName.toLowerCase());
-        if (supCmp !== 0) return supCmp;
-        return a.raw_description.toLowerCase().localeCompare(b.raw_description.toLowerCase());
-    });
+    const totalPullCases = pullItems.reduce((sum, i) => sum + (i.pull_quantity || 0), 0);
+    const confirmedPullCases = pullItems.filter(i => i.pull_confirmed)
+        .reduce((sum, i) => sum + (i.pull_quantity || 0), 0);
 
-    const confirmedCount = pullItems.filter(i => i.pull_confirmed).length;
-    const total = pullItems.length;
-
-    html += `<div class="report-section-header">Pulls${total > 0 ? ` (${confirmedCount} of ${total} confirmed)` : ''}</div>`;
-
-    if (total === 0) {
-        html += `<div class="report-section-empty">No pull items</div>`;
-    } else {
-        const pct = Math.round((confirmedCount / total) * 100);
-        html += `
-        <div class="pull-sheet-progress-bar">
-            <div class="pull-sheet-progress-line">
-                <span>${confirmedCount} of ${total} confirmed</span>
-                <span>${pct}%</span>
-            </div>
-            <div class="progress-bar-track" style="margin-top:6px">
-                <div class="progress-bar-fill" style="width:${pct}%"></div>
-            </div>
-        </div>`;
-
-        let currentSupplierName = null;
-        pullItems.forEach(item => {
-            if (item.supplierName !== currentSupplierName) {
-                currentSupplierName = item.supplierName;
-                html += `<div class="pull-sheet-supplier">${item.supplierName}</div>`;
-            }
-            const confirmedClass = item.pull_confirmed ? 'pull-confirmed' : '';
-            const statusChip = item.pull_confirmed
-                ? `<span class="pull-confirmed-chip">&#10003;</span>`
-                : `<span class="pull-pending-chip">&bull;</span>`;
-            html += `
-            <div class="pull-sheet-row ${confirmedClass}" onclick="togglePullFromReport(${item.supplierIdx}, ${item.itemIdx})">
-                <span class="pull-sheet-qty">${item.pull_quantity}</span>
-                <span class="pull-sheet-name">${item.raw_description}</span>
-                ${statusChip}
-            </div>`;
-        });
-    }
+    html += '<div class="report-section-header">Pulls</div>';
+    html += buildPullStatsHtml(totalPullCases, confirmedPullCases, pullItems.length);
 
     document.getElementById('live-report-content').innerHTML = html;
-}
-
-async function togglePullFromReport(supplierIdx, itemIdx) {
-    const item = currentDelivery.suppliers[supplierIdx].items[itemIdx];
-    try {
-        await apiPatch(
-            `/deliveries/${currentDelivery.id}/suppliers/${supplierIdx}/items/${itemIdx}/pull-confirm`,
-            {}
-        );
-        lastWriteTimestamp = Date.now();
-        item.pull_confirmed = !item.pull_confirmed;
-        renderLiveReport();
-        renderItemList();
-    } catch (e) {
-        showToast('Failed to update pull status', 'error');
-    }
 }
 
 function onSearchInput() {
@@ -1705,64 +1609,79 @@ function getExceptionItems() {
     return exceptions;
 }
 
+function buildAdjustmentStatsHtml(casesShort, casesOver, returnCount) {
+    if (casesShort === 0 && casesOver === 0 && returnCount === 0) {
+        return '<div class="report-section-empty">No adjustments — everything matched!</div>';
+    }
+    let html = '<div class="report-stat-block">';
+    if (casesShort > 0) html += `
+        <div class="report-stat-row">
+            <span class="report-stat-label">Cases short</span>
+            <span class="report-stat-num stat-short">${casesShort}</span>
+        </div>`;
+    if (casesOver > 0) html += `
+        <div class="report-stat-row">
+            <span class="report-stat-label">Cases over</span>
+            <span class="report-stat-num stat-over">${casesOver}</span>
+        </div>`;
+    if (returnCount > 0) html += `
+        <div class="report-stat-row">
+            <span class="report-stat-label">Returns</span>
+            <span class="report-stat-num stat-return">${returnCount} item${returnCount !== 1 ? 's' : ''}</span>
+        </div>`;
+    html += '</div>';
+    return html;
+}
+
+function buildPullStatsHtml(totalCases, confirmedCases, itemCount) {
+    if (itemCount === 0) {
+        return '<div class="report-section-empty">No pull items</div>';
+    }
+    const pendingCases = totalCases - confirmedCases;
+    let html = '<div class="report-stat-block">';
+    html += `
+        <div class="report-stat-row">
+            <span class="report-stat-label">Total cases</span>
+            <span class="report-stat-num stat-pull">${totalCases}</span>
+        </div>
+        <div class="report-stat-row">
+            <span class="report-stat-label">Confirmed</span>
+            <span class="report-stat-num stat-pull">${confirmedCases}</span>
+        </div>`;
+    if (pendingCases > 0) html += `
+        <div class="report-stat-row">
+            <span class="report-stat-label">Pending</span>
+            <span class="report-stat-num">${pendingCases}</span>
+        </div>`;
+    html += '</div>';
+    return html;
+}
+
 function showCompletionModal() {
     const exceptions = getExceptionItems();
+    const casesShort = exceptions.filter(e => e.status === 'short')
+        .reduce((sum, e) => sum + Math.max(0, (e.expected || 0) - (e.received || 0)), 0);
+    const casesOver = exceptions.filter(e => e.status === 'over')
+        .reduce((sum, e) => sum + Math.max(0, (e.received || 0) - (e.expected || 0)), 0);
+    const returnCount = exceptions.filter(e => e.status === 'return').length;
 
-    // Gather pull items
     const pullItems = [];
     if (currentDelivery) {
         currentDelivery.suppliers.forEach(supplier => {
             supplier.items.forEach(item => {
-                if (item.pull_quantity > 0) {
-                    pullItems.push({ ...item, supplierName: supplier.supplier_name });
-                }
+                if (item.pull_quantity > 0) pullItems.push(item);
             });
         });
     }
+    const totalPullCases = pullItems.reduce((sum, i) => sum + (i.pull_quantity || 0), 0);
+    const confirmedPullCases = pullItems.filter(i => i.pull_confirmed)
+        .reduce((sum, i) => sum + (i.pull_quantity || 0), 0);
 
     let html = '';
-
-    // Adjustments section
-    html += `<div class="report-section-header">Adjustments${exceptions.length > 0 ? ` (${exceptions.length})` : ''}</div>`;
-    if (exceptions.length === 0) {
-        html += `<div class="report-section-empty">No adjustments — everything matched!</div>`;
-    } else {
-        exceptions.forEach(ex => {
-            html += `
-            <div class="exception-row exception-${ex.status}">
-                <div class="exception-info">
-                    <div class="exception-name">${ex.description}</div>
-                    <div class="exception-supplier">${ex.supplierName}</div>
-                    ${ex.notes ? `<div class="exception-note">${ex.notes}</div>` : ''}
-                </div>
-                <div class="exception-qty">
-                    <span class="exception-expected">${ex.expected}</span>
-                    <span class="exception-arrow">&rarr;</span>
-                    <span class="exception-received">${ex.received ?? 0}</span>
-                </div>
-                <span class="badge badge-${ex.status}">${ex.status}</span>
-            </div>`;
-        });
-    }
-
-    // Pulls section
-    const confirmedCount = pullItems.filter(i => i.pull_confirmed).length;
-    html += `<div class="report-section-header">Pulls${pullItems.length > 0 ? ` (${confirmedCount} of ${pullItems.length} confirmed)` : ''}</div>`;
-    if (pullItems.length === 0) {
-        html += `<div class="report-section-empty">No pull items</div>`;
-    } else {
-        pullItems.forEach(item => {
-            const statusChip = item.pull_confirmed
-                ? `<span class="pull-confirmed-chip">&#10003;</span>`
-                : `<span class="pull-pending-chip">&bull;</span>`;
-            html += `
-            <div class="pull-sheet-row ${item.pull_confirmed ? 'pull-confirmed' : ''}">
-                <span class="pull-sheet-qty">${item.pull_quantity}</span>
-                <span class="pull-sheet-name">${item.raw_description}</span>
-                ${statusChip}
-            </div>`;
-        });
-    }
+    html += '<div class="report-section-header">Adjustments</div>';
+    html += buildAdjustmentStatsHtml(casesShort, casesOver, returnCount);
+    html += '<div class="report-section-header">Pulls</div>';
+    html += buildPullStatsHtml(totalPullCases, confirmedPullCases, pullItems.length);
 
     document.getElementById('exception-list').innerHTML = html;
 

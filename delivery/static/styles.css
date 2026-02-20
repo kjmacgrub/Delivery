@@ -1525,31 +1525,39 @@ textarea {
     white-space: nowrap;
 }
 
-.report-pull-count {
-    font-size: 13px;
-    font-weight: 600;
-    color: var(--primary);
-    white-space: nowrap;
+.report-stat-block {
+    background: var(--surface);
+    padding: 4px 16px;
 }
 
-.report-pull-row {
+.report-stat-row {
     display: flex;
     align-items: center;
-    gap: 10px;
-    padding: 8px 0;
-    border-bottom: 1px solid #f0f0f0;
-    border-left: 3px solid var(--border);
-    padding-left: 8px;
+    justify-content: space-between;
+    padding: 10px 0;
+    border-bottom: 1px solid var(--border);
+    font-size: 16px;
 }
 
-.report-pull-row:last-of-type {
+.report-stat-row:last-child {
     border-bottom: none;
 }
 
-.report-pull-row.pull-confirmed {
-    border-left-color: var(--success);
-    opacity: 0.75;
+.report-stat-label {
+    color: var(--text-secondary);
+    font-weight: 500;
 }
+
+.report-stat-num {
+    font-size: 22px;
+    font-weight: 700;
+    color: var(--text);
+}
+
+.stat-short { color: #ff9500; }
+.stat-over { color: var(--primary); }
+.stat-return { color: var(--danger); }
+.stat-pull { color: var(--primary); }
 
 .report-detail {
     margin-top: 12px;
