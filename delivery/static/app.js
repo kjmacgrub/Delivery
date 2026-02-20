@@ -7,6 +7,7 @@ const API = '/api/v1';
 
 // ---- Version History ----
 const VERSION_HISTORY = [
+    { version: 'v1.23', description: 'Delivery-first nav: auto-open active delivery, hamburger admin menu' },
     { version: 'v1.22', description: 'Floor Pull inline with Qty Received; pull sheet syncs to item list' },
     { version: 'v1.21', description: 'Manual floor pull stepper + Pull Sheet screen' },
     { version: 'v1.20', description: 'Add commit hash to version display' },
@@ -64,62 +65,39 @@ function showView(name) {
     });
     currentView = name;
 
-    const appHeader = document.getElementById('app-header');
     const title = document.getElementById('page-title');
     const badge = document.getElementById('status-badge');
-    const headerRow = document.querySelector('.header-row');
     const brandText = document.getElementById('header-brand-text');
-    const chevronsLeft = document.getElementById('back-chevrons-left');
-    const chevronsRight = document.getElementById('back-chevrons-right');
-
-    // Hide header on landing (has its own big title)
-    if (name === 'landing') {
-        appHeader.classList.add('hidden');
-    } else {
-        appHeader.classList.remove('hidden');
-    }
-
-    // Default: hide chevrons and clear brand text
-    brandText.textContent = '';
-    chevronsLeft.classList.add('hidden');
-    chevronsRight.classList.add('hidden');
 
     // Exceptions button only visible in detail view
     document.getElementById('exceptions-btn').classList.toggle('hidden', name !== 'detail');
 
-    // Show chevrons on pages that have back navigation
-    const showChevrons = ['deliveries', 'storage', 'detail', 'reports', 'pullsheet'].includes(name);
-    if (showChevrons) {
-        chevronsLeft.classList.remove('hidden');
-        chevronsRight.classList.remove('hidden');
-    }
+    // Default: clear brand text; views that show a delivery date will set it
+    brandText.textContent = '';
 
     switch (name) {
         case 'landing':
+            title.textContent = '';
             badge.textContent = '';
             badge.className = 'badge';
             break;
         case 'deliveries':
-            headerRow.classList.remove('hidden');
             title.textContent = 'Deliveries';
             badge.textContent = '';
             badge.className = 'badge';
             break;
         case 'storage':
-            headerRow.classList.remove('hidden');
             title.textContent = 'Import File';
             badge.textContent = '';
             badge.className = 'badge';
             break;
         case 'detail':
-            headerRow.classList.remove('hidden');
             title.textContent = '';
             badge.textContent = '';
             badge.className = 'badge';
-            // Brand text updated by renderDetail() with delivery date
+            // Brand text set by renderDetail()
             break;
         case 'complete':
-            headerRow.classList.remove('hidden');
             title.textContent = 'Delivery Complete';
             badge.textContent = 'completed';
             badge.className = 'badge badge-completed';
@@ -128,13 +106,11 @@ function showView(name) {
             }
             break;
         case 'reports':
-            headerRow.classList.remove('hidden');
             title.textContent = 'Adjustment Reports';
             badge.textContent = '';
             badge.className = 'badge';
             break;
         case 'pullsheet':
-            headerRow.classList.remove('hidden');
             title.textContent = 'Pull Sheet';
             badge.textContent = '';
             badge.className = 'badge';
@@ -146,46 +122,64 @@ function showView(name) {
 }
 
 function goHome() {
-    if (currentView === 'landing') return;
-    if (currentView === 'detail') cleanupListeners();
-    if (currentView === 'complete') cleanupListeners();
-    showView('landing');
-    loadLanding();
+    if (currentDelivery && currentDelivery.status !== 'completed') {
+        // Active delivery exists — go (back) to it
+        if (currentView !== 'detail') {
+            showView('detail');
+        }
+    } else {
+        showNoDeliveryScreen();
+    }
 }
 
 function goBack() {
     switch (currentView) {
-        case 'deliveries':
-            showView('landing');
-            loadLanding();
-            break;
-        case 'storage':
-            showView('landing');
-            loadLanding();
-            break;
         case 'detail':
-            // If supplier filter is active, clear it instead of going all the way back
+            // Clear supplier filter if active; otherwise do nothing (delivery is home)
             if (supplierFilter !== null) {
                 clearSupplierFilter();
-                return;
             }
-            cleanupListeners();
-            showView('landing');
-            loadLanding();
-            break;
-        case 'complete':
-            cleanupListeners();
-            showView('landing');
-            loadLanding();
-            break;
-        case 'reports':
-            showView('landing');
-            loadLanding();
             break;
         case 'pullsheet':
             showView('detail');
             break;
+        case 'storage':
+        case 'deliveries':
+        case 'reports':
+            if (currentDelivery && currentDelivery.status !== 'completed') {
+                showView('detail');
+            } else {
+                showNoDeliveryScreen();
+            }
+            break;
+        case 'complete':
+            goHome();
+            break;
     }
+}
+
+function showNoDeliveryScreen() {
+    cleanupListeners();
+    currentDelivery = null;
+    currentSupplierIdx = null;
+    completionShown = false;
+    supplierFilter = null;
+    showView('landing');
+}
+
+// ---- Admin Menu ----
+function openAdminModal() {
+    document.getElementById('admin-modal').classList.remove('hidden');
+}
+
+function closeAdminModal() {
+    document.getElementById('admin-modal').classList.add('hidden');
+}
+
+function showDeliveriesView() {
+    cleanupListeners();
+    showView('deliveries');
+    loadDeliveries();
 }
 
 // ---- API Helpers ----
@@ -1684,9 +1678,6 @@ function showToast(message, type = 'info') {
 
 function refreshData() {
     switch (currentView) {
-        case 'landing':
-            loadLanding();
-            break;
         case 'deliveries':
             loadDeliveries();
             break;
@@ -1807,11 +1798,7 @@ function showDeliveryOverScreen() {
 }
 
 function loadNewDelivery() {
-    currentDelivery = null;
-    currentSupplierIdx = null;
-    completionShown = false;
-    showView('landing');
-    loadLanding();
+    showNoDeliveryScreen();
 }
 
 // ---- Fireworks Animation ----
@@ -1904,120 +1891,6 @@ function playFireworks(onComplete) {
     requestAnimationFrame(animate);
 }
 
-// ---- Landing Page ----
-
-async function loadLanding() {
-    // Reset files section to collapsed
-    document.getElementById('show-files-btn').classList.remove('hidden');
-    document.getElementById('landing-files-header').classList.add('hidden');
-    document.getElementById('landing-files').classList.add('hidden');
-    loadLandingDeliveries();
-}
-
-function expandLandingFiles() {
-    document.getElementById('show-files-btn').classList.add('hidden');
-    document.getElementById('landing-files-header').classList.remove('hidden');
-    document.getElementById('landing-files').classList.remove('hidden');
-    loadLandingFiles();
-}
-
-async function loadLandingFiles() {
-    const container = document.getElementById('landing-files');
-    container.innerHTML = '<div class="loading">Loading files...</div>';
-    try {
-        const data = await apiGet('/storage/files');
-        if (!data.files || !data.files.length) {
-            container.innerHTML = `
-                <div class="empty-state-sm">
-                    <p>No files in incoming folder</p>
-                </div>`;
-            return;
-        }
-        container.innerHTML = data.files.map(f => `
-            <div class="card storage-card" onclick="parseStorageFile('${f.name}')">
-                <div class="card-title">${friendlyFileName(f.name)}</div>
-                <span class="storage-parse-label">Import</span>
-            </div>
-        `).join('');
-    } catch (e) {
-        container.innerHTML = `<div class="empty-state-sm"><p>Could not load files</p></div>`;
-    }
-}
-
-async function loadLandingDeliveries() {
-    const container = document.getElementById('landing-deliveries');
-    container.innerHTML = '<div class="loading">Loading deliveries...</div>';
-    try {
-        const [delData, repData] = await Promise.all([
-            apiGet('/deliveries'),
-            apiGet('/reports').catch(() => ({ reports: [] })),
-        ]);
-        if (!delData.deliveries || !delData.deliveries.length) {
-            container.innerHTML = `<div class="empty-state-sm"><p>No deliveries yet</p></div>`;
-            return;
-        }
-        // Move deliveries section above files when deliveries exist
-        const sectionDeliveries = document.getElementById('section-deliveries');
-        const sectionFiles = document.getElementById('section-files');
-        sectionDeliveries.parentNode.insertBefore(sectionDeliveries, sectionFiles);
-
-        // Build a map of delivery_id -> report for completed deliveries
-        const reportsByDeliveryId = {};
-        (repData.reports || []).forEach(r => {
-            reportsByDeliveryId[r.delivery_id] = r;
-        });
-
-        container.innerHTML = delData.deliveries.map(d => {
-            const pct = d.item_count > 0 ? Math.round((d.checked_in_count / d.item_count) * 100) : 0;
-            const label = `${d.day_of_week} ${formatDate(d.delivery_date)}`;
-            const canDelete = d.checked_in_count === 0 || d.status === 'completed';
-            const deleteBtn = canDelete
-                ? `<button class="delete-btn" onclick="event.stopPropagation(); deleteLandingDelivery('${d.id}', '${label}')" title="Delete delivery">&times;</button>`
-                : '';
-
-            // Show "View Report" button on completed deliveries that have a report
-            const report = reportsByDeliveryId[d.id];
-            let reportBtn = '';
-            if (d.status === 'completed' && report) {
-                const excLabel = report.total_exceptions > 0
-                    ? `${report.total_exceptions} adjustment${report.total_exceptions !== 1 ? 's' : ''}`
-                    : 'No adjustments';
-                reportBtn = `<button class="btn-view-report" onclick="event.stopPropagation(); showReportById('${report.id}')">Report: ${excLabel}</button>`;
-            }
-
-            const statusLine = d.checked_in_count === 0
-                ? `<div class="card-subtitle">Not yet started</div>`
-                : `<div class="landing-in-progress">In progress</div>`;
-
-            return `
-            <div class="card" onclick="openDelivery('${d.id}')">
-                <div class="card-header">
-                    <div>
-                        <div class="card-title">${formatDate(d.delivery_date)}</div>
-                        ${statusLine}
-                    </div>
-                    <div class="card-header-right">
-                        ${deleteBtn}
-                    </div>
-                </div>
-                ${reportBtn}
-            </div>`;
-        }).join('');
-    } catch (e) {
-        container.innerHTML = `<div class="empty-state-sm"><p>Could not load deliveries</p></div>`;
-    }
-}
-
-async function deleteLandingDelivery(id, name) {
-    if (!confirm(`Delete delivery "${name}"?\n\nThis cannot be undone.`)) return;
-    try {
-        await apiDelete(`/deliveries/${id}`);
-        showToast('Delivery deleted');
-        loadLandingDeliveries();
-    } catch (e) {
-        showToast('Failed to delete delivery', 'error');
-    }
-}
 
 
 
@@ -2040,18 +1913,35 @@ function closeVersionModal() {
 
 // ---- Init ----
 document.addEventListener('DOMContentLoaded', async () => {
-    // Set version from single source of truth
     const currentVersion = VERSION_HISTORY[0].version;
-
     let commitHash = 'dev';
     try {
         const res = await fetch('/api/commit');
         const data = await res.json();
         commitHash = data.hash;
     } catch (e) { /* ignore */ }
-
     document.getElementById('app-version').textContent = `${currentVersion} · ${commitHash}`;
 
-    showView('landing');
-    loadLanding();
+    await initApp();
 });
+
+async function initApp() {
+    try {
+        const data = await apiGet('/deliveries');
+        const deliveries = data.deliveries || [];
+
+        // Find the most recent non-completed delivery
+        const active = deliveries
+            .filter(d => d.status !== 'completed')
+            .sort((a, b) => (b.parsed_at || '').localeCompare(a.parsed_at || ''))[0];
+
+        if (active) {
+            await openDelivery(active.id);
+        } else {
+            showNoDeliveryScreen();
+        }
+    } catch (e) {
+        showToast('Failed to load deliveries', 'error');
+        showNoDeliveryScreen();
+    }
+}

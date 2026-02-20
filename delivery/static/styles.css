@@ -62,36 +62,30 @@ html, body {
 }
 
 .header-brand {
-    font-size: 28px;
-    font-weight: 700;
-    color: var(--text);
-    text-align: center;
-    cursor: pointer;
-    -webkit-tap-highlight-color: transparent;
     display: flex;
     align-items: center;
-    justify-content: center;
+    gap: 4px;
 }
 
-.header-brand:active {
-    opacity: 0.6;
-}
-
-.brand-chevrons {
-    display: inline-flex;
-    align-items: center;
-    color: var(--primary);
-    cursor: pointer;
-    -webkit-tap-highlight-color: transparent;
-    padding: 4px;
-}
-
-.brand-chevrons:active {
-    opacity: 0.5;
+.menu-btn {
+    color: var(--text);
+    flex-shrink: 0;
 }
 
 #header-brand-text {
-    margin: 0 12px;
+    flex: 1;
+    text-align: center;
+    font-size: 28px;
+    font-weight: 700;
+    color: var(--text);
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+    /* right-pad by the same width as the menu button to keep text optically centered */
+    padding-right: 40px;
+}
+
+#header-brand-text:active {
+    opacity: 0.6;
 }
 
 .btn-exceptions {
@@ -1976,6 +1970,64 @@ textarea {
     font-size: 14px;
     color: var(--text);
     line-height: 1.4;
+}
+
+/* ---- No Active Delivery Screen ---- */
+.no-delivery-screen {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 50vh;
+    text-align: center;
+    gap: 12px;
+    padding: 32px;
+}
+
+.no-delivery-title {
+    font-size: 22px;
+    font-weight: 700;
+    color: var(--text);
+}
+
+.no-delivery-sub {
+    font-size: 15px;
+    color: var(--text-secondary);
+    margin-bottom: 12px;
+}
+
+/* ---- Admin Menu Modal ---- */
+.admin-modal-content {
+    max-height: 60vh;
+}
+
+.admin-modal-body {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding-top: 8px;
+}
+
+.admin-menu-btn {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 16px 20px;
+    background: var(--bg);
+    border: none;
+    border-radius: var(--radius);
+    font-size: 17px;
+    font-weight: 600;
+    color: var(--text);
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+    width: 100%;
+    text-align: left;
+    transition: background 0.15s;
+}
+
+.admin-menu-btn:active {
+    background: var(--border);
 }
 
 /* ---- Pull Sheet ---- */

@@ -14,22 +14,21 @@
       gtag('js', new Date());
       gtag('config', 'G-6JSKH5XWSC');
     </script>
-    <link rel="stylesheet" href="/static/styles.css?v=1.22">
+    <link rel="stylesheet" href="/static/styles.css?v=1.23">
 </head>
 <body>
     <div id="app">
         <!-- Header -->
         <header id="app-header">
-            <div id="header-brand" class="header-brand" onclick="goHome()">
-                <span id="back-chevrons-left" class="brand-chevrons hidden" onclick="event.stopPropagation(); goBack()">
-                    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M15 18l-6-6 6-6"/></svg>
-                    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="margin-left:-14px"><path d="M15 18l-6-6 6-6"/></svg>
-                </span>
-                <span id="header-brand-text">Daily Delivery</span>
-                <span id="back-chevrons-right" class="brand-chevrons hidden" onclick="event.stopPropagation(); goBack()">
-                    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M9 18l6-6-6-6"/></svg>
-                    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="margin-left:-14px"><path d="M9 18l6-6-6-6"/></svg>
-                </span>
+            <div id="header-brand" class="header-brand">
+                <button id="menu-btn" class="icon-btn menu-btn" onclick="openAdminModal()" aria-label="Menu">
+                    <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                        <line x1="3" y1="6" x2="21" y2="6"/>
+                        <line x1="3" y1="12" x2="21" y2="12"/>
+                        <line x1="3" y1="18" x2="21" y2="18"/>
+                    </svg>
+                </button>
+                <span id="header-brand-text" onclick="goHome()">Daily Delivery</span>
             </div>
             <div class="header-row">
                 <div class="header-left">
@@ -50,25 +49,12 @@
             </div>
         </header>
 
-        <!-- View: Landing -->
+        <!-- View: No Active Delivery -->
         <div id="view-landing" class="view active">
-            <div class="landing-page">
-                <h1 class="landing-title">Daily Delivery</h1>
-
-
-                <div id="section-files" class="landing-section">
-                    <div id="show-files-btn" class="landing-action" onclick="expandLandingFiles()">Show available delivery days</div>
-                    <h2 id="landing-files-header" class="landing-section-title hidden">Available Worksheets</h2>
-                    <div id="landing-files" class="card-list hidden"></div>
-                </div>
-
-                <div id="section-deliveries" class="landing-section">
-                    <h2 class="landing-section-title">Existing Deliveries</h2>
-                    <div id="landing-deliveries" class="card-list">
-                        <div class="loading">Loading deliveries...</div>
-                    </div>
-                </div>
-
+            <div class="no-delivery-screen">
+                <p class="no-delivery-title">No Active Delivery</p>
+                <p class="no-delivery-sub">Import a file or switch to an existing delivery</p>
+                <button class="btn btn-primary btn-lg" onclick="openAdminModal()">Open Menu</button>
             </div>
         </div>
 
@@ -255,6 +241,31 @@
             </div>
         </div>
 
+        <!-- Modal: Admin Menu -->
+        <div id="admin-modal" class="modal hidden">
+            <div class="modal-backdrop" onclick="closeAdminModal()"></div>
+            <div class="modal-content admin-modal-content">
+                <div class="modal-header">
+                    <h2>Menu</h2>
+                    <button class="icon-btn" onclick="closeAdminModal()">&times;</button>
+                </div>
+                <div class="modal-body admin-modal-body">
+                    <button class="admin-menu-btn" onclick="closeAdminModal(); showDeliveriesView()">
+                        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></svg>
+                        Switch Delivery
+                    </button>
+                    <button class="admin-menu-btn" onclick="closeAdminModal(); showStorageFiles()">
+                        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14,2 14,8 20,8"/></svg>
+                        Import New File
+                    </button>
+                    <button class="admin-menu-btn" onclick="closeAdminModal(); showReports()">
+                        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 17H7v-7h2m4 7h-2V7h2m4 10h-2v-4h2"/><rect x="2" y="2" width="20" height="20" rx="2"/></svg>
+                        View Reports
+                    </button>
+                </div>
+            </div>
+        </div>
+
         <!-- Fireworks Canvas (overlay) -->
         <canvas id="fireworks-canvas"></canvas>
 
@@ -269,6 +280,6 @@
     <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
 
-    <script src="/static/app.js?v=1.22"></script>
+    <script src="/static/app.js?v=1.23"></script>
 </body>
 </html>
