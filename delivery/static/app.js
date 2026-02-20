@@ -7,6 +7,7 @@ const API = '/api/v1';
 
 // ---- Version History ----
 const VERSION_HISTORY = [
+    { version: 'v1.32', description: 'Adjustment rows show quantity and status label for all types' },
     { version: 'v1.31', description: 'Remove summary stat lines from all reports; show item detail only' },
     { version: 'v1.30', description: 'Live Report pulls are interactive: tappable rows to confirm/unconfirm' },
     { version: 'v1.29', description: 'Report item detail: names and supplier shown below case totals' },
@@ -426,7 +427,8 @@ function renderReportList(reports) {
         const adjItems = (r.exception_items || []).map(i => ({
             name: i.raw_description, supplier: i.supplier_name, status: i.received_status,
             diff: i.received_status === 'short' ? Math.max(0, (i.quantity_expected || 0) - (i.quantity_received || 0))
-                : i.received_status === 'over' ? Math.max(0, (i.quantity_received || 0) - (i.quantity_expected || 0)) : null,
+                : i.received_status === 'over' ? Math.max(0, (i.quantity_received || 0) - (i.quantity_expected || 0))
+                : (i.quantity_expected || 0),
         }));
         const normPulls = (r.pull_items || []).map(i => ({
             name: i.raw_description, supplier: i.supplier_name,
@@ -1017,7 +1019,8 @@ function renderLiveReport() {
     const adjItems = exceptions.map(e => ({
         name: e.description, supplier: e.supplierName, status: e.status,
         diff: e.status === 'short' ? Math.max(0, (e.expected || 0) - (e.received || 0))
-            : e.status === 'over' ? Math.max(0, (e.received || 0) - (e.expected || 0)) : null,
+            : e.status === 'over' ? Math.max(0, (e.received || 0) - (e.expected || 0))
+            : (e.expected || 0),
     }));
 
     html += '<div class="report-section-header">Adjustments</div>';
@@ -1654,9 +1657,7 @@ function buildAdjustmentStatsHtml(adjItems) {
         return '<div class="report-section-empty">No adjustments — everything matched!</div>';
     }
     return adjItems.map(item => {
-        const diffLabel = item.status === 'short' ? `-${item.diff}`
-            : item.status === 'over' ? `+${item.diff}`
-            : 'return';
+        const diffLabel = `${item.diff} ${item.status}`;
         return `
         <div class="report-item-row">
             <div class="report-item-info">
@@ -1693,7 +1694,8 @@ function showCompletionModal() {
     const adjItems = exceptions.map(e => ({
         name: e.description, supplier: e.supplierName, status: e.status,
         diff: e.status === 'short' ? Math.max(0, (e.expected || 0) - (e.received || 0))
-            : e.status === 'over' ? Math.max(0, (e.received || 0) - (e.expected || 0)) : null,
+            : e.status === 'over' ? Math.max(0, (e.received || 0) - (e.expected || 0))
+            : (e.expected || 0),
     }));
 
     const normPullItems = [];
