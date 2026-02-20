@@ -4,7 +4,7 @@ Check-in workflow endpoints for receiving deliveries.
 
 from fastapi import APIRouter, HTTPException, Request
 
-from delivery.models import LineItemCheckIn
+from delivery.models import LineItemCheckIn, SetPullRequest
 from delivery.schemas import CheckInResponse, CompleteDeliveryResponse
 
 router = APIRouter()
@@ -40,6 +40,28 @@ async def check_in_item(
 
     return CheckInResponse(
         message=f"Checked in: {item.raw_description}",
+        items_updated=1,
+    )
+
+
+@router.patch(
+    "/deliveries/{delivery_id}/suppliers/{supplier_idx}/items/{item_idx}/set-pull",
+    response_model=CheckInResponse,
+)
+async def set_pull(
+    delivery_id: str,
+    supplier_idx: int,
+    item_idx: int,
+    body: SetPullRequest,
+    request: Request,
+):
+    """Set (or clear) the pull quantity on an item."""
+    service = _get_service(request)
+    item = service.set_pull_quantity(delivery_id, supplier_idx, item_idx, body.quantity)
+    if not item:
+        raise HTTPException(status_code=404, detail="Item not found.")
+    return CheckInResponse(
+        message=f"Pull quantity set to {body.quantity}: {item.raw_description}",
         items_updated=1,
     )
 

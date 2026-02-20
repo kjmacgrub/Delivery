@@ -89,6 +89,11 @@ class LineItemCheckIn(BaseModel):
     pull_confirmed: Optional[bool] = None
 
 
+class SetPullRequest(BaseModel):
+    """Request body for setting a manual pull quantity on an item."""
+    quantity: int = Field(ge=0)
+
+
 # ---- Supplier Entries ----
 
 class SupplierEntryBase(BaseModel):

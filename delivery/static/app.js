@@ -7,6 +7,7 @@ const API = '/api/v1';
 
 // ---- Version History ----
 const VERSION_HISTORY = [
+    { version: 'v1.21', description: 'Manual floor pull stepper + Pull Sheet screen' },
     { version: 'v1.20', description: 'Add commit hash to version display' },
     { version: 'v1.19', description: 'Single-item unreceive, landing page polish, friendly filenames' },
     { version: 'v1.12', description: 'Adjustments rename, pull confirmation, supplier sort, UI polish' },
@@ -53,7 +54,7 @@ let pendingDeliveryUpdate = null;  // snapshot data waiting for modal to close
 let lastWriteTimestamp = 0;        // to debounce our own writes
 
 // ---- Navigation ----
-const views = ['landing', 'deliveries', 'storage', 'detail', 'complete', 'reports'];
+const views = ['landing', 'deliveries', 'storage', 'detail', 'complete', 'reports', 'pullsheet'];
 
 function showView(name) {
     views.forEach(v => {
@@ -86,7 +87,7 @@ function showView(name) {
     document.getElementById('exceptions-btn').classList.toggle('hidden', name !== 'detail');
 
     // Show chevrons on pages that have back navigation
-    const showChevrons = ['deliveries', 'storage', 'detail', 'reports'].includes(name);
+    const showChevrons = ['deliveries', 'storage', 'detail', 'reports', 'pullsheet'].includes(name);
     if (showChevrons) {
         chevronsLeft.classList.remove('hidden');
         chevronsRight.classList.remove('hidden');
@@ -131,6 +132,15 @@ function showView(name) {
             badge.textContent = '';
             badge.className = 'badge';
             break;
+        case 'pullsheet':
+            headerRow.classList.remove('hidden');
+            title.textContent = 'Pull Sheet';
+            badge.textContent = '';
+            badge.className = 'badge';
+            if (currentDelivery) {
+                brandText.textContent = `${currentDelivery.day_of_week} ${formatDate(currentDelivery.delivery_date)}`;
+            }
+            break;
     }
 }
 
@@ -170,6 +180,9 @@ function goBack() {
         case 'reports':
             showView('landing');
             loadLanding();
+            break;
+        case 'pullsheet':
+            showView('detail');
             break;
     }
 }
@@ -762,6 +775,15 @@ function renderItemList() {
         expandBtn.classList.add('hidden');
     }
 
+    // Update pull sheet button visibility
+    const pullSheetBtn = document.getElementById('pull-sheet-btn');
+    if (pullSheetBtn) {
+        const pullCount = currentDelivery.suppliers.reduce((sum, s) =>
+            sum + s.items.filter(i => i.pull_quantity > 0).length, 0);
+        pullSheetBtn.classList.toggle('hidden', pullCount === 0);
+        if (pullCount > 0) pullSheetBtn.textContent = `Pulls (${pullCount})`;
+    }
+
     const container = document.getElementById('flat-item-list');
     container.classList.toggle('show-received', showReceived);
 
@@ -1042,6 +1064,101 @@ function updateFilteredSupplierSummary() {
     summaryEl.innerHTML = progressBar(supRcvU, supExpU, rcvClass2);
 }
 
+// ---- Pull Sheet ----
+
+function showPullSheet() {
+    showView('pullsheet');
+    renderPullSheet();
+}
+
+function renderPullSheet() {
+    if (!currentDelivery) return;
+
+    // Gather all pull items across all suppliers
+    const pullItems = [];
+    currentDelivery.suppliers.forEach((supplier, sIdx) => {
+        supplier.items.forEach((item, iIdx) => {
+            if (item.pull_quantity > 0) {
+                pullItems.push({
+                    ...item,
+                    supplierIdx: sIdx,
+                    itemIdx: iIdx,
+                    supplierName: supplier.supplier_name,
+                });
+            }
+        });
+    });
+
+    // Sort by supplier name, then item name
+    pullItems.sort((a, b) => {
+        const supCmp = a.supplierName.toLowerCase().localeCompare(b.supplierName.toLowerCase());
+        if (supCmp !== 0) return supCmp;
+        return a.raw_description.toLowerCase().localeCompare(b.raw_description.toLowerCase());
+    });
+
+    const confirmedCount = pullItems.filter(i => i.pull_confirmed).length;
+    const total = pullItems.length;
+
+    // Render progress line
+    const progressEl = document.getElementById('pull-progress');
+    if (total === 0) {
+        progressEl.innerHTML = '';
+    } else {
+        const pct = Math.round((confirmedCount / total) * 100);
+        progressEl.innerHTML = `
+            <div class="pull-sheet-progress-line">
+                <span>${confirmedCount} of ${total} confirmed</span>
+                <span>${pct}%</span>
+            </div>
+            <div class="progress-bar-track" style="margin-top:6px">
+                <div class="progress-bar-fill" style="width:${pct}%"></div>
+            </div>`;
+    }
+
+    if (total === 0) {
+        document.getElementById('pull-sheet-list').innerHTML =
+            '<div class="empty-state"><p>No pull items</p></div>';
+        return;
+    }
+
+    // Render list grouped by supplier
+    let html = '';
+    let currentSupplierName = null;
+    pullItems.forEach(item => {
+        if (item.supplierName !== currentSupplierName) {
+            currentSupplierName = item.supplierName;
+            html += `<div class="pull-sheet-supplier">${item.supplierName}</div>`;
+        }
+        const confirmedClass = item.pull_confirmed ? 'pull-confirmed' : '';
+        const statusChip = item.pull_confirmed
+            ? `<span class="pull-confirmed-chip">&#10003;</span>`
+            : `<span class="pull-pending-chip">&bull;</span>`;
+        html += `
+        <div class="pull-sheet-row ${confirmedClass}" onclick="togglePullFromPullSheet(${item.supplierIdx}, ${item.itemIdx})">
+            <span class="pull-sheet-qty">${item.pull_quantity}</span>
+            <span class="pull-sheet-name">${item.raw_description}</span>
+            ${statusChip}
+        </div>`;
+    });
+
+    document.getElementById('pull-sheet-list').innerHTML = html;
+}
+
+async function togglePullFromPullSheet(supplierIdx, itemIdx) {
+    const item = currentDelivery.suppliers[supplierIdx].items[itemIdx];
+    try {
+        await apiPatch(
+            `/deliveries/${currentDelivery.id}/suppliers/${supplierIdx}/items/${itemIdx}/pull-confirm`,
+            {}
+        );
+        lastWriteTimestamp = Date.now();
+        item.pull_confirmed = !item.pull_confirmed;
+        renderPullSheet();
+    } catch (e) {
+        showToast('Failed to update pull status', 'error');
+    }
+}
+
 function onSearchInput() {
     const input = document.getElementById('item-search');
     searchQuery = input.value.trim().toLowerCase();
@@ -1092,6 +1209,9 @@ function openCheckInModal(itemIdx) {
     } else {
         selectedReason = null;
     }
+
+    // Floor Pull stepper
+    document.getElementById('modal-pull-qty').value = item.pull_quantity ?? 0;
 
     // Pull confirmation checkbox
     const pullGroup = document.getElementById('pull-confirm-group');
@@ -1223,6 +1343,43 @@ function adjustQty(delta) {
         if (selectedReason === 'over') selectedReason = null;
     }
     updateModalStatusButtons();
+}
+
+async function adjustPullQty(delta) {
+    if (!checkInItem) return;
+    const input = document.getElementById('modal-pull-qty');
+    const val = parseInt(input.value) || 0;
+    const newQty = Math.max(0, val + delta);
+    input.value = newQty;
+
+    // Update pull-confirm-group visibility dynamically
+    const pullGroup = document.getElementById('pull-confirm-group');
+    const pullQtySpan = document.getElementById('pull-confirm-qty');
+    if (newQty > 0) {
+        pullGroup.classList.remove('hidden');
+        pullQtySpan.textContent = newQty;
+    } else {
+        pullGroup.classList.add('hidden');
+    }
+
+    const { supplierIdx, itemIdx } = checkInItem;
+    try {
+        await apiPatch(
+            `/deliveries/${currentDelivery.id}/suppliers/${supplierIdx}/items/${itemIdx}/set-pull`,
+            { quantity: newQty }
+        );
+        lastWriteTimestamp = Date.now();
+
+        // Update local state
+        const item = currentDelivery.suppliers[supplierIdx].items[itemIdx];
+        item.pull_quantity = newQty > 0 ? newQty : null;
+        item.pull_for_floor = newQty > 0;
+
+        // Re-render item list in background (no toast)
+        renderItemList();
+    } catch (e) {
+        showToast('Failed to update pull quantity', 'error');
+    }
 }
 
 // Also update on direct qty input

@@ -14,7 +14,7 @@
       gtag('js', new Date());
       gtag('config', 'G-6JSKH5XWSC');
     </script>
-    <link rel="stylesheet" href="/static/styles.css?v=1.20">
+    <link rel="stylesheet" href="/static/styles.css?v=1.21">
 </head>
 <body>
     <div id="app">
@@ -140,12 +140,19 @@
                         <input type="text" id="item-search" placeholder="Search..." oninput="onSearchInput()" autocomplete="off" autocorrect="off" spellcheck="false">
                         <button id="search-clear-btn" class="search-clear hidden" onclick="clearSearch()">&times;</button>
                     </div>
+                    <button id="pull-sheet-btn" class="sort-btn hidden" onclick="showPullSheet()">Pulls</button>
                     <span id="item-receive-all-btn" class="receive-all-slot"></span>
                 </div>
                 <div id="flat-item-list" class="compact-list"></div>
             </div>
         </div>
 
+
+        <!-- View: Pull Sheet -->
+        <div id="view-pullsheet" class="view">
+            <div id="pull-progress" class="pull-sheet-progress-bar"></div>
+            <div id="pull-sheet-list" class="compact-list"></div>
+        </div>
 
         <!-- Modal: Check-in Item -->
         <div id="checkin-modal" class="modal hidden">
@@ -166,6 +173,14 @@
                             <button class="qty-btn" onclick="adjustQty(-1)">-</button>
                             <input type="number" id="modal-qty" min="0" inputmode="numeric">
                             <button class="qty-btn" onclick="adjustQty(1)">+</button>
+                        </div>
+                    </div>
+                    <div class="form-group" id="pull-qty-group">
+                        <label>Floor Pull</label>
+                        <div class="qty-input-row">
+                            <button class="qty-btn" onclick="adjustPullQty(-1)">-</button>
+                            <input type="number" id="modal-pull-qty" min="0" inputmode="numeric">
+                            <button class="qty-btn" onclick="adjustPullQty(1)">+</button>
                         </div>
                     </div>
                     <div class="form-group">
@@ -250,6 +265,6 @@
     <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
 
-    <script src="/static/app.js?v=1.20"></script>
+    <script src="/static/app.js?v=1.21"></script>
 </body>
 </html>
