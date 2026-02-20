@@ -54,6 +54,9 @@ fi
 
 echo "=== Deploying to Cloud Run ==="
 
+COMMIT_HASH=$(git rev-parse --short HEAD)
+echo "Commit: $COMMIT_HASH"
+
 # Build and deploy in one step (Cloud Build handles the Docker build)
 gcloud run deploy $SERVICE_NAME \
     --source . \
@@ -61,7 +64,7 @@ gcloud run deploy $SERVICE_NAME \
     --project $PROJECT_ID \
     --allow-unauthenticated \
     --set-secrets="/secrets/firebase-service-account.json=${SECRET_NAME}:latest" \
-    --set-env-vars="FIREBASE_CREDENTIALS=/secrets/firebase-service-account.json" \
+    --set-env-vars="FIREBASE_CREDENTIALS=/secrets/firebase-service-account.json,COMMIT_HASH=$COMMIT_HASH" \
     --memory=512Mi \
     --cpu=1 \
     --min-instances=0 \

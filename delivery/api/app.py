@@ -3,6 +3,7 @@ FastAPI application factory.
 """
 
 import logging
+import os
 from contextlib import asynccontextmanager
 from pathlib import Path
 
@@ -95,6 +96,10 @@ def create_app(use_firebase: bool = True) -> FastAPI:
         @app.get("/")
         async def serve_index():
             return FileResponse(str(static_dir / "index.html"))
+
+    @app.get("/api/commit")
+    async def get_commit():
+        return {"hash": os.environ.get("COMMIT_HASH", "dev")}
 
     @app.get("/health")
     async def health_check():

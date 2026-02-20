@@ -7,10 +7,11 @@ const API = '/api/v1';
 
 // ---- Version History ----
 const VERSION_HISTORY = [
+    { version: 'v1.20', description: 'Add commit hash to version display' },
     { version: 'v1.19', description: 'Single-item unreceive, landing page polish, friendly filenames' },
-    { version: 'v1.12', description: 'Discrepancies rename, pull confirmation, supplier sort, UI polish' },
-    { version: 'v1.06', description: 'Discrepancies rename, notes in reports, header cleanup' },
-    { version: 'v1.02', description: 'Pull confirmation, auto-detect suppliers, live discrepancies, cross-supplier view' },
+    { version: 'v1.12', description: 'Adjustments rename, pull confirmation, supplier sort, UI polish' },
+    { version: 'v1.06', description: 'Adjustments rename, notes in reports, header cleanup' },
+    { version: 'v1.02', description: 'Pull confirmation, auto-detect suppliers, live adjustments, cross-supplier view' },
     { version: 'v1.01', description: 'Landing page refinements, inline reports, navigation fixes' },
     { version: 'v1.00', description: 'Landing page, app title, version history' },
     { version: 'v0.29', description: 'Firestore real-time listeners for live cross-iPad updates' },
@@ -62,12 +63,12 @@ function showView(name) {
     currentView = name;
 
     const appHeader = document.getElementById('app-header');
-    const backBtn = document.getElementById('back-btn');
     const title = document.getElementById('page-title');
     const badge = document.getElementById('status-badge');
-
     const headerRow = document.querySelector('.header-row');
-    const brand = document.getElementById('header-brand');
+    const brandText = document.getElementById('header-brand-text');
+    const chevronsLeft = document.getElementById('back-chevrons-left');
+    const chevronsRight = document.getElementById('back-chevrons-right');
 
     // Hide header on landing (has its own big title)
     if (name === 'landing') {
@@ -76,11 +77,20 @@ function showView(name) {
         appHeader.classList.remove('hidden');
     }
 
-    // Default brand text; detail view overrides with date
-    brand.textContent = '';
+    // Default: hide chevrons and clear brand text
+    brandText.textContent = '';
+    chevronsLeft.classList.add('hidden');
+    chevronsRight.classList.add('hidden');
 
     // Exceptions button only visible in detail view
     document.getElementById('exceptions-btn').classList.toggle('hidden', name !== 'detail');
+
+    // Show chevrons on pages that have back navigation
+    const showChevrons = ['deliveries', 'storage', 'detail', 'reports'].includes(name);
+    if (showChevrons) {
+        chevronsLeft.classList.remove('hidden');
+        chevronsRight.classList.remove('hidden');
+    }
 
     switch (name) {
         case 'landing':
@@ -89,21 +99,18 @@ function showView(name) {
             break;
         case 'deliveries':
             headerRow.classList.remove('hidden');
-            backBtn.classList.remove('hidden');
             title.textContent = 'Deliveries';
             badge.textContent = '';
             badge.className = 'badge';
             break;
         case 'storage':
             headerRow.classList.remove('hidden');
-            backBtn.classList.remove('hidden');
             title.textContent = 'Import File';
             badge.textContent = '';
             badge.className = 'badge';
             break;
         case 'detail':
             headerRow.classList.remove('hidden');
-            backBtn.classList.remove('hidden');
             title.textContent = '';
             badge.textContent = '';
             badge.className = 'badge';
@@ -111,18 +118,16 @@ function showView(name) {
             break;
         case 'complete':
             headerRow.classList.remove('hidden');
-            backBtn.classList.add('hidden');
             title.textContent = 'Delivery Complete';
             badge.textContent = 'completed';
             badge.className = 'badge badge-completed';
             if (currentDelivery) {
-                brand.textContent = `${currentDelivery.day_of_week} ${formatDate(currentDelivery.delivery_date)}`;
+                brandText.textContent = `${currentDelivery.day_of_week} ${formatDate(currentDelivery.delivery_date)}`;
             }
             break;
         case 'reports':
             headerRow.classList.remove('hidden');
-            backBtn.classList.remove('hidden');
-            title.textContent = 'Discrepancy Reports';
+            title.textContent = 'Adjustment Reports';
             badge.textContent = '';
             badge.className = 'badge';
             break;
@@ -364,7 +369,7 @@ async function deleteDelivery(id, name) {
     }
 }
 
-// ---- Discrepancy Reports ----
+// ---- Adjustment Reports ----
 async function showReports() {
     showView('reports');
     const container = document.getElementById('report-list');
@@ -376,7 +381,7 @@ async function showReports() {
             container.innerHTML = `
                 <div class="empty-state">
                     <p>No reports yet</p>
-                    <p class="subtitle">Discrepancy reports are created when deliveries are completed</p>
+                    <p class="subtitle">Adjustment reports are created when deliveries are completed</p>
                 </div>`;
             return;
         }
@@ -399,8 +404,8 @@ function renderReportList(reports) {
         const deliveryDate = r.delivery_date ? formatDate(r.delivery_date) : '';
         const hasExceptions = r.total_exceptions > 0;
         const exceptionBadge = hasExceptions
-            ? `<span class="report-exception-count">${r.total_exceptions} discrepanc${r.total_exceptions !== 1 ? 'ies' : 'y'}</span>`
-            : `<span class="report-no-exceptions">No discrepancies</span>`;
+            ? `<span class="report-exception-count">${r.total_exceptions} adjustment${r.total_exceptions !== 1 ? 's' : ''}</span>`
+            : `<span class="report-no-exceptions">No adjustments</span>`;
 
         const exceptionRows = (r.exception_items || []).map(item => {
             const statusClass = item.received_status;
@@ -439,7 +444,7 @@ function renderReportList(reports) {
                 <span class="card-meta-item">${r.source_filename}</span>
             </div>
             <div class="report-detail" id="report-detail-${idx}" style="display:none;">
-                ${hasExceptions ? exceptionRows : '<div class="report-all-good">✓ Everything matched — no discrepancies</div>'}
+                ${hasExceptions ? exceptionRows : '<div class="report-all-good">✓ Everything matched — no adjustments</div>'}
                 <button class="report-delete-btn" onclick="event.stopPropagation(); deleteReport(${idx})">Delete Report</button>
             </div>
         </div>`;
@@ -490,7 +495,7 @@ async function deleteReport(idx) {
             document.getElementById('report-list').innerHTML = `
                 <div class="empty-state">
                     <p>No reports yet</p>
-                    <p class="subtitle">Discrepancy reports are created when deliveries are completed</p>
+                    <p class="subtitle">Adjustment reports are created when deliveries are completed</p>
                 </div>`;
         } else {
             renderReportList(cachedReports);
@@ -598,8 +603,8 @@ function renderDetail() {
     const receivedToggleClass = showReceived ? 'summary-stat clickable active-stat' : 'summary-stat clickable';
 
     // Always show delivery date in header brand
-    const brand = document.getElementById('header-brand');
-    brand.textContent = `${delivery.day_of_week} ${formatDate(delivery.delivery_date)}`;
+    const brandText = document.getElementById('header-brand-text');
+    brandText.textContent = `${delivery.day_of_week} ${formatDate(delivery.delivery_date)}`;
 
     const detailTitle = document.getElementById('detail-title');
 
@@ -647,11 +652,11 @@ function showLiveExceptions() {
     if (exceptions.length === 0) {
         listEl.innerHTML = `
             <div class="no-exceptions">
-                <p>No discrepancies so far</p>
+                <p>No adjustments so far</p>
             </div>`;
     } else {
         listEl.innerHTML = `
-            <div class="exception-count">${exceptions.length} discrepanc${exceptions.length > 1 ? 'ies' : 'y'}</div>
+            <div class="exception-count">${exceptions.length} adjustment${exceptions.length > 1 ? 's' : ''}</div>
             ${exceptions.map(ex => `
                 <div class="exception-row exception-${ex.status}">
                     <div class="exception-info">
@@ -671,10 +676,10 @@ function showLiveExceptions() {
 
     // Reuse the complete modal but with a dismiss button
     const modal = document.getElementById('complete-modal');
-    document.querySelector('.complete-modal-content .modal-header h2').textContent = 'Discrepancies';
+    document.querySelector('.complete-modal-content .modal-header h2').textContent = 'Adjustments';
     document.querySelector('.complete-subtitle').textContent = exceptions.length > 0
-        ? `${exceptions.length} item${exceptions.length !== 1 ? 's' : ''} with discrepancies`
-        : 'All received items match expected quantities — no discrepancies';
+        ? `${exceptions.length} item${exceptions.length !== 1 ? 's' : ''} with adjustments`
+        : 'All received items match expected quantities — no adjustments';
     // Hide the confirm button, change continue button text
     document.querySelector('.complete-modal-content .modal-footer').innerHTML = `
         <button class="btn btn-secondary" onclick="dismissCompletionModal()">Close</button>`;
@@ -1453,7 +1458,7 @@ function progressBar(done, total, toggleClass) {
     const cls = toggleClass || '';
     const onclick = toggleClass ? ' onclick="toggleReceivedView()"' : '';
     const toggleLabel = toggleClass
-        ? `<div class="progress-bar-toggle"${onclick}>${showReceived ? 'Hide Received' : 'Show All'}</div>`
+        ? `<div class="progress-bar-toggle"${onclick}>${showReceived ? 'Hide Received' : 'Show Received'}</div>`
         : '';
     return `
     <div class="progress-bar-summary ${cls}">
@@ -1577,11 +1582,11 @@ function showCompletionModal() {
     if (exceptions.length === 0) {
         listEl.innerHTML = `
             <div class="no-exceptions">
-                <p>No discrepancies — everything matched!</p>
+                <p>No adjustments — everything matched!</p>
             </div>`;
     } else {
         listEl.innerHTML = `
-            <div class="exception-count">${exceptions.length} discrepanc${exceptions.length > 1 ? 'ies' : 'y'}</div>
+            <div class="exception-count">${exceptions.length} adjustment${exceptions.length > 1 ? 's' : ''}</div>
             ${exceptions.map(ex => `
                 <div class="exception-row exception-${ex.status}">
                     <div class="exception-info">
@@ -1599,9 +1604,9 @@ function showCompletionModal() {
             `).join('')}`;
     }
 
-    // Restore completion modal header/footer (may have been overridden by live discrepancies view)
+    // Restore completion modal header/footer (may have been overridden by live adjustments view)
     document.querySelector('.complete-modal-content .modal-header h2').textContent = 'All items received!';
-    document.querySelector('.complete-subtitle').textContent = 'See discrepancies below. Continue to confirm delivery over?';
+    document.querySelector('.complete-subtitle').textContent = 'See adjustments below. Continue to confirm delivery over?';
     document.querySelector('.complete-modal-content .modal-footer').innerHTML = `
         <button class="btn btn-secondary" onclick="dismissCompletionModal()">Continue Checking In</button>
         <button class="btn btn-success" onclick="confirmDeliveryComplete()">Confirm Delivery Complete</button>`;
@@ -1816,8 +1821,8 @@ async function loadLandingDeliveries() {
             let reportBtn = '';
             if (d.status === 'completed' && report) {
                 const excLabel = report.total_exceptions > 0
-                    ? `${report.total_exceptions} discrepanc${report.total_exceptions !== 1 ? 'ies' : 'y'}`
-                    : 'No discrepancies';
+                    ? `${report.total_exceptions} adjustment${report.total_exceptions !== 1 ? 's' : ''}`
+                    : 'No adjustments';
                 reportBtn = `<button class="btn-view-report" onclick="event.stopPropagation(); showReportById('${report.id}')">Report: ${excLabel}</button>`;
             }
 
@@ -1875,11 +1880,18 @@ function closeVersionModal() {
 }
 
 // ---- Init ----
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
     // Set version from single source of truth
     const currentVersion = VERSION_HISTORY[0].version;
-    document.querySelector('.landing-version').textContent = currentVersion;
-    document.getElementById('app-version').textContent = currentVersion;
+
+    let commitHash = 'dev';
+    try {
+        const res = await fetch('/api/commit');
+        const data = await res.json();
+        commitHash = data.hash;
+    } catch (e) { /* ignore */ }
+
+    document.getElementById('app-version').textContent = `${currentVersion} · ${commitHash}`;
 
     showView('landing');
     loadLanding();
