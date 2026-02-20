@@ -16,7 +16,7 @@ from delivery.models import (
     SupplierEntry, SupplierStatus,
     LineItem, ReceivedStatus,
     LineItemCheckIn,
-    ExceptionReport, ExceptionItem,
+    ExceptionReport, ExceptionItem, PullReportItem,
 )
 
 
@@ -424,8 +424,9 @@ class DeliveryService:
                         f"in {supplier.supplier_name} is still pending"
                     )
 
-        # Build exception list
+        # Build exception and pull lists
         exceptions = []
+        pull_items = []
         total_items = 0
         for supplier in delivery.suppliers:
             for item in supplier.items:
@@ -439,6 +440,13 @@ class DeliveryService:
                         received_status=item.received_status,
                         received_notes=item.received_notes,
                     ))
+                if item.pull_quantity and item.pull_quantity > 0:
+                    pull_items.append(PullReportItem(
+                        supplier_name=supplier.supplier_name,
+                        raw_description=item.raw_description,
+                        pull_quantity=item.pull_quantity,
+                        pull_confirmed=item.pull_confirmed,
+                    ))
 
         report_id = str(uuid.uuid4())[:8]
         report = ExceptionReport(
@@ -451,6 +459,7 @@ class DeliveryService:
             total_items=total_items,
             total_exceptions=len(exceptions),
             exception_items=exceptions,
+            pull_items=pull_items,
         )
 
         # Save report to Firestore

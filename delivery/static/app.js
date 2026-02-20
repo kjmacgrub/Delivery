@@ -7,6 +7,7 @@ const API = '/api/v1';
 
 // ---- Version History ----
 const VERSION_HISTORY = [
+    { version: 'v1.27', description: 'Pulls included in completion modal and completed delivery reports' },
     { version: 'v1.26', description: 'Live Report section headings; rename View Reports to View Past Deliveries' },
     { version: 'v1.25', description: 'Combined Live Report (adjustments + pulls) in hamburger menu' },
     { version: 'v1.24', description: 'Continue Delivery option in hamburger menu' },
@@ -439,6 +440,24 @@ function renderReportList(reports) {
                 </div>`;
         }).join('');
 
+        const pulls = r.pull_items || [];
+        const pullsConfirmed = pulls.filter(i => i.pull_confirmed).length;
+        const pullRows = pulls.map(item => {
+            const statusChip = item.pull_confirmed
+                ? `<span class="pull-confirmed-chip">&#10003;</span>`
+                : `<span class="pull-pending-chip">&bull;</span>`;
+            return `
+                <div class="report-pull-row ${item.pull_confirmed ? 'pull-confirmed' : ''}">
+                    <span class="pull-sheet-qty">${item.pull_quantity}</span>
+                    <span class="pull-sheet-name">${item.raw_description}</span>
+                    ${statusChip}
+                </div>`;
+        }).join('');
+
+        const pullBadge = pulls.length > 0
+            ? `<span class="report-pull-count">${pulls.length} pull${pulls.length !== 1 ? 's' : ''}</span>`
+            : '';
+
         return `
         <div class="card report-card" onclick="toggleReportDetail(${idx})">
             <div class="card-header">
@@ -448,6 +467,7 @@ function renderReportList(reports) {
                 </div>
                 <div class="card-header-right">
                     ${exceptionBadge}
+                    ${pullBadge}
                 </div>
             </div>
             <div class="card-meta">
@@ -455,7 +475,10 @@ function renderReportList(reports) {
                 <span class="card-meta-item">${r.source_filename}</span>
             </div>
             <div class="report-detail" id="report-detail-${idx}" style="display:none;">
-                ${hasExceptions ? exceptionRows : '<div class="report-all-good">✓ Everything matched — no adjustments</div>'}
+                <div class="report-section-header">Adjustments${hasExceptions ? ` (${r.total_exceptions})` : ''}</div>
+                ${hasExceptions ? exceptionRows : '<div class="report-section-empty">✓ Everything matched — no adjustments</div>'}
+                <div class="report-section-header">Pulls${pulls.length > 0 ? ` (${pullsConfirmed} of ${pulls.length} confirmed)` : ''}</div>
+                ${pulls.length > 0 ? pullRows : '<div class="report-section-empty">No pull items</div>'}
                 <button class="report-delete-btn" onclick="event.stopPropagation(); deleteReport(${idx})">Delete Report</button>
             </div>
         </div>`;
@@ -1684,36 +1707,67 @@ function getExceptionItems() {
 
 function showCompletionModal() {
     const exceptions = getExceptionItems();
-    const listEl = document.getElementById('exception-list');
 
-    if (exceptions.length === 0) {
-        listEl.innerHTML = `
-            <div class="no-exceptions">
-                <p>No adjustments — everything matched!</p>
-            </div>`;
-    } else {
-        listEl.innerHTML = `
-            <div class="exception-count">${exceptions.length} adjustment${exceptions.length > 1 ? 's' : ''}</div>
-            ${exceptions.map(ex => `
-                <div class="exception-row exception-${ex.status}">
-                    <div class="exception-info">
-                        <div class="exception-name">${ex.description}</div>
-                        <div class="exception-supplier">${ex.supplierName}</div>
-                        ${ex.notes ? `<div class="exception-note">${ex.notes}</div>` : ''}
-                    </div>
-                    <div class="exception-qty">
-                        <span class="exception-expected">${ex.expected}</span>
-                        <span class="exception-arrow">&rarr;</span>
-                        <span class="exception-received">${ex.received ?? 0}</span>
-                    </div>
-                    <span class="badge badge-${ex.status}">${ex.status}</span>
-                </div>
-            `).join('')}`;
+    // Gather pull items
+    const pullItems = [];
+    if (currentDelivery) {
+        currentDelivery.suppliers.forEach(supplier => {
+            supplier.items.forEach(item => {
+                if (item.pull_quantity > 0) {
+                    pullItems.push({ ...item, supplierName: supplier.supplier_name });
+                }
+            });
+        });
     }
 
-    // Restore completion modal header/footer (may have been overridden by live adjustments view)
+    let html = '';
+
+    // Adjustments section
+    html += `<div class="report-section-header">Adjustments${exceptions.length > 0 ? ` (${exceptions.length})` : ''}</div>`;
+    if (exceptions.length === 0) {
+        html += `<div class="report-section-empty">No adjustments — everything matched!</div>`;
+    } else {
+        exceptions.forEach(ex => {
+            html += `
+            <div class="exception-row exception-${ex.status}">
+                <div class="exception-info">
+                    <div class="exception-name">${ex.description}</div>
+                    <div class="exception-supplier">${ex.supplierName}</div>
+                    ${ex.notes ? `<div class="exception-note">${ex.notes}</div>` : ''}
+                </div>
+                <div class="exception-qty">
+                    <span class="exception-expected">${ex.expected}</span>
+                    <span class="exception-arrow">&rarr;</span>
+                    <span class="exception-received">${ex.received ?? 0}</span>
+                </div>
+                <span class="badge badge-${ex.status}">${ex.status}</span>
+            </div>`;
+        });
+    }
+
+    // Pulls section
+    const confirmedCount = pullItems.filter(i => i.pull_confirmed).length;
+    html += `<div class="report-section-header">Pulls${pullItems.length > 0 ? ` (${confirmedCount} of ${pullItems.length} confirmed)` : ''}</div>`;
+    if (pullItems.length === 0) {
+        html += `<div class="report-section-empty">No pull items</div>`;
+    } else {
+        pullItems.forEach(item => {
+            const statusChip = item.pull_confirmed
+                ? `<span class="pull-confirmed-chip">&#10003;</span>`
+                : `<span class="pull-pending-chip">&bull;</span>`;
+            html += `
+            <div class="pull-sheet-row ${item.pull_confirmed ? 'pull-confirmed' : ''}">
+                <span class="pull-sheet-qty">${item.pull_quantity}</span>
+                <span class="pull-sheet-name">${item.raw_description}</span>
+                ${statusChip}
+            </div>`;
+        });
+    }
+
+    document.getElementById('exception-list').innerHTML = html;
+
     document.querySelector('.complete-modal-content .modal-header h2').textContent = 'All items received!';
-    document.querySelector('.complete-subtitle').textContent = 'See adjustments below. Continue to confirm delivery over?';
+    document.querySelector('.complete-subtitle').textContent = 'Review and confirm delivery complete?';
     document.querySelector('.complete-modal-content .modal-footer').innerHTML = `
         <button class="btn btn-secondary" onclick="dismissCompletionModal()">Continue Checking In</button>
         <button class="btn btn-success" onclick="confirmDeliveryComplete()">Confirm Delivery Complete</button>`;

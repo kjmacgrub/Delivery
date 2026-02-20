@@ -186,6 +186,14 @@ class ExceptionItem(BaseModel):
     received_notes: Optional[str] = None
 
 
+class PullReportItem(BaseModel):
+    """A pull item snapshot captured at delivery completion."""
+    supplier_name: str
+    raw_description: str
+    pull_quantity: int
+    pull_confirmed: bool
+
+
 class ExceptionReport(BaseModel):
     """Report of delivery exceptions for buyer review."""
     id: str = ""
@@ -197,3 +205,4 @@ class ExceptionReport(BaseModel):
     total_items: int = 0
     total_exceptions: int = 0
     exception_items: List[ExceptionItem] = Field(default_factory=list)
+    pull_items: List[PullReportItem] = Field(default_factory=list)
