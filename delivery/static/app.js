@@ -7,6 +7,7 @@ const API = '/api/v1';
 
 // ---- Version History ----
 const VERSION_HISTORY = [
+    { version: 'v1.31', description: 'Remove summary stat lines from all reports; show item detail only' },
     { version: 'v1.30', description: 'Live Report pulls are interactive: tappable rows to confirm/unconfirm' },
     { version: 'v1.29', description: 'Report item detail: names and supplier shown below case totals' },
     { version: 'v1.28', description: 'Case-centric reports: show aggregate case totals instead of item rows' },
@@ -422,23 +423,12 @@ function renderReportList(reports) {
             ? `<span class="report-exception-count">${r.total_exceptions} adjustment${r.total_exceptions !== 1 ? 's' : ''}</span>`
             : `<span class="report-no-exceptions">No adjustments</span>`;
 
-        const excItems = r.exception_items || [];
-        const casesShort = excItems.filter(i => i.received_status === 'short')
-            .reduce((sum, i) => sum + Math.max(0, (i.quantity_expected || 0) - (i.quantity_received || 0)), 0);
-        const casesOver = excItems.filter(i => i.received_status === 'over')
-            .reduce((sum, i) => sum + Math.max(0, (i.quantity_received || 0) - (i.quantity_expected || 0)), 0);
-        const returnCount = excItems.filter(i => i.received_status === 'return').length;
-        const adjItems = excItems.map(i => ({
+        const adjItems = (r.exception_items || []).map(i => ({
             name: i.raw_description, supplier: i.supplier_name, status: i.received_status,
             diff: i.received_status === 'short' ? Math.max(0, (i.quantity_expected || 0) - (i.quantity_received || 0))
                 : i.received_status === 'over' ? Math.max(0, (i.quantity_received || 0) - (i.quantity_expected || 0)) : null,
         }));
-
-        const pulls = r.pull_items || [];
-        const totalPullCases = pulls.reduce((sum, i) => sum + (i.pull_quantity || 0), 0);
-        const confirmedPullCases = pulls.filter(i => i.pull_confirmed)
-            .reduce((sum, i) => sum + (i.pull_quantity || 0), 0);
-        const normPulls = pulls.map(i => ({
+        const normPulls = (r.pull_items || []).map(i => ({
             name: i.raw_description, supplier: i.supplier_name,
             cases: i.pull_quantity, confirmed: i.pull_confirmed,
         }));
@@ -460,9 +450,9 @@ function renderReportList(reports) {
             </div>
             <div class="report-detail" id="report-detail-${idx}" style="display:none;">
                 <div class="report-section-header">Adjustments</div>
-                ${buildAdjustmentStatsHtml(casesShort, casesOver, returnCount, adjItems)}
+                ${buildAdjustmentStatsHtml(adjItems)}
                 <div class="report-section-header">Pulls</div>
-                ${buildPullStatsHtml(totalPullCases, confirmedPullCases, pulls.length, normPulls)}
+                ${buildPullStatsHtml(normPulls)}
                 <button class="report-delete-btn" onclick="event.stopPropagation(); deleteReport(${idx})">Delete Report</button>
             </div>
         </div>`;
@@ -1024,11 +1014,6 @@ function renderLiveReport() {
 
     // --- Adjustments section ---
     const exceptions = getExceptionItems();
-    const casesShort = exceptions.filter(e => e.status === 'short')
-        .reduce((sum, e) => sum + Math.max(0, (e.expected || 0) - (e.received || 0)), 0);
-    const casesOver = exceptions.filter(e => e.status === 'over')
-        .reduce((sum, e) => sum + Math.max(0, (e.received || 0) - (e.expected || 0)), 0);
-    const returnCount = exceptions.filter(e => e.status === 'return').length;
     const adjItems = exceptions.map(e => ({
         name: e.description, supplier: e.supplierName, status: e.status,
         diff: e.status === 'short' ? Math.max(0, (e.expected || 0) - (e.received || 0))
@@ -1036,7 +1021,7 @@ function renderLiveReport() {
     }));
 
     html += '<div class="report-section-header">Adjustments</div>';
-    html += buildAdjustmentStatsHtml(casesShort, casesOver, returnCount, adjItems);
+    html += buildAdjustmentStatsHtml(adjItems);
 
     // --- Pulls section ---
     const pullItems = [];
@@ -1050,31 +1035,12 @@ function renderLiveReport() {
         const sup = a.supplierName.toLowerCase().localeCompare(b.supplierName.toLowerCase());
         return sup !== 0 ? sup : a.raw_description.toLowerCase().localeCompare(b.raw_description.toLowerCase());
     });
-    const totalPullCases = pullItems.reduce((sum, i) => sum + (i.pull_quantity || 0), 0);
-    const confirmedPullCases = pullItems.filter(i => i.pull_confirmed)
-        .reduce((sum, i) => sum + (i.pull_quantity || 0), 0);
-    const pendingPullCases = totalPullCases - confirmedPullCases;
 
     html += '<div class="report-section-header">Pulls</div>';
 
     if (pullItems.length === 0) {
         html += '<div class="report-section-empty">No pull items</div>';
     } else {
-        html += `<div class="report-stat-block">
-            <div class="report-stat-row">
-                <span class="report-stat-label">Total cases</span>
-                <span class="report-stat-num stat-pull">${totalPullCases}</span>
-            </div>
-            <div class="report-stat-row">
-                <span class="report-stat-label">Confirmed</span>
-                <span class="report-stat-num stat-pull">${confirmedPullCases}</span>
-            </div>
-            ${pendingPullCases > 0 ? `<div class="report-stat-row">
-                <span class="report-stat-label">Pending</span>
-                <span class="report-stat-num">${pendingPullCases}</span>
-            </div>` : ''}
-        </div>`;
-
         let currentSupplierName = null;
         pullItems.forEach(item => {
             if (item.supplierName !== currentSupplierName) {
@@ -1683,32 +1649,15 @@ function getExceptionItems() {
     return exceptions;
 }
 
-function buildAdjustmentStatsHtml(casesShort, casesOver, returnCount, adjItems = []) {
-    if (casesShort === 0 && casesOver === 0 && returnCount === 0) {
+function buildAdjustmentStatsHtml(adjItems) {
+    if (adjItems.length === 0) {
         return '<div class="report-section-empty">No adjustments — everything matched!</div>';
     }
-    let html = '<div class="report-stat-block">';
-    if (casesShort > 0) html += `
-        <div class="report-stat-row">
-            <span class="report-stat-label">Cases short</span>
-            <span class="report-stat-num stat-short">${casesShort}</span>
-        </div>`;
-    if (casesOver > 0) html += `
-        <div class="report-stat-row">
-            <span class="report-stat-label">Cases over</span>
-            <span class="report-stat-num stat-over">${casesOver}</span>
-        </div>`;
-    if (returnCount > 0) html += `
-        <div class="report-stat-row">
-            <span class="report-stat-label">Returns</span>
-            <span class="report-stat-num stat-return">${returnCount} item${returnCount !== 1 ? 's' : ''}</span>
-        </div>`;
-    html += '</div>';
-    adjItems.forEach(item => {
+    return adjItems.map(item => {
         const diffLabel = item.status === 'short' ? `-${item.diff}`
             : item.status === 'over' ? `+${item.diff}`
             : 'return';
-        html += `
+        return `
         <div class="report-item-row">
             <div class="report-item-info">
                 <span class="report-item-name">${item.name}</span>
@@ -1716,36 +1665,18 @@ function buildAdjustmentStatsHtml(casesShort, casesOver, returnCount, adjItems =
             </div>
             <span class="report-item-diff stat-${item.status}">${diffLabel}</span>
         </div>`;
-    });
-    return html;
+    }).join('');
 }
 
-function buildPullStatsHtml(totalCases, confirmedCases, itemCount, pullItems = []) {
-    if (itemCount === 0) {
+function buildPullStatsHtml(pullItems) {
+    if (pullItems.length === 0) {
         return '<div class="report-section-empty">No pull items</div>';
     }
-    const pendingCases = totalCases - confirmedCases;
-    let html = '<div class="report-stat-block">';
-    html += `
-        <div class="report-stat-row">
-            <span class="report-stat-label">Total cases</span>
-            <span class="report-stat-num stat-pull">${totalCases}</span>
-        </div>
-        <div class="report-stat-row">
-            <span class="report-stat-label">Confirmed</span>
-            <span class="report-stat-num stat-pull">${confirmedCases}</span>
-        </div>`;
-    if (pendingCases > 0) html += `
-        <div class="report-stat-row">
-            <span class="report-stat-label">Pending</span>
-            <span class="report-stat-num">${pendingCases}</span>
-        </div>`;
-    html += '</div>';
-    pullItems.forEach(item => {
+    return pullItems.map(item => {
         const statusChip = item.confirmed
             ? `<span class="report-item-diff stat-pull">&#10003;</span>`
             : `<span class="report-item-diff report-item-pending">•</span>`;
-        html += `
+        return `
         <div class="report-item-row">
             <div class="report-item-info">
                 <span class="report-item-name">${item.name}</span>
@@ -1754,45 +1685,34 @@ function buildPullStatsHtml(totalCases, confirmedCases, itemCount, pullItems = [
             <span class="report-item-cases">${item.cases} cases</span>
             ${statusChip}
         </div>`;
-    });
-    return html;
+    }).join('');
 }
 
 function showCompletionModal() {
     const exceptions = getExceptionItems();
-    const casesShort = exceptions.filter(e => e.status === 'short')
-        .reduce((sum, e) => sum + Math.max(0, (e.expected || 0) - (e.received || 0)), 0);
-    const casesOver = exceptions.filter(e => e.status === 'over')
-        .reduce((sum, e) => sum + Math.max(0, (e.received || 0) - (e.expected || 0)), 0);
-    const returnCount = exceptions.filter(e => e.status === 'return').length;
     const adjItems = exceptions.map(e => ({
         name: e.description, supplier: e.supplierName, status: e.status,
         diff: e.status === 'short' ? Math.max(0, (e.expected || 0) - (e.received || 0))
             : e.status === 'over' ? Math.max(0, (e.received || 0) - (e.expected || 0)) : null,
     }));
 
-    const pullItems = [];
+    const normPullItems = [];
     if (currentDelivery) {
         currentDelivery.suppliers.forEach(supplier => {
             supplier.items.forEach(item => {
-                if (item.pull_quantity > 0)
-                    pullItems.push({ ...item, supplierName: supplier.supplier_name });
+                if (item.pull_quantity > 0) normPullItems.push({
+                    name: item.raw_description, supplier: supplier.supplier_name,
+                    cases: item.pull_quantity, confirmed: item.pull_confirmed,
+                });
             });
         });
     }
-    const totalPullCases = pullItems.reduce((sum, i) => sum + (i.pull_quantity || 0), 0);
-    const confirmedPullCases = pullItems.filter(i => i.pull_confirmed)
-        .reduce((sum, i) => sum + (i.pull_quantity || 0), 0);
-    const normPullItems = pullItems.map(i => ({
-        name: i.raw_description, supplier: i.supplierName,
-        cases: i.pull_quantity, confirmed: i.pull_confirmed,
-    }));
 
     let html = '';
     html += '<div class="report-section-header">Adjustments</div>';
-    html += buildAdjustmentStatsHtml(casesShort, casesOver, returnCount, adjItems);
+    html += buildAdjustmentStatsHtml(adjItems);
     html += '<div class="report-section-header">Pulls</div>';
-    html += buildPullStatsHtml(totalPullCases, confirmedPullCases, pullItems.length, normPullItems);
+    html += buildPullStatsHtml(normPullItems);
 
     document.getElementById('exception-list').innerHTML = html;
 
