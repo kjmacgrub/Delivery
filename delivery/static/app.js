@@ -7,6 +7,7 @@ const API = '/api/v1';
 
 // ---- Version History ----
 const VERSION_HISTORY = [
+    { version: 'v1.25', description: 'Combined Live Report (adjustments + pulls) in hamburger menu' },
     { version: 'v1.24', description: 'Continue Delivery option in hamburger menu' },
     { version: 'v1.23', description: 'Delivery-first nav: auto-open active delivery, hamburger admin menu' },
     { version: 'v1.22', description: 'Floor Pull inline with Qty Received; pull sheet syncs to item list' },
@@ -70,9 +71,6 @@ function showView(name) {
     const badge = document.getElementById('status-badge');
     const brandText = document.getElementById('header-brand-text');
 
-    // Exceptions button only visible in detail view
-    document.getElementById('exceptions-btn').classList.toggle('hidden', name !== 'detail');
-
     // Default: clear brand text; views that show a delivery date will set it
     brandText.textContent = '';
 
@@ -112,7 +110,7 @@ function showView(name) {
             badge.className = 'badge';
             break;
         case 'pullsheet':
-            title.textContent = 'Pull Sheet';
+            title.textContent = 'Live Report';
             badge.textContent = '';
             badge.className = 'badge';
             if (currentDelivery) {
@@ -172,6 +170,7 @@ function showNoDeliveryScreen() {
 function openAdminModal() {
     const hasActive = currentDelivery && currentDelivery.status !== 'completed';
     document.getElementById('admin-continue-btn').classList.toggle('hidden', !hasActive);
+    document.getElementById('admin-report-btn').classList.toggle('hidden', !hasActive);
     document.getElementById('admin-modal').classList.remove('hidden');
 }
 
@@ -645,56 +644,6 @@ function renderDetail() {
     }
 
     renderItemList();
-    updateExceptionsButton();
-}
-
-function updateExceptionsButton() {
-    const exceptions = getExceptionItems();
-    const btn = document.getElementById('exceptions-btn');
-    const countEl = document.getElementById('exceptions-count');
-    countEl.textContent = exceptions.length;
-    btn.classList.toggle('has-exceptions', exceptions.length > 0);
-}
-
-function showLiveExceptions() {
-    const exceptions = getExceptionItems();
-    const listEl = document.getElementById('exception-list');
-
-    if (exceptions.length === 0) {
-        listEl.innerHTML = `
-            <div class="no-exceptions">
-                <p>No adjustments so far</p>
-            </div>`;
-    } else {
-        listEl.innerHTML = `
-            <div class="exception-count">${exceptions.length} adjustment${exceptions.length > 1 ? 's' : ''}</div>
-            ${exceptions.map(ex => `
-                <div class="exception-row exception-${ex.status}">
-                    <div class="exception-info">
-                        <div class="exception-name">${ex.description}</div>
-                        <div class="exception-supplier">${ex.supplierName}</div>
-                        ${ex.notes ? `<div class="exception-note">${ex.notes}</div>` : ''}
-                    </div>
-                    <div class="exception-qty">
-                        <span class="exception-expected">${ex.expected}</span>
-                        <span class="exception-arrow">&rarr;</span>
-                        <span class="exception-received">${ex.received ?? 0}</span>
-                    </div>
-                    <span class="badge badge-${ex.status}">${ex.status}</span>
-                </div>
-            `).join('')}`;
-    }
-
-    // Reuse the complete modal but with a dismiss button
-    const modal = document.getElementById('complete-modal');
-    document.querySelector('.complete-modal-content .modal-header h2').textContent = 'Adjustments';
-    document.querySelector('.complete-subtitle').textContent = exceptions.length > 0
-        ? `${exceptions.length} item${exceptions.length !== 1 ? 's' : ''} with adjustments`
-        : 'All received items match expected quantities — no adjustments';
-    // Hide the confirm button, change continue button text
-    document.querySelector('.complete-modal-content .modal-footer').innerHTML = `
-        <button class="btn btn-secondary" onclick="dismissCompletionModal()">Close</button>`;
-    modal.classList.remove('hidden');
 }
 
 function toggleReceivedView() {
@@ -773,14 +722,6 @@ function renderItemList() {
         expandBtn.classList.add('hidden');
     }
 
-    // Update pull sheet button visibility
-    const pullSheetBtn = document.getElementById('pull-sheet-btn');
-    if (pullSheetBtn) {
-        const pullCount = currentDelivery.suppliers.reduce((sum, s) =>
-            sum + s.items.filter(i => i.pull_quantity > 0).length, 0);
-        pullSheetBtn.classList.toggle('hidden', pullCount === 0);
-        if (pullCount > 0) pullSheetBtn.textContent = `Pulls (${pullCount})`;
-    }
 
     const container = document.getElementById('flat-item-list');
     container.classList.toggle('show-received', showReceived);
@@ -1064,30 +1005,48 @@ function updateFilteredSupplierSummary() {
 
 // ---- Pull Sheet ----
 
-function showPullSheet() {
+function showLiveReport() {
     showView('pullsheet');
-    renderPullSheet();
+    renderLiveReport();
 }
 
-function renderPullSheet() {
+function renderLiveReport() {
     if (!currentDelivery) return;
+    let html = '';
 
-    // Gather all pull items across all suppliers
+    // --- Adjustments section ---
+    const exceptions = getExceptionItems();
+    html += `<div class="report-section-header">Adjustments${exceptions.length > 0 ? ` (${exceptions.length})` : ''}</div>`;
+    if (exceptions.length === 0) {
+        html += `<div class="report-section-empty">No adjustments</div>`;
+    } else {
+        exceptions.forEach(ex => {
+            html += `
+            <div class="exception-row exception-${ex.status}">
+                <div class="exception-info">
+                    <div class="exception-name">${ex.description}</div>
+                    <div class="exception-supplier">${ex.supplierName}</div>
+                    ${ex.notes ? `<div class="exception-note">${ex.notes}</div>` : ''}
+                </div>
+                <div class="exception-qty">
+                    <span class="exception-expected">${ex.expected}</span>
+                    <span class="exception-arrow">&rarr;</span>
+                    <span class="exception-received">${ex.received ?? 0}</span>
+                </div>
+                <span class="badge badge-${ex.status}">${ex.status}</span>
+            </div>`;
+        });
+    }
+
+    // --- Pulls section ---
     const pullItems = [];
     currentDelivery.suppliers.forEach((supplier, sIdx) => {
         supplier.items.forEach((item, iIdx) => {
             if (item.pull_quantity > 0) {
-                pullItems.push({
-                    ...item,
-                    supplierIdx: sIdx,
-                    itemIdx: iIdx,
-                    supplierName: supplier.supplier_name,
-                });
+                pullItems.push({ ...item, supplierIdx: sIdx, itemIdx: iIdx, supplierName: supplier.supplier_name });
             }
         });
     });
-
-    // Sort by supplier name, then item name
     pullItems.sort((a, b) => {
         const supCmp = a.supplierName.toLowerCase().localeCompare(b.supplierName.toLowerCase());
         if (supCmp !== 0) return supCmp;
@@ -1097,52 +1056,46 @@ function renderPullSheet() {
     const confirmedCount = pullItems.filter(i => i.pull_confirmed).length;
     const total = pullItems.length;
 
-    // Render progress line
-    const progressEl = document.getElementById('pull-progress');
+    html += `<div class="report-section-header">Pulls${total > 0 ? ` (${confirmedCount} of ${total} confirmed)` : ''}</div>`;
+
     if (total === 0) {
-        progressEl.innerHTML = '';
+        html += `<div class="report-section-empty">No pull items</div>`;
     } else {
         const pct = Math.round((confirmedCount / total) * 100);
-        progressEl.innerHTML = `
+        html += `
+        <div class="pull-sheet-progress-bar">
             <div class="pull-sheet-progress-line">
                 <span>${confirmedCount} of ${total} confirmed</span>
                 <span>${pct}%</span>
             </div>
             <div class="progress-bar-track" style="margin-top:6px">
                 <div class="progress-bar-fill" style="width:${pct}%"></div>
-            </div>`;
-    }
-
-    if (total === 0) {
-        document.getElementById('pull-sheet-list').innerHTML =
-            '<div class="empty-state"><p>No pull items</p></div>';
-        return;
-    }
-
-    // Render list grouped by supplier
-    let html = '';
-    let currentSupplierName = null;
-    pullItems.forEach(item => {
-        if (item.supplierName !== currentSupplierName) {
-            currentSupplierName = item.supplierName;
-            html += `<div class="pull-sheet-supplier">${item.supplierName}</div>`;
-        }
-        const confirmedClass = item.pull_confirmed ? 'pull-confirmed' : '';
-        const statusChip = item.pull_confirmed
-            ? `<span class="pull-confirmed-chip">&#10003;</span>`
-            : `<span class="pull-pending-chip">&bull;</span>`;
-        html += `
-        <div class="pull-sheet-row ${confirmedClass}" onclick="togglePullFromPullSheet(${item.supplierIdx}, ${item.itemIdx})">
-            <span class="pull-sheet-qty">${item.pull_quantity}</span>
-            <span class="pull-sheet-name">${item.raw_description}</span>
-            ${statusChip}
+            </div>
         </div>`;
-    });
 
-    document.getElementById('pull-sheet-list').innerHTML = html;
+        let currentSupplierName = null;
+        pullItems.forEach(item => {
+            if (item.supplierName !== currentSupplierName) {
+                currentSupplierName = item.supplierName;
+                html += `<div class="pull-sheet-supplier">${item.supplierName}</div>`;
+            }
+            const confirmedClass = item.pull_confirmed ? 'pull-confirmed' : '';
+            const statusChip = item.pull_confirmed
+                ? `<span class="pull-confirmed-chip">&#10003;</span>`
+                : `<span class="pull-pending-chip">&bull;</span>`;
+            html += `
+            <div class="pull-sheet-row ${confirmedClass}" onclick="togglePullFromReport(${item.supplierIdx}, ${item.itemIdx})">
+                <span class="pull-sheet-qty">${item.pull_quantity}</span>
+                <span class="pull-sheet-name">${item.raw_description}</span>
+                ${statusChip}
+            </div>`;
+        });
+    }
+
+    document.getElementById('live-report-content').innerHTML = html;
 }
 
-async function togglePullFromPullSheet(supplierIdx, itemIdx) {
+async function togglePullFromReport(supplierIdx, itemIdx) {
     const item = currentDelivery.suppliers[supplierIdx].items[itemIdx];
     try {
         await apiPatch(
@@ -1151,8 +1104,8 @@ async function togglePullFromPullSheet(supplierIdx, itemIdx) {
         );
         lastWriteTimestamp = Date.now();
         item.pull_confirmed = !item.pull_confirmed;
-        renderPullSheet();
-        renderItemList(); // keep main item list in sync
+        renderLiveReport();
+        renderItemList();
     } catch (e) {
         showToast('Failed to update pull status', 'error');
     }

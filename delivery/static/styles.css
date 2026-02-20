@@ -2030,6 +2030,29 @@ textarea {
     background: var(--border);
 }
 
+/* ---- Live Report ---- */
+.report-section-header {
+    padding: 12px 16px 6px;
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.6px;
+    background: var(--bg);
+    margin-top: 6px;
+}
+
+.report-section-header:first-child {
+    margin-top: 0;
+}
+
+.report-section-empty {
+    padding: 10px 16px;
+    font-size: 15px;
+    color: var(--text-secondary);
+    background: var(--surface);
+}
+
 /* ---- Pull Sheet ---- */
 .pull-sheet-progress-bar {
     background: var(--surface);

@@ -14,7 +14,7 @@
       gtag('js', new Date());
       gtag('config', 'G-6JSKH5XWSC');
     </script>
-    <link rel="stylesheet" href="/static/styles.css?v=1.24">
+    <link rel="stylesheet" href="/static/styles.css?v=1.25">
 </head>
 <body>
     <div id="app">
@@ -35,9 +35,6 @@
                     <h1 id="page-title">Deliveries</h1>
                 </div>
                 <div class="header-right">
-                    <button id="exceptions-btn" class="btn-exceptions hidden" onclick="showLiveExceptions()">
-                        <span id="exceptions-count">0</span> Adjustments
-                    </button>
                     <span id="status-badge" class="badge"></span>
                     <button id="refresh-btn" class="icon-btn" onclick="refreshData()">
                         <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -126,7 +123,6 @@
                         <input type="text" id="item-search" placeholder="Search..." oninput="onSearchInput()" autocomplete="off" autocorrect="off" spellcheck="false">
                         <button id="search-clear-btn" class="search-clear hidden" onclick="clearSearch()">&times;</button>
                     </div>
-                    <button id="pull-sheet-btn" class="sort-btn hidden" onclick="showPullSheet()">Pulls</button>
                     <span id="item-receive-all-btn" class="receive-all-slot"></span>
                 </div>
                 <div id="flat-item-list" class="compact-list"></div>
@@ -134,10 +130,9 @@
         </div>
 
 
-        <!-- View: Pull Sheet -->
+        <!-- View: Live Report -->
         <div id="view-pullsheet" class="view">
-            <div id="pull-progress" class="pull-sheet-progress-bar"></div>
-            <div id="pull-sheet-list" class="compact-list"></div>
+            <div id="live-report-content" class="compact-list"></div>
         </div>
 
         <!-- Modal: Check-in Item -->
@@ -254,6 +249,10 @@
                         <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5,3 19,12 5,21"/></svg>
                         Continue Delivery
                     </button>
+                    <button id="admin-report-btn" class="admin-menu-btn hidden" onclick="closeAdminModal(); showLiveReport()">
+                        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="1"/><path d="M9 12h6M9 16h4"/></svg>
+                        Live Report
+                    </button>
                     <button class="admin-menu-btn" onclick="closeAdminModal(); showDeliveriesView()">
                         <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></svg>
                         Switch Delivery
@@ -284,6 +283,6 @@
     <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
 
-    <script src="/static/app.js?v=1.24"></script>
+    <script src="/static/app.js?v=1.25"></script>
 </body>
 </html>
