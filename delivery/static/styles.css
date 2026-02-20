@@ -1161,6 +1161,17 @@ html, body {
     gap: 12px;
 }
 
+.qty-pair-row {
+    display: flex;
+    gap: 20px;
+    align-items: flex-start;
+}
+
+.qty-pair-item {
+    flex: 1;
+    min-width: 0;
+}
+
 .qty-btn {
     width: 52px;
     height: 52px;

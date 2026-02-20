@@ -14,7 +14,7 @@
       gtag('js', new Date());
       gtag('config', 'G-6JSKH5XWSC');
     </script>
-    <link rel="stylesheet" href="/static/styles.css?v=1.21">
+    <link rel="stylesheet" href="/static/styles.css?v=1.22">
 </head>
 <body>
     <div id="app">
@@ -168,19 +168,23 @@
                         <div id="modal-expected" class="info-value"></div>
                     </div>
                     <div class="form-group">
-                        <label>Quantity Received</label>
-                        <div class="qty-input-row">
-                            <button class="qty-btn" onclick="adjustQty(-1)">-</button>
-                            <input type="number" id="modal-qty" min="0" inputmode="numeric">
-                            <button class="qty-btn" onclick="adjustQty(1)">+</button>
-                        </div>
-                    </div>
-                    <div class="form-group" id="pull-qty-group">
-                        <label>Floor Pull</label>
-                        <div class="qty-input-row">
-                            <button class="qty-btn" onclick="adjustPullQty(-1)">-</button>
-                            <input type="number" id="modal-pull-qty" min="0" inputmode="numeric">
-                            <button class="qty-btn" onclick="adjustPullQty(1)">+</button>
+                        <div class="qty-pair-row">
+                            <div class="qty-pair-item">
+                                <label>Quantity Received</label>
+                                <div class="qty-input-row">
+                                    <button class="qty-btn" onclick="adjustQty(-1)">-</button>
+                                    <input type="number" id="modal-qty" min="0" inputmode="numeric">
+                                    <button class="qty-btn" onclick="adjustQty(1)">+</button>
+                                </div>
+                            </div>
+                            <div class="qty-pair-item">
+                                <label>Floor Pull</label>
+                                <div class="qty-input-row">
+                                    <button class="qty-btn" onclick="adjustPullQty(-1)">-</button>
+                                    <input type="number" id="modal-pull-qty" min="0" inputmode="numeric">
+                                    <button class="qty-btn" onclick="adjustPullQty(1)">+</button>
+                                </div>
+                            </div>
                         </div>
                     </div>
                     <div class="form-group">
@@ -265,6 +269,6 @@
     <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
 
-    <script src="/static/app.js?v=1.21"></script>
+    <script src="/static/app.js?v=1.22"></script>
 </body>
 </html>

@@ -7,6 +7,7 @@ const API = '/api/v1';
 
 // ---- Version History ----
 const VERSION_HISTORY = [
+    { version: 'v1.22', description: 'Floor Pull inline with Qty Received; pull sheet syncs to item list' },
     { version: 'v1.21', description: 'Manual floor pull stepper + Pull Sheet screen' },
     { version: 'v1.20', description: 'Add commit hash to version display' },
     { version: 'v1.19', description: 'Single-item unreceive, landing page polish, friendly filenames' },
@@ -1154,6 +1155,7 @@ async function togglePullFromPullSheet(supplierIdx, itemIdx) {
         lastWriteTimestamp = Date.now();
         item.pull_confirmed = !item.pull_confirmed;
         renderPullSheet();
+        renderItemList(); // keep main item list in sync
     } catch (e) {
         showToast('Failed to update pull status', 'error');
     }
