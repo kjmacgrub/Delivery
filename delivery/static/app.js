@@ -817,22 +817,21 @@ function renderCompactRow(item, showSupplier, crossMap = null) {
         ? `<span class="pull-qty ${pullConfirmedClass}" onclick="event.stopPropagation(); togglePullFromList(${item.supplierIdx}, ${item.itemIdx})">(${item.pull_quantity})</span> `
         : '';
 
-    // Build "also from" text for items shared across suppliers
-    let alsoHtml = '';
+    const supplierChip = showSupplier
+        ? `<div class="compact-supplier" onclick="event.stopPropagation(); filterBySupplier(${item.supplierIdx})">${item.supplierAbbrev}</div>`
+        : '';
+
+    // Build "also from" sub-row for items shared across suppliers
+    let alsoRow = '';
     if (crossMap) {
         const others = (crossMap.get(item.raw_description.toLowerCase()) || [])
             .filter(e => e.supplierIdx !== item.supplierIdx);
         if (others.length > 0) {
-            const alsoStr = others.map(e => `${e.supplierName} – ${e.qty} cases`).join(', ');
-            alsoHtml = `<span class="compact-also">(also ${alsoStr})</span>`;
+            const parts = others.map(e => `${e.qty} cases from ${e.supplierName}`);
+            const alsoText = 'Also ' + parts.join(', and ');
+            alsoRow = `<div class="cross-supplier-row${showSupplier ? '' : ' accordion-item'}">${alsoText}</div>`;
         }
     }
-
-    const supplierChip = showSupplier
-        ? `<div class="compact-supplier" onclick="event.stopPropagation(); filterBySupplier(${item.supplierIdx})">${item.supplierAbbrev}${alsoHtml ? ' ' + alsoHtml : ''}</div>`
-        : alsoHtml
-            ? `<div class="compact-also-chip">${alsoHtml}</div>`
-            : '';
 
     return `
     <div class="compact-row ${statusClass} ${processingClass} ${floorClass}${showSupplier ? '' : ' accordion-item'}"
@@ -841,7 +840,7 @@ function renderCompactRow(item, showSupplier, crossMap = null) {
         <div class="compact-name">${item.raw_description}</div>
         ${supplierChip}
         ${checkIcon}
-    </div>`;
+    </div>${alsoRow}`;
 }
 
 function renderSupplierAccordion(container, flatItems) {
