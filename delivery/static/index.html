@@ -159,17 +159,17 @@
                                 </div>
                             </div>
                             <div class="qty-pair-item">
-                                <div class="floor-pull-label-row">
-                                    <label>Floor Pull</label>
-                                    <label id="pull-confirm-inline" class="pull-confirm-inline hidden" onclick="togglePullConfirmed()">
-                                        <span class="pull-confirm-text">Confirmed</span>
-                                        <span id="pull-confirm-checkbox" class="pull-checkbox"></span>
-                                    </label>
-                                </div>
-                                <div class="qty-input-row">
+                                <label>Floor Pull</label>
+                                <div class="qty-input-row floor-pull-row">
                                     <button class="qty-btn" onclick="adjustPullQty(-1)">-</button>
                                     <input type="number" id="modal-pull-qty" min="0" inputmode="numeric">
-                                    <button class="qty-btn" onclick="adjustPullQty(1)">+</button>
+                                    <div class="pull-btn-col">
+                                        <div id="pull-confirm-inline" class="pull-confirm-inline hidden" onclick="togglePullConfirmed()">
+                                            <span class="pull-confirm-text">Confirmed</span>
+                                            <span id="pull-confirm-checkbox" class="pull-checkbox"></span>
+                                        </div>
+                                        <button class="qty-btn" onclick="adjustPullQty(1)">+</button>
+                                    </div>
                                 </div>
                             </div>
                         </div>
