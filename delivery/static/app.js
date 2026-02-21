@@ -7,6 +7,7 @@ const API = '/api/v1';
 
 // ---- Version History ----
 const VERSION_HISTORY = [
+    { version: 'v1.36', description: 'Suppliers pill toggles expand/collapse; remove Expand All pill' },
     { version: 'v1.35', description: 'Suppliers accordion is the default view' },
     { version: 'v1.34', description: 'Multi button shares centered position with Expand All' },
     { version: 'v1.33', description: 'Sort bar: Suppliers/Items/Cases order, centered Expand All, Multi filter' },
@@ -735,16 +736,6 @@ function renderItemList() {
     multiBtn.classList.toggle('hidden', itemSortMode !== 'alpha' || supplierFilter !== null);
     multiBtn.classList.toggle('active', multiFilter);
 
-    // Show expand/collapse toggle only in supplier accordion mode
-    const expandBtn = document.getElementById('expand-collapse-btn');
-    if (itemSortMode === 'supplier' && supplierFilter === null) {
-        const allExpanded = currentDelivery.suppliers.length > 0 &&
-            currentDelivery.suppliers.every((s, idx) => expandedSuppliers.has(idx));
-        expandBtn.textContent = allExpanded ? 'Collapse All' : 'Expand All';
-        expandBtn.classList.remove('hidden');
-    } else {
-        expandBtn.classList.add('hidden');
-    }
 
 
     const container = document.getElementById('flat-item-list');
@@ -961,6 +952,14 @@ function toggleSupplierAccordion(supplierIdx) {
         expandedSuppliers.add(supplierIdx);
     }
     renderItemList();
+}
+
+function toggleSupplierView() {
+    if (itemSortMode === 'supplier') {
+        toggleExpandAll();
+    } else {
+        setItemSort('supplier');
+    }
 }
 
 function toggleExpandAll() {
