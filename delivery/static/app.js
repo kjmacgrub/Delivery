@@ -7,6 +7,7 @@ const API = '/api/v1';
 
 // ---- Version History ----
 const VERSION_HISTORY = [
+    { version: 'v1.35', description: 'Suppliers accordion is the default view' },
     { version: 'v1.34', description: 'Multi button shares centered position with Expand All' },
     { version: 'v1.33', description: 'Sort bar: Suppliers/Items/Cases order, centered Expand All, Multi filter' },
     { version: 'v1.32', description: 'Adjustment rows show quantity and status label for all types' },
@@ -55,7 +56,7 @@ let currentDelivery = null;
 let currentSupplierIdx = null;
 let checkInItem = null; // { supplierIdx, itemIdx }
 let supplierFilter = null; // null = show all, or { idx, name } to filter to one supplier
-let itemSortMode = 'alpha'; // 'alpha', 'qty', or 'supplier'
+let itemSortMode = 'supplier'; // 'alpha', 'qty', or 'supplier'
 let multiFilter = false;   // show only items shared across 2+ suppliers
 let showReceived = false; // false = show pending items, true = show received items
 let searchQuery = ''; // search filter for item list
