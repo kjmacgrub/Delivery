@@ -902,9 +902,9 @@ html, body {
 /* Pull confirmation checkbox in modal — sits next to Floor Pull label */
 .floor-pull-label-row {
     display: flex;
-    align-items: flex-start;
+    align-items: flex-end;
     justify-content: space-between;
-    margin-bottom: 4px;
+    margin-bottom: 8px;
 }
 
 .floor-pull-label-row > label {
@@ -1186,7 +1186,7 @@ html, body {
 .qty-pair-row {
     display: flex;
     gap: 20px;
-    align-items: flex-start;
+    align-items: flex-end;
 }
 
 .qty-pair-item {
