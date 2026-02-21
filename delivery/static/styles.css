@@ -899,23 +899,34 @@ html, body {
     background: #c8e6c9;
 }
 
-/* Pull confirmation checkbox in modal — stacked above + button */
-.pull-confirm-stack {
+/* Pull confirmation checkbox in modal — sits next to Floor Pull label */
+.floor-pull-label-row {
     display: flex;
-    flex-direction: column;
     align-items: center;
-    gap: 4px;
+    gap: 10px;
+    margin-bottom: 4px;
+}
+
+.floor-pull-label-row > label {
+    display: flex;
+    margin-bottom: 0;
 }
 
 .pull-confirm-inline {
     display: flex;
     align-items: center;
-    gap: 6px;
+    gap: 5px;
     font-size: 12px;
     font-weight: 500;
     color: var(--text-secondary);
     cursor: pointer;
     -webkit-tap-highlight-color: transparent;
+}
+
+.pull-confirm-inline .pull-checkbox {
+    width: 20px;
+    height: 20px;
+    font-size: 12px;
 }
 
 .pull-checkbox {
