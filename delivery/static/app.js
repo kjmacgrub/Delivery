@@ -58,7 +58,7 @@ firebase.initializeApp(FIREBASE_CONFIG);
 const db = firebase.firestore();
 
 // ---- State ----
-let currentView = 'landing';
+let currentView = 'storage';
 let currentDelivery = null;
 let currentSupplierIdx = null;
 let checkInItem = null; // { supplierIdx, itemIdx }
@@ -76,7 +76,7 @@ let pendingDeliveryUpdate = null;  // snapshot data waiting for modal to close
 let lastWriteTimestamp = 0;        // to debounce our own writes
 
 // ---- Navigation ----
-const views = ['landing', 'deliveries', 'storage', 'detail', 'complete', 'reports', 'pullsheet'];
+const views = ['deliveries', 'storage', 'detail', 'complete', 'reports', 'pullsheet'];
 
 function showView(name) {
     views.forEach(v => {
@@ -93,11 +93,7 @@ function showView(name) {
     brandText.textContent = '';
 
     switch (name) {
-        case 'landing':
-            title.textContent = '';
-            badge.textContent = '';
-            badge.className = 'badge';
-            break;
+
         case 'deliveries':
             title.textContent = 'Deliveries';
             badge.textContent = '';
@@ -181,7 +177,7 @@ function showNoDeliveryScreen() {
     currentSupplierIdx = null;
     completionShown = false;
     supplierFilter = null;
-    showView('landing');
+    showStorageFiles();
 }
 
 // ---- Admin Menu ----
