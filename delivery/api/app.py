@@ -4,13 +4,14 @@ FastAPI application factory.
 
 import logging
 import os
+import subprocess
 from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, HTMLResponse
 
 from delivery.api.routes import deliveries, items, checkin, storage
 
@@ -81,6 +82,20 @@ def create_app(use_firebase: bool = True) -> FastAPI:
     app.include_router(checkin.router, prefix="/api/v1", tags=["checkin"])
     app.include_router(storage.router, prefix="/api/v1", tags=["storage"])
 
+    # Resolve commit hash once at startup
+    def _get_commit_hash() -> str:
+        if h := os.environ.get("COMMIT_HASH"):
+            return h
+        try:
+            return subprocess.check_output(
+                ["git", "rev-parse", "--short", "HEAD"],
+                stderr=subprocess.DEVNULL,
+            ).strip().decode()
+        except Exception:
+            return "dev"
+
+    commit_hash = _get_commit_hash()
+
     # Serve static files for the web UI (no-cache during development)
     static_dir = Path(__file__).parent.parent / "static"
     if static_dir.exists():
@@ -95,11 +110,13 @@ def create_app(use_firebase: bool = True) -> FastAPI:
 
         @app.get("/")
         async def serve_index():
-            return FileResponse(str(static_dir / "index.html"))
+            html = (static_dir / "index.html").read_text()
+            html = html.replace("__COMMIT__", commit_hash)
+            return HTMLResponse(content=html)
 
     @app.get("/api/commit")
     async def get_commit():
-        return {"hash": os.environ.get("COMMIT_HASH", "dev")}
+        return {"hash": commit_hash}
 
     @app.get("/health")
     async def health_check():

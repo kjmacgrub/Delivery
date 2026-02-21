@@ -1,9 +1,10 @@
 # Delivery App
 
 ## Versioning
-- Increment version number with every commit
-- Update in 2 places: `index.html` cache bust params (`?v=X.XX` on CSS and JS links), and `VERSION_HISTORY` array in `app.js`
-- Show version number to user after commit so they can compare deployed vs local
+- Display format: `v1.41 · abc1234` (version · commit hash) shown in `#app-version`
+- **Only bump the version number when explicitly requested** — not on every commit
+- On version bump: add entry to `VERSION_HISTORY` array in `app.js` only
+- Cache busters in `index.html` use `?v=__COMMIT__` — injected server-side at serve time, no manual updates needed
 - Format: v1.XX (minor increments)
 
 ## Dev Server
