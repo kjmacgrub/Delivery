@@ -7,6 +7,7 @@ const API = '/api/v1';
 
 // ---- Version History ----
 const VERSION_HISTORY = [
+    { version: 'v1.42', description: 'Remove landing page; go straight to import when no active delivery' },
     { version: 'v1.41', description: 'Cache busters use commit hash; version number only bumps on request' },
     { version: 'v1.41', description: 'Confirmed label stacked above checkbox, pushed right of Floor Pull label' },
     { version: 'v1.40', description: 'Pull confirmed checkbox sits next to Floor Pull label, steppers stay aligned' },
