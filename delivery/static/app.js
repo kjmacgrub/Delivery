@@ -7,6 +7,7 @@ const API = '/api/v1';
 
 // ---- Version History ----
 const VERSION_HISTORY = [
+    { version: 'v1.39', description: 'Pull confirmed checkbox moves inline above + button in modal' },
     { version: 'v1.38', description: 'Bold supplier headings in Live Report' },
     { version: 'v1.37', description: 'Remove Switch Delivery from menu; import or continue only' },
     { version: 'v1.36', description: 'Suppliers pill toggles expand/collapse; remove Expand All pill' },
@@ -1165,15 +1166,13 @@ function openCheckInModal(itemIdx) {
     document.getElementById('modal-pull-qty').value = item.pull_quantity ?? 0;
 
     // Pull confirmation checkbox
-    const pullGroup = document.getElementById('pull-confirm-group');
+    const pullConfirmLabel = document.getElementById('pull-confirm-inline');
     const pullCheckbox = document.getElementById('pull-confirm-checkbox');
-    const pullQtySpan = document.getElementById('pull-confirm-qty');
     if (item.pull_quantity != null && item.pull_quantity > 0) {
-        pullGroup.classList.remove('hidden');
-        pullQtySpan.textContent = item.pull_quantity;
+        pullConfirmLabel.classList.remove('hidden');
         pullCheckbox.classList.toggle('checked', !!item.pull_confirmed);
     } else {
-        pullGroup.classList.add('hidden');
+        pullConfirmLabel.classList.add('hidden');
     }
 
     // Show unreceive button only if item is already received
@@ -1303,14 +1302,12 @@ async function adjustPullQty(delta) {
     const newQty = Math.max(0, val + delta);
     input.value = newQty;
 
-    // Update pull-confirm-group visibility dynamically
-    const pullGroup = document.getElementById('pull-confirm-group');
-    const pullQtySpan = document.getElementById('pull-confirm-qty');
+    // Update pull confirm visibility dynamically
+    const pullConfirmLabel = document.getElementById('pull-confirm-inline');
     if (newQty > 0) {
-        pullGroup.classList.remove('hidden');
-        pullQtySpan.textContent = newQty;
+        pullConfirmLabel.classList.remove('hidden');
     } else {
-        pullGroup.classList.add('hidden');
+        pullConfirmLabel.classList.add('hidden');
     }
 
     const { supplierIdx, itemIdx } = checkInItem;
@@ -1374,8 +1371,8 @@ async function submitCheckIn() {
     const { supplierIdx, itemIdx } = checkInItem;
 
     // Pull confirmation
-    const pullGroup = document.getElementById('pull-confirm-group');
-    const pullConfirmed = !pullGroup.classList.contains('hidden')
+    const pullConfirmLabel = document.getElementById('pull-confirm-inline');
+    const pullConfirmed = !pullConfirmLabel.classList.contains('hidden')
         ? document.getElementById('pull-confirm-checkbox').classList.contains('checked')
         : null;
 

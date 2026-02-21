@@ -899,17 +899,23 @@ html, body {
     background: #c8e6c9;
 }
 
-/* Pull confirmation checkbox in modal */
-.pull-confirm-label {
-    display: flex !important;
+/* Pull confirmation checkbox in modal — stacked above + button */
+.pull-confirm-stack {
+    display: flex;
+    flex-direction: column;
     align-items: center;
-    gap: 10px;
+    gap: 4px;
+}
+
+.pull-confirm-inline {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--text-secondary);
     cursor: pointer;
     -webkit-tap-highlight-color: transparent;
-    font-size: 15px;
-    font-weight: 500;
-    color: var(--text);
-    padding: 10px 0;
 }
 
 .pull-checkbox {

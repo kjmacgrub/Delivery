@@ -14,7 +14,7 @@
       gtag('js', new Date());
       gtag('config', 'G-6JSKH5XWSC');
     </script>
-    <link rel="stylesheet" href="/static/styles.css?v=1.38">
+    <link rel="stylesheet" href="/static/styles.css?v=1.39">
 </head>
 <body>
     <div id="app">
@@ -163,7 +163,13 @@
                                 <div class="qty-input-row">
                                     <button class="qty-btn" onclick="adjustPullQty(-1)">-</button>
                                     <input type="number" id="modal-pull-qty" min="0" inputmode="numeric">
-                                    <button class="qty-btn" onclick="adjustPullQty(1)">+</button>
+                                    <div class="pull-confirm-stack">
+                                        <label id="pull-confirm-inline" class="pull-confirm-inline hidden" onclick="togglePullConfirmed()">
+                                            <span id="pull-confirm-checkbox" class="pull-checkbox"></span>
+                                            <span>confirmed</span>
+                                        </label>
+                                        <button class="qty-btn" onclick="adjustPullQty(1)">+</button>
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -174,12 +180,6 @@
                             <button id="status-over" class="status-btn" data-status="over" onclick="selectReason('over')">Over</button>
                             <button id="status-return" class="status-btn" data-status="return" onclick="selectReason('return')">Return</button>
                         </div>
-                    </div>
-                    <div class="form-group hidden" id="pull-confirm-group">
-                        <label class="pull-confirm-label" onclick="togglePullConfirmed()">
-                            <span id="pull-confirm-checkbox" class="pull-checkbox"></span>
-                            <span>Pull confirmed (<span id="pull-confirm-qty"></span> cases for floor)</span>
-                        </label>
                     </div>
                     <div class="form-group">
                         <label>Notes (optional)</label>
@@ -279,6 +279,6 @@
     <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
 
-    <script src="/static/app.js?v=1.38"></script>
+    <script src="/static/app.js?v=1.39"></script>
 </body>
 </html>
