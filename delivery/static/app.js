@@ -616,8 +616,6 @@ function renderDetail() {
     const allItemsFlat = delivery.suppliers.flatMap(s => s.items);
     const totalCases = casesExpected(allItemsFlat);
 
-    const receivedToggleClass = showReceived ? 'summary-stat clickable active-stat' : 'summary-stat clickable';
-
     // Always show delivery date in header brand
     const brandText = document.getElementById('header-brand-text');
     brandText.textContent = `${delivery.day_of_week} ${formatDate(delivery.delivery_date)}`;
@@ -632,15 +630,17 @@ function renderDetail() {
         detailTitle.classList.remove('hidden');
         document.getElementById('detail-title-text').textContent = supplier.supplier_name;
         document.getElementById('delivery-summary').innerHTML =
-            progressBar(supRcv, supExp, receivedToggleClass);
+            progressBar(supRcv, supExp);
     } else {
         // Normal delivery view — date is in header, hide detail-title
         detailTitle.classList.add('hidden');
         const allItems = delivery.suppliers.flatMap(s => s.items);
         const rcvCases = casesReceived(allItems);
         document.getElementById('delivery-summary').innerHTML =
-            progressBar(rcvCases, totalCases, receivedToggleClass);
+            progressBar(rcvCases, totalCases);
     }
+
+    updateReceivedToggle();
 
     // Sync search input with state
     const searchInput = document.getElementById('item-search');
@@ -659,11 +659,10 @@ function toggleReceivedView() {
 }
 
 function updateReceivedToggle() {
-    // Update toggle button state in both sort bars
-    const btn1 = document.getElementById('toggle-received');
-    const btn2 = document.getElementById('supplier-toggle-received');
-    if (btn1) btn1.classList.toggle('active', showReceived);
-    if (btn2) btn2.classList.toggle('active', showReceived);
+    const btn = document.getElementById('sort-hide-received');
+    if (!btn) return;
+    btn.textContent = showReceived ? 'Hide Received' : 'Show Received';
+    btn.classList.toggle('active', showReceived);
 }
 
 // ---- Supplier abbreviation ----
@@ -988,9 +987,8 @@ function filterBySupplier(supplierIdx) {
     // Reuse the top-level summary bar with supplier stats
     const supRcvF = casesReceived(supplier.items);
     const supExpF = casesExpected(supplier.items);
-    const rcvClass = showReceived ? 'summary-stat clickable active-stat' : 'summary-stat clickable';
     document.getElementById('delivery-summary').innerHTML =
-        progressBar(supRcvF, supExpF, rcvClass);
+        progressBar(supRcvF, supExpF);
 
     // Reuse the detail-title with supplier name, make it go back to clear filter
     const detailTitle = document.getElementById('detail-title');
@@ -1024,9 +1022,8 @@ function updateFilteredSupplierSummary() {
     const supplier = currentDelivery.suppliers[supplierFilter.idx];
     const supRcvU = casesReceived(supplier.items);
     const supExpU = casesExpected(supplier.items);
-    const rcvClass2 = showReceived ? 'summary-stat clickable active-stat' : 'summary-stat clickable';
     const summaryEl = document.getElementById('delivery-summary');
-    summaryEl.innerHTML = progressBar(supRcvU, supExpU, rcvClass2);
+    summaryEl.innerHTML = progressBar(supRcvU, supExpU);
 }
 
 // ---- Pull Sheet ----
@@ -1576,22 +1573,16 @@ function casesExpected(items) {
     return items.reduce((sum, item) => sum + item.quantity_expected, 0);
 }
 
-function progressBar(done, total, toggleClass) {
+function progressBar(done, total) {
     const pct = total > 0 ? Math.round((done / total) * 100) : 0;
-    const cls = toggleClass || '';
-    const onclick = toggleClass ? ' onclick="toggleReceivedView()"' : '';
-    const toggleLabel = toggleClass
-        ? `<div class="progress-bar-toggle"${onclick}>${showReceived ? 'Hide Received' : 'Show Received'}</div>`
-        : '';
     return `
-    <div class="progress-bar-summary ${cls}">
-        ${toggleLabel}
-        <div class="progress-bar-count"${onclick}><span class="${done > 0 ? 'count-green' : ''}">${fmtNum(done)}</span> / ${fmtNum(total)}</div>
-        <div class="progress-bar-label"${onclick}>
+    <div class="progress-bar-summary">
+        <div class="progress-bar-count"><span class="${done > 0 ? 'count-green' : ''}">${fmtNum(done)}</span> / ${fmtNum(total)}</div>
+        <div class="progress-bar-label">
             <span class="progress-bar-title">Received</span>
             <span class="progress-bar-title">Expected</span>
         </div>
-        <div class="progress-bar-track"${onclick}>
+        <div class="progress-bar-track">
             <div class="progress-bar-fill" style="width: ${pct}%; transition: width 0.4s ease"></div>
         </div>
     </div>`;

@@ -342,7 +342,7 @@ html, body {
     position: relative;
 }
 
-#sort-multi {
+#sort-hide-received {
     position: absolute;
     left: 50%;
     transform: translateX(-50%);

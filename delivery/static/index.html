@@ -115,7 +115,7 @@
                     <button id="sort-supplier" class="sort-btn active" onclick="toggleSupplierView()">Suppliers</button>
                     <button id="sort-alpha" class="sort-btn" onclick="setItemSort('alpha')">Items</button>
                     <button id="sort-qty" class="sort-btn" onclick="setItemSort('qty')">Cases</button>
-                    <button id="sort-multi" class="sort-btn hidden" onclick="toggleMultiFilter()">Multi</button>
+                    <button id="sort-hide-received" class="sort-btn" onclick="toggleReceivedView()">Show Received</button>
                     <div class="sort-search-wrapper">
                         <svg class="search-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                             <circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/>
@@ -123,6 +123,7 @@
                         <input type="text" id="item-search" placeholder="Search..." oninput="onSearchInput()" autocomplete="off" autocorrect="off" spellcheck="false">
                         <button id="search-clear-btn" class="search-clear hidden" onclick="clearSearch()">&times;</button>
                     </div>
+                    <button id="sort-multi" class="sort-btn hidden" onclick="toggleMultiFilter()">Multi</button>
                     <span id="item-receive-all-btn" class="receive-all-slot"></span>
                 </div>
                 <div id="flat-item-list" class="compact-list"></div>
