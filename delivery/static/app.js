@@ -7,6 +7,7 @@ const API = '/api/v1';
 
 // ---- Version History ----
 const VERSION_HISTORY = [
+    { version: 'v1.34', description: 'Multi button shares centered position with Expand All' },
     { version: 'v1.33', description: 'Sort bar: Suppliers/Items/Cases order, centered Expand All, Multi filter' },
     { version: 'v1.32', description: 'Adjustment rows show quantity and status label for all types' },
     { version: 'v1.31', description: 'Remove summary stat lines from all reports; show item detail only' },
@@ -777,7 +778,9 @@ function renderItemList() {
 
     if (!flatItems.length) {
         let emptyMsg;
-        if (searchQuery) {
+        if (multiFilter) {
+            emptyMsg = 'No items are shared across multiple suppliers';
+        } else if (searchQuery) {
             emptyMsg = 'No items match your search';
         } else if (!showReceived) {
             emptyMsg = 'All items received!';

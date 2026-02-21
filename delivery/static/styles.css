@@ -342,7 +342,8 @@ html, body {
     position: relative;
 }
 
-#expand-collapse-btn {
+#expand-collapse-btn,
+#sort-multi {
     position: absolute;
     left: 50%;
     transform: translateX(-50%);
