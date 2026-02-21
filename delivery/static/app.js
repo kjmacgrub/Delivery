@@ -7,6 +7,7 @@ const API = '/api/v1';
 
 // ---- Version History ----
 const VERSION_HISTORY = [
+    { version: 'v1.38', description: 'Bold supplier headings in Live Report' },
     { version: 'v1.37', description: 'Remove Switch Delivery from menu; import or continue only' },
     { version: 'v1.36', description: 'Suppliers pill toggles expand/collapse; remove Expand All pill' },
     { version: 'v1.35', description: 'Suppliers accordion is the default view' },

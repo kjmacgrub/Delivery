@@ -2166,11 +2166,9 @@ textarea {
 .pull-sheet-supplier {
     padding: 6px 10px;
     background: var(--bg);
-    font-size: 12px;
+    font-size: 15px;
     font-weight: 700;
-    color: var(--text-secondary);
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
+    color: var(--text);
 }
 
 .pull-sheet-row {
