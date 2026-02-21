@@ -7,6 +7,7 @@ const API = '/api/v1';
 
 // ---- Version History ----
 const VERSION_HISTORY = [
+    { version: 'v1.37', description: 'Remove Switch Delivery from menu; import or continue only' },
     { version: 'v1.36', description: 'Suppliers pill toggles expand/collapse; remove Expand All pill' },
     { version: 'v1.35', description: 'Suppliers accordion is the default view' },
     { version: 'v1.34', description: 'Multi button shares centered position with Expand All' },
@@ -190,11 +191,6 @@ function closeAdminModal() {
     document.getElementById('admin-modal').classList.add('hidden');
 }
 
-function showDeliveriesView() {
-    cleanupListeners();
-    showView('deliveries');
-    loadDeliveries();
-}
 
 // ---- API Helpers ----
 async function apiGet(path) {
