@@ -1260,9 +1260,24 @@ function selectReason(reason) {
     updateModalStatusButtons();
 }
 
-function togglePullConfirmed() {
+async function togglePullConfirmed() {
+    if (!checkInItem) return;
     const cb = document.getElementById('pull-confirm-checkbox');
     cb.classList.toggle('checked');
+    const { supplierIdx, itemIdx } = checkInItem;
+    const item = currentDelivery.suppliers[supplierIdx].items[itemIdx];
+    try {
+        await apiPatch(
+            `/deliveries/${currentDelivery.id}/suppliers/${supplierIdx}/items/${itemIdx}/pull-confirm`,
+            {}
+        );
+        lastWriteTimestamp = Date.now();
+        item.pull_confirmed = !item.pull_confirmed;
+        renderItemList();
+    } catch (e) {
+        cb.classList.toggle('checked'); // revert on error
+        showToast('Failed to update', 'error');
+    }
 }
 
 async function togglePullFromList(supplierIdx, itemIdx) {
