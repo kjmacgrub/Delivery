@@ -339,6 +339,14 @@ html, body {
     align-items: center;
     gap: 6px;
     margin-bottom: 8px;
+    position: relative;
+}
+
+#expand-collapse-btn {
+    position: absolute;
+    left: 50%;
+    transform: translateX(-50%);
+    pointer-events: auto;
 }
 
 .sort-label {

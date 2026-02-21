@@ -7,6 +7,7 @@ const API = '/api/v1';
 
 // ---- Version History ----
 const VERSION_HISTORY = [
+    { version: 'v1.33', description: 'Sort bar: Suppliers/Items/Cases order, centered Expand All, Multi filter' },
     { version: 'v1.32', description: 'Adjustment rows show quantity and status label for all types' },
     { version: 'v1.31', description: 'Remove summary stat lines from all reports; show item detail only' },
     { version: 'v1.30', description: 'Live Report pulls are interactive: tappable rows to confirm/unconfirm' },
@@ -54,6 +55,7 @@ let currentSupplierIdx = null;
 let checkInItem = null; // { supplierIdx, itemIdx }
 let supplierFilter = null; // null = show all, or { idx, name } to filter to one supplier
 let itemSortMode = 'alpha'; // 'alpha', 'qty', or 'supplier'
+let multiFilter = false;   // show only items shared across 2+ suppliers
 let showReceived = false; // false = show pending items, true = show received items
 let searchQuery = ''; // search filter for item list
 let completionShown = false; // prevent duplicate completion modal
@@ -704,12 +706,32 @@ function renderItemList() {
         flatItems = flatItems.filter(item => item.supplierIdx === supplierFilter.idx);
     }
 
+    // Multi filter: items appearing in 2+ supplier blocks
+    if (multiFilter && itemSortMode === 'alpha') {
+        const descSuppliers = new Map();
+        currentDelivery.suppliers.forEach((supplier, sIdx) => {
+            supplier.items.forEach(item => {
+                if (!descSuppliers.has(item.raw_description)) descSuppliers.set(item.raw_description, new Set());
+                descSuppliers.get(item.raw_description).add(sIdx);
+            });
+        });
+        const multiDescs = new Set([...descSuppliers.entries()]
+            .filter(([, suppliers]) => suppliers.size > 1)
+            .map(([desc]) => desc));
+        flatItems = flatItems.filter(item => multiDescs.has(item.raw_description));
+    }
+
     // Update sort button states — only one active at a time
     document.getElementById('sort-alpha').classList.toggle('active', itemSortMode === 'alpha');
     document.getElementById('sort-qty').classList.toggle('active', itemSortMode === 'qty');
     const supplierBtn = document.getElementById('sort-supplier');
     supplierBtn.classList.toggle('active', itemSortMode === 'supplier');
     supplierBtn.classList.toggle('hidden', supplierFilter !== null);
+
+    // Multi button: only in Items mode
+    const multiBtn = document.getElementById('sort-multi');
+    multiBtn.classList.toggle('hidden', itemSortMode !== 'alpha' || supplierFilter !== null);
+    multiBtn.classList.toggle('active', multiFilter);
 
     // Show expand/collapse toggle only in supplier accordion mode
     const expandBtn = document.getElementById('expand-collapse-btn');
@@ -1099,7 +1121,13 @@ function clearSearch() {
 }
 
 function setItemSort(mode) {
+    if (mode !== 'alpha') multiFilter = false;
     itemSortMode = mode;
+    renderItemList();
+}
+
+function toggleMultiFilter() {
+    multiFilter = !multiFilter;
     renderItemList();
 }
 
