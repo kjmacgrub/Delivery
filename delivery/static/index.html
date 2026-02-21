@@ -28,7 +28,11 @@
                         <line x1="3" y1="18" x2="21" y2="18"/>
                     </svg>
                 </button>
+                <button id="header-continue-btn" class="icon-btn hidden" onclick="goHome()" aria-label="Continue Delivery">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5,3 19,12 5,21"/></svg>
+                </button>
                 <span id="header-brand-text" onclick="goHome()">Daily Delivery</span>
+                <span id="live-status-btn" class="live-status-btn hidden" onclick="showLiveReport()">Street</span>
             </div>
             <div class="header-row">
                 <div class="header-left">
@@ -36,12 +40,6 @@
                 </div>
                 <div class="header-right">
                     <span id="status-badge" class="badge"></span>
-                    <button id="refresh-btn" class="icon-btn" onclick="refreshData()">
-                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <path d="M23 4v6h-6"/><path d="M1 20v-6h6"/>
-                            <path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/>
-                        </svg>
-                    </button>
                 </div>
             </div>
         </header>
@@ -132,7 +130,10 @@
             <div class="modal-backdrop" onclick="closeModal()"></div>
             <div class="modal-content">
                 <div class="modal-header">
-                    <h2 id="modal-item-name">Item</h2>
+                    <div class="modal-title-stack">
+                        <div id="modal-supplier-name" class="modal-supplier-name"></div>
+                        <h2 id="modal-item-name">Item</h2>
+                    </div>
                     <button class="icon-btn" onclick="closeModal()">&times;</button>
                 </div>
                 <div class="modal-body">
@@ -237,15 +238,8 @@
                     <button class="icon-btn" onclick="closeAdminModal()">&times;</button>
                 </div>
                 <div class="modal-body admin-modal-body">
-                    <button id="admin-continue-btn" class="admin-menu-btn hidden" onclick="closeAdminModal(); goHome()">
-                        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5,3 19,12 5,21"/></svg>
-                        Continue Delivery
-                    </button>
-                    <button id="admin-report-btn" class="admin-menu-btn hidden" onclick="closeAdminModal(); showLiveReport()">
-                        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="1"/><path d="M9 12h6M9 16h4"/></svg>
-                        Live Report
-                    </button>
-                    <button class="admin-menu-btn" onclick="closeAdminModal(); showStorageFiles()">
+
+<button class="admin-menu-btn" onclick="closeAdminModal(); showStorageFiles()">
                         <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14,2 14,8 20,8"/></svg>
                         Import New File
                     </button>

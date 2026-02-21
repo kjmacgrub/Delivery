@@ -7,6 +7,7 @@ const API = '/api/v1';
 
 // ---- Version History ----
 const VERSION_HISTORY = [
+    { version: 'v1.43', description: 'Street button in header, supplier name in modal, UX polish and label updates' },
     { version: 'v1.42', description: 'Remove landing page; go straight to import when no active delivery' },
     { version: 'v1.41', description: 'Cache busters use commit hash; version number only bumps on request' },
     { version: 'v1.41', description: 'Confirmed label stacked above checkbox, pushed right of Floor Pull label' },
@@ -90,8 +91,10 @@ function showView(name) {
     const badge = document.getElementById('status-badge');
     const brandText = document.getElementById('header-brand-text');
 
-    // Default: clear brand text; views that show a delivery date will set it
-    brandText.textContent = '';
+    // Always show delivery date in brand text when a delivery is loaded
+    brandText.textContent = currentDelivery
+        ? `${currentDelivery.day_of_week} ${formatDate(currentDelivery.delivery_date)}`
+        : '';
 
     switch (name) {
 
@@ -109,15 +112,11 @@ function showView(name) {
             title.textContent = '';
             badge.textContent = '';
             badge.className = 'badge';
-            // Brand text set by renderDetail()
             break;
         case 'complete':
             title.textContent = 'Delivery Complete';
             badge.textContent = 'completed';
             badge.className = 'badge badge-completed';
-            if (currentDelivery) {
-                brandText.textContent = `${currentDelivery.day_of_week} ${formatDate(currentDelivery.delivery_date)}`;
-            }
             break;
         case 'reports':
             title.textContent = 'Adjustment Reports';
@@ -125,12 +124,9 @@ function showView(name) {
             badge.className = 'badge';
             break;
         case 'pullsheet':
-            title.textContent = 'Live Report';
+            title.textContent = '';
             badge.textContent = '';
             badge.className = 'badge';
-            if (currentDelivery) {
-                brandText.textContent = `${currentDelivery.day_of_week} ${formatDate(currentDelivery.delivery_date)}`;
-            }
             break;
     }
 }
@@ -178,14 +174,21 @@ function showNoDeliveryScreen() {
     currentSupplierIdx = null;
     completionShown = false;
     supplierFilter = null;
+    updateLiveStatusBtn();
     showStorageFiles();
+}
+
+// ---- Live Status Button ----
+function updateLiveStatusBtn() {
+    const active = currentDelivery && currentDelivery.status !== 'completed';
+    const liveBtn = document.getElementById('live-status-btn');
+    if (liveBtn) liveBtn.classList.toggle('hidden', !active);
+    const continueBtn = document.getElementById('header-continue-btn');
+    if (continueBtn) continueBtn.classList.toggle('hidden', !active);
 }
 
 // ---- Admin Menu ----
 function openAdminModal() {
-    const hasActive = currentDelivery && currentDelivery.status !== 'completed';
-    document.getElementById('admin-continue-btn').classList.toggle('hidden', !hasActive);
-    document.getElementById('admin-report-btn').classList.toggle('hidden', !hasActive);
     document.getElementById('admin-modal').classList.remove('hidden');
 }
 
@@ -244,6 +247,7 @@ function applyDeliveryUpdate(data) {
 
     // Replace delivery data (client-side state like sort/filter/expanded is preserved)
     currentDelivery = data;
+    updateLiveStatusBtn();
 
     // Re-render
     renderDetail();
@@ -454,7 +458,7 @@ function renderReportList(reports) {
                 <span class="card-meta-item">${r.source_filename}</span>
             </div>
             <div class="report-detail" id="report-detail-${idx}" style="display:none;">
-                <div class="report-section-header">Adjustments</div>
+                <div class="report-section-header">Returns and Adjustments</div>
                 ${buildAdjustmentStatsHtml(adjItems)}
                 <div class="report-section-header">Pulls</div>
                 ${buildPullStatsHtml(normPulls)}
@@ -578,6 +582,7 @@ async function openDelivery(id) {
         const delivery = await apiGet(`/deliveries/${id}`);
         currentDelivery = delivery;
         completionShown = false;
+        updateLiveStatusBtn();
 
         // If already completed, show the delivery-over screen
         if (delivery.status === 'completed') {
@@ -612,10 +617,6 @@ function renderDetail() {
         sum + s.items.filter(i => i.received_status !== 'pending').length, 0);
     const allItemsFlat = delivery.suppliers.flatMap(s => s.items);
     const totalCases = casesExpected(allItemsFlat);
-
-    // Always show delivery date in header brand
-    const brandText = document.getElementById('header-brand-text');
-    brandText.textContent = `${delivery.day_of_week} ${formatDate(delivery.delivery_date)}`;
 
     const detailTitle = document.getElementById('detail-title');
 
@@ -789,10 +790,10 @@ function buildCrossSupplierMap() {
     if (!currentDelivery) return new Map();
     const map = new Map();
     currentDelivery.suppliers.forEach((supplier, sIdx) => {
-        supplier.items.forEach(item => {
+        supplier.items.forEach((item, iIdx) => {
             const key = item.raw_description.toLowerCase();
             if (!map.has(key)) map.set(key, []);
-            map.get(key).push({ supplierName: supplier.supplier_name, supplierIdx: sIdx, qty: item.quantity_expected });
+            map.get(key).push({ supplierName: supplier.supplier_name, supplierIdx: sIdx, itemIdx: iIdx, qty: item.quantity_expected });
         });
     });
     return map;
@@ -827,9 +828,9 @@ function renderCompactRow(item, showSupplier, crossMap = null) {
         const others = (crossMap.get(item.raw_description.toLowerCase()) || [])
             .filter(e => e.supplierIdx !== item.supplierIdx);
         if (others.length > 0) {
-            const parts = others.map(e => `${e.qty} cases from ${e.supplierName}`);
-            const alsoText = 'Also ' + parts.join(', and ');
-            alsoRow = `<div class="cross-supplier-row${showSupplier ? '' : ' accordion-item'}">${alsoText}</div>`;
+            const parts = others.map(e => `${e.qty} cases from <span class="also-supplier-link" onclick="event.stopPropagation(); openCheckInModalFlat(${e.supplierIdx}, ${e.itemIdx})">${e.supplierName}</span>`);
+            const alsoText = `<span class="also-label">Also</span> ` + parts.join(', and ');
+            alsoRow = `<div class="cross-supplier-row ${statusClass}">${alsoText}</div>`;
         }
     }
 
@@ -1039,7 +1040,7 @@ function renderLiveReport() {
             : (e.expected || 0),
     }));
 
-    html += '<div class="report-section-header">Adjustments</div>';
+    html += '<div class="report-section-header">Returns and Adjustments</div>';
     html += buildAdjustmentStatsHtml(adjItems);
 
     // --- Pulls section ---
@@ -1068,8 +1069,8 @@ function renderLiveReport() {
             }
             const confirmedClass = item.pull_confirmed ? 'pull-confirmed' : '';
             const statusChip = item.pull_confirmed
-                ? `<span class="pull-confirmed-chip">&#10003;</span>`
-                : `<span class="pull-pending-chip">&bull;</span>`;
+                ? `<div class="pull-sheet-check done"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20,6 9,17 4,12"/></svg></div>`
+                : `<div class="pull-sheet-check pending"></div>`;
             html += `
             <div class="pull-sheet-row ${confirmedClass}" onclick="togglePullFromReport(${item.supplierIdx}, ${item.itemIdx})">
                 <span class="pull-sheet-qty">${item.pull_quantity}</span>
@@ -1142,6 +1143,7 @@ function openCheckInModal(itemIdx) {
     const item = supplier.items[itemIdx];
     checkInItem = { supplierIdx: currentSupplierIdx, itemIdx };
 
+    document.getElementById('modal-supplier-name').textContent = supplier.supplier_name;
     document.getElementById('modal-item-name').textContent = item.raw_description;
     modalExpectedQty = item.quantity_expected;
     document.getElementById('modal-expected').textContent = item.quantity_expected;
@@ -1738,7 +1740,7 @@ function showCompletionModal() {
     }
 
     let html = '';
-    html += '<div class="report-section-header">Adjustments</div>';
+    html += '<div class="report-section-header">Returns and Adjustments</div>';
     html += buildAdjustmentStatsHtml(adjItems);
     html += '<div class="report-section-header">Pulls</div>';
     html += buildPullStatsHtml(normPullItems);

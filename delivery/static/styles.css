@@ -133,6 +133,17 @@ html, body {
     font-weight: 700;
 }
 
+.live-status-btn {
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--warning);
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+    white-space: nowrap;
+    letter-spacing: 0.02em;
+    margin-left: auto;
+}
+
 /* ---- Buttons ---- */
 .icon-btn {
     background: none;
@@ -811,7 +822,7 @@ html, body {
     align-items: center;
     gap: 8px;
     padding: 7px 10px 7px 50px;
-    background: var(--highlight);
+    background: var(--surface);
     cursor: pointer;
     -webkit-tap-highlight-color: transparent;
     border-left: 3px solid var(--pending);
@@ -820,7 +831,7 @@ html, body {
 }
 
 .compact-row:active {
-    background: #ffe9a0;
+    background: var(--bg);
 }
 
 .compact-row.checked-ok,
@@ -1135,10 +1146,24 @@ html, body {
     border-bottom: 1px solid var(--border);
 }
 
+.modal-title-stack {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    max-width: 80%;
+}
+
+.modal-supplier-name {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
 .modal-header h2 {
     font-size: 18px;
     font-weight: 700;
-    max-width: 80%;
 }
 
 .modal-body {
@@ -1805,7 +1830,7 @@ textarea {
     align-items: center;
     gap: 8px;
     padding: 10px 12px;
-    background: var(--surface);
+    background: var(--highlight);
     cursor: pointer;
     -webkit-tap-highlight-color: transparent;
     border-left: 4px solid var(--pending);
@@ -1909,13 +1934,35 @@ textarea {
 }
 
 .cross-supplier-row {
-    padding: 1px 12px 5px 16px;
+    padding: 1px 12px 5px 86px;
     font-size: 12px;
     color: var(--text-secondary);
+    background: var(--surface);
 }
 
-.cross-supplier-row.accordion-item {
-    padding-left: 50px;
+.cross-supplier-row.checked-ok,
+.cross-supplier-row.checked-short,
+.cross-supplier-row.checked-over,
+.cross-supplier-row.checked-return {
+    background: var(--surface);
+}
+
+.compact-list.show-received .cross-supplier-row.checked-ok,
+.compact-list.show-received .cross-supplier-row.checked-short,
+.compact-list.show-received .cross-supplier-row.checked-over,
+.compact-list.show-received .cross-supplier-row.checked-return {
+    background: #e8f5e9;
+}
+
+.also-label {
+    color: var(--danger);
+}
+
+.also-supplier-link {
+    color: var(--primary);
+    text-decoration: underline;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
 }
 
 /* ---- Landing Page ---- */
@@ -2216,18 +2263,28 @@ textarea {
     text-overflow: ellipsis;
 }
 
-.pull-confirmed-chip {
-    font-size: 18px;
-    font-weight: 700;
-    color: var(--success);
+.pull-sheet-check {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
     flex-shrink: 0;
 }
 
-.pull-pending-chip {
-    font-size: 22px;
-    color: var(--border);
-    flex-shrink: 0;
-    line-height: 1;
+.pull-sheet-check.pending {
+    border: 2px solid var(--border);
+}
+
+.pull-sheet-check.done {
+    background: var(--success);
+    color: white;
+}
+
+.pull-sheet-check svg {
+    width: 14px;
+    height: 14px;
 }
 
 .hidden {
