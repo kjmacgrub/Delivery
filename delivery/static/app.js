@@ -877,6 +877,10 @@ function renderSupplierAccordion(container, flatItems) {
         // Get items for this supplier from the flat list (already filtered by showReceived)
         let supplierItems = flatItems.filter(item => item.supplierIdx === sIdx);
 
+        // Hide fully-received suppliers when showReceived is off
+        const allDone = supplier.items.every(i => i.received_status !== 'pending');
+        if (!showReceived && allDone) return;
+
         // Apply search filter
         if (searchQuery) {
             supplierItems = supplierItems.filter(item =>
@@ -901,7 +905,6 @@ function renderSupplierAccordion(container, flatItems) {
         const doneItems = allItems.filter(i => i.received_status !== 'pending').length;
         const rcvCases = casesReceived(allItems);
         const expCases = casesExpected(allItems);
-        const allDone = doneItems === totalItems;
         const someDone = doneItems > 0 && !allDone;
 
         const statusClass = allDone ? 'supplier-complete' : '';
