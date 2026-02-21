@@ -981,6 +981,22 @@ html, body {
     background: rgba(0,122,255,0.1);
 }
 
+.compact-also {
+    font-size: 10px;
+    font-weight: 400;
+    color: var(--text-secondary);
+}
+
+.compact-also-chip {
+    font-size: 10px;
+    color: var(--text-secondary);
+    position: absolute;
+    left: 50%;
+    transform: translateX(-50%);
+    white-space: nowrap;
+    z-index: 1;
+}
+
 .compact-check {
     display: flex;
     align-items: center;

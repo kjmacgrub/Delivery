@@ -780,47 +780,25 @@ function renderItemList() {
         return;
     }
 
-    // When filtered by supplier, show cross-supplier info for matching items
-    if (supplierFilter !== null) {
-        const crossSupplierMap = buildCrossSupplierMap();
-        container.innerHTML = flatItems.map(item => {
-            let html = renderCompactRow(item, false);
-            const key = item.raw_description.toLowerCase();
-            const others = crossSupplierMap[key];
-            if (others && others.length > 0) {
-                html += others.map(o =>
-                    `<div class="compact-row cross-supplier-row">
-                        <div class="compact-qty cross-supplier-qty">${o.qty}</div>
-                        <div class="compact-name cross-supplier-name">also from ${o.supplierName}</div>
-                    </div>`
-                ).join('');
-            }
-            return html;
-        }).join('');
-    } else {
-        container.innerHTML = flatItems.map(item => renderCompactRow(item, true)).join('');
-    }
+    const crossMap = buildCrossSupplierMap();
+    container.innerHTML = flatItems.map(item => renderCompactRow(item, supplierFilter === null, crossMap)).join('');
 }
 
 function buildCrossSupplierMap() {
-    // Build a map of item description -> [{ supplierName, qty }] for OTHER suppliers
-    if (!currentDelivery || supplierFilter === null) return {};
-    const map = {};
+    // Build a map: description -> [{ supplierName, supplierIdx, qty }] for all suppliers
+    if (!currentDelivery) return new Map();
+    const map = new Map();
     currentDelivery.suppliers.forEach((supplier, sIdx) => {
-        if (sIdx === supplierFilter.idx) return; // skip current supplier
         supplier.items.forEach(item => {
             const key = item.raw_description.toLowerCase();
-            if (!map[key]) map[key] = [];
-            map[key].push({
-                supplierName: supplier.supplier_name,
-                qty: item.quantity_expected,
-            });
+            if (!map.has(key)) map.set(key, []);
+            map.get(key).push({ supplierName: supplier.supplier_name, supplierIdx: sIdx, qty: item.quantity_expected });
         });
     });
     return map;
 }
 
-function renderCompactRow(item, showSupplier) {
+function renderCompactRow(item, showSupplier, crossMap = null) {
     const isPending = item.received_status === 'pending';
     const statusClass = isPending ? '' : `checked-${item.received_status}`;
     const processingClass = item.needs_processing ? 'needs-processing' : '';
@@ -838,9 +816,23 @@ function renderCompactRow(item, showSupplier) {
     const pullQty = item.pull_quantity != null
         ? `<span class="pull-qty ${pullConfirmedClass}" onclick="event.stopPropagation(); togglePullFromList(${item.supplierIdx}, ${item.itemIdx})">(${item.pull_quantity})</span> `
         : '';
+
+    // Build "also from" text for items shared across suppliers
+    let alsoHtml = '';
+    if (crossMap) {
+        const others = (crossMap.get(item.raw_description.toLowerCase()) || [])
+            .filter(e => e.supplierIdx !== item.supplierIdx);
+        if (others.length > 0) {
+            const alsoStr = others.map(e => `${e.supplierName} – ${e.qty} cases`).join(', ');
+            alsoHtml = `<span class="compact-also">(also ${alsoStr})</span>`;
+        }
+    }
+
     const supplierChip = showSupplier
-        ? `<div class="compact-supplier" onclick="event.stopPropagation(); filterBySupplier(${item.supplierIdx})">${item.supplierAbbrev}</div>`
-        : '';
+        ? `<div class="compact-supplier" onclick="event.stopPropagation(); filterBySupplier(${item.supplierIdx})">${item.supplierAbbrev}${alsoHtml ? ' ' + alsoHtml : ''}</div>`
+        : alsoHtml
+            ? `<div class="compact-also-chip">${alsoHtml}</div>`
+            : '';
 
     return `
     <div class="compact-row ${statusClass} ${processingClass} ${floorClass}${showSupplier ? '' : ' accordion-item'}"
@@ -855,6 +847,8 @@ function renderCompactRow(item, showSupplier) {
 function renderSupplierAccordion(container, flatItems) {
     const delivery = currentDelivery;
     if (!delivery) return;
+
+    const crossMap = buildCrossSupplierMap();
 
     // Build sorted supplier list (alphabetical)
     let supplierIndices = delivery.suppliers.map((s, idx) => idx);
@@ -934,7 +928,7 @@ function renderSupplierAccordion(container, flatItems) {
         </div>`;
 
         if (isExpanded && supplierItems.length > 0) {
-            html += supplierItems.map(item => renderCompactRow(item, false)).join('');
+            html += supplierItems.map(item => renderCompactRow(item, false, crossMap)).join('');
         }
     });
 
