@@ -899,25 +899,23 @@ html, body {
     background: #c8e6c9;
 }
 
-/* Pull confirmation checkbox in modal — stacked above + button */
-.floor-pull-row {
-    align-items: flex-end;
-}
-
+/* Pull confirmation checkbox in modal — floats above + button, out of flow */
 .pull-btn-col {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 4px;
+    position: relative;
 }
 
 .pull-confirm-inline {
+    position: absolute;
+    bottom: calc(100% + 4px);
+    left: 50%;
+    transform: translateX(-50%);
     display: flex;
     flex-direction: column;
     align-items: center;
     gap: 3px;
     cursor: pointer;
     -webkit-tap-highlight-color: transparent;
+    white-space: nowrap;
 }
 
 .pull-confirm-text {
@@ -1185,7 +1183,7 @@ html, body {
 .qty-pair-row {
     display: flex;
     gap: 20px;
-    align-items: flex-end;
+    align-items: flex-start;
 }
 
 .qty-pair-item {
