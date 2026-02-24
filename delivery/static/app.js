@@ -1073,7 +1073,7 @@ function renderLiveReport() {
                 : `<div class="pull-sheet-check pending"></div>`;
             html += `
             <div class="pull-sheet-row ${confirmedClass}" onclick="togglePullFromReport(${item.supplierIdx}, ${item.itemIdx})">
-                <span class="pull-sheet-qty">${item.pull_quantity}</span>
+                <span class="pull-sheet-qty">${item.pull_quantity} <span class="pull-sheet-of">(of ${item.quantity_expected})</span></span>
                 <span class="pull-sheet-name">${item.raw_description}</span>
                 ${statusChip}
             </div>`;

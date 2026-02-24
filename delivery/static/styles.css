@@ -2253,6 +2253,12 @@ textarea {
     flex-shrink: 0;
 }
 
+.pull-sheet-of {
+    font-size: 13px;
+    font-weight: 400;
+    color: var(--text-muted);
+}
+
 .pull-sheet-name {
     flex: 1;
     font-size: 15px;
