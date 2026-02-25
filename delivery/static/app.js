@@ -543,8 +543,7 @@ async function showStorageFiles() {
         container.innerHTML = data.files.map(f => `
             <div class="card storage-card" onclick="parseStorageFile('${f.name}')">
                 <div>
-                    <div class="card-title">${f.name}</div>
-                    <div class="card-subtitle">${formatSize(f.size)} &middot; ${formatTimestamp(f.updated)}</div>
+                    <div class="card-title">${friendlyFileName(f.name)}</div>
                 </div>
                 <span class="storage-parse-label">Parse</span>
             </div>
