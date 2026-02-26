@@ -249,8 +249,12 @@ function applyDeliveryUpdate(data) {
     currentDelivery = data;
     updateLiveStatusBtn();
 
-    // Re-render
-    renderDetail();
+    // Re-render whichever view is active
+    if (currentView === 'pullsheet') {
+        renderLiveReport();
+    } else {
+        renderDetail();
+    }
 
     // Restore scroll position
     window.scrollTo(0, scrollY);
