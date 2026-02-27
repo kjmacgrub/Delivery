@@ -31,8 +31,18 @@
                 <button id="header-continue-btn" class="icon-btn hidden" onclick="goHome()" aria-label="Continue Delivery">
                     <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5,3 19,12 5,21"/></svg>
                 </button>
+                <button id="live-status-btn" class="icon-btn hidden" onclick="showLiveReport()" aria-label="Street View">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <line x1="4" y1="3" x2="4" y2="21"/>
+                        <line x1="20" y1="3" x2="20" y2="21"/>
+                        <line x1="12" y1="4" x2="12" y2="6"/>
+                        <line x1="12" y1="9" x2="12" y2="11"/>
+                        <line x1="12" y1="14" x2="12" y2="16"/>
+                        <line x1="12" y1="19" x2="12" y2="21"/>
+                    </svg>
+                </button>
                 <span id="header-brand-text" onclick="goHome()">Daily Delivery</span>
-                <span id="live-status-btn" class="live-status-btn hidden" onclick="showLiveReport()">Street</span>
+                <span id="julian-day" class="julian-day"></span>
             </div>
             <div class="header-row">
                 <div class="header-left">
@@ -104,6 +114,7 @@
                     <button id="sort-supplier" class="sort-btn active" onclick="toggleSupplierView()">Suppliers</button>
                     <button id="sort-alpha" class="sort-btn" onclick="setItemSort('alpha')">Items</button>
                     <button id="sort-qty" class="sort-btn" onclick="setItemSort('qty')">Cases</button>
+                    <button id="sort-location" class="sort-btn" onclick="toggleLocationView()">Location</button>
                     <button id="sort-hide-received" class="sort-btn" onclick="toggleReceivedView()">Show Received</button>
                     <div class="sort-search-wrapper">
                         <svg class="search-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -182,8 +193,27 @@
                 <div class="modal-footer">
                     <button id="modal-unreceive-btn" class="btn btn-unreceive hidden" onclick="unreceiveItem()">Unreceive</button>
                     <button class="btn btn-secondary" onclick="closeModal()">Cancel</button>
-                    <button id="modal-ok-btn" class="btn btn-ok-neutral" onclick="submitCheckIn()">OK</button>
+                    <button id="modal-ok-btn" class="btn btn-ok-neutral" onclick="submitCheckIn()">Received</button>
                 </div>
+            </div>
+        </div>
+
+        <!-- Pop-up: Pull Quantity (positioned near tap) -->
+        <div id="pull-popup-backdrop" class="pull-popup-backdrop hidden" onclick="closePullPopup()"></div>
+        <div id="pull-popup" class="pull-popup hidden">
+            <div id="pull-popup-name" class="pull-popup-name"></div>
+            <div id="pull-popup-submit" class="pull-popup-row hidden" onclick="submitPullPopup()">
+                <span class="pull-popup-row-label">Submit</span>
+                <span class="pull-checkbox"></span>
+            </div>
+            <div class="qty-input-row pull-popup-stepper">
+                <button class="qty-btn" onclick="adjustPullPopupQty(-1)">-</button>
+                <input type="number" id="pull-popup-qty" min="0" inputmode="numeric">
+                <button class="qty-btn" onclick="adjustPullPopupQty(1)">+</button>
+            </div>
+            <div id="pull-popup-confirm" class="pull-popup-row hidden" onclick="confirmPullPopup()">
+                <span class="pull-popup-row-label">Confirmed</span>
+                <span id="pull-popup-checkbox" class="pull-checkbox"></span>
             </div>
         </div>
 
@@ -243,9 +273,13 @@
                         <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14,2 14,8 20,8"/></svg>
                         Import New File
                     </button>
-                    <button class="admin-menu-btn" onclick="closeAdminModal(); showReports()">
+                    <button class="admin-menu-btn" onclick="closeAdminModal(); loadDeliveries()">
                         <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 17H7v-7h2m4 7h-2V7h2m4 10h-2v-4h2"/><rect x="2" y="2" width="20" height="20" rx="2"/></svg>
-                        View Past Deliveries
+                        Manage Deliveries
+                    </button>
+                    <button class="admin-menu-btn" onclick="closeAdminModal(); showReports()">
+                        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14,2 14,8 20,8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10,9 9,9 8,9"/></svg>
+                        Adjustment Reports
                     </button>
                 </div>
             </div>

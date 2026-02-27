@@ -64,6 +64,7 @@ let currentView = 'storage';
 let currentDelivery = null;
 let currentSupplierIdx = null;
 let checkInItem = null; // { supplierIdx, itemIdx }
+let pullPopupItem = null; // { supplierIdx, itemIdx }
 let supplierFilter = null; // null = show all, or { idx, name } to filter to one supplier
 let itemSortMode = 'supplier'; // 'alpha', 'qty', or 'supplier'
 let multiFilter = false;   // show only items shared across 2+ suppliers
@@ -71,6 +72,9 @@ let showReceived = false; // false = show pending items, true = show received it
 let searchQuery = ''; // search filter for item list
 let completionShown = false; // prevent duplicate completion modal
 let expandedSuppliers = new Set(); // supplier indices expanded in accordion view
+let expandedLocations = new Set(); // location zone keys expanded in accordion view
+let highCountData = null; // { lowercase_item_name: { sat, sun, mon } } or null
+let inventoryData = null; // { lowercase_item_name: { name, basement_location, floor_location } } or null
 
 // ---- Real-time Listener State ----
 let activeUnsubscribes = [];       // functions to call to tear down listeners
@@ -336,6 +340,7 @@ function listenToDeliveryList() {
 
 // ---- Delivery List ----
 async function loadDeliveries() {
+    showView('deliveries');
     try {
         const data = await apiGet('/deliveries');
         renderDeliveryList(data.deliveries);
@@ -544,14 +549,75 @@ async function showStorageFiles() {
             return;
         }
 
-        container.innerHTML = data.files.map(f => `
-            <div class="card storage-card" onclick="parseStorageFile('${f.name}')">
-                <div>
-                    <div class="card-title">${friendlyFileName(f.name)}</div>
-                </div>
-                <span class="storage-parse-label">Parse</span>
-            </div>
-        `).join('');
+        // Categorize files by type and date
+        const dateGroups = new Map(); // dateStr -> { delivery: file|null, highCount: file|null }
+        let inventoryFile = null;
+
+        data.files.forEach(f => {
+            const lname = f.name.toLowerCase();
+            const dateMatch = f.name.match(/(\d{4}-\d{2}-\d{2})/);
+            const dateStr = dateMatch ? dateMatch[1] : null;
+            if (lname.includes('inventory')) {
+                inventoryFile = f;
+            } else if (dateStr) {
+                if (!dateGroups.has(dateStr)) dateGroups.set(dateStr, { delivery: null, highCount: null });
+                const g = dateGroups.get(dateStr);
+                if (lname.includes('high_count')) g.highCount = f;
+                else g.delivery = f;
+            }
+        });
+
+        let html = '';
+
+        // Date groups sorted newest first
+        [...dateGroups.keys()].sort().reverse().forEach(dateStr => {
+            const g = dateGroups.get(dateStr);
+            const dateLabel = friendlyDateStr(dateStr);
+            html += `<div class="import-group">
+                <div class="import-group-title">${dateLabel}</div>`;
+            if (g.delivery) {
+                html += `<div class="import-file-row" onclick="parseStorageFile('${g.delivery.name}')">
+                    <span class="import-type-chip import-type-delivery">Delivery</span>
+                    <span class="import-parse-btn">Parse</span>
+                </div>`;
+            } else {
+                html += `<div class="import-file-row import-row-missing">
+                    <span class="import-type-chip import-type-missing">Delivery</span>
+                    <span class="import-missing-text">Not uploaded</span>
+                </div>`;
+            }
+            if (g.highCount) {
+                html += `<div class="import-file-row" onclick="parseHighCountFile('${g.highCount.name}')">
+                    <span class="import-type-chip import-type-highcount">High Count</span>
+                    <span class="import-parse-btn">Parse</span>
+                </div>`;
+            } else {
+                html += `<div class="import-file-row import-row-missing">
+                    <span class="import-type-chip import-type-missing">High Count</span>
+                    <span class="import-missing-text">Not uploaded</span>
+                </div>`;
+            }
+            html += `</div>`;
+        });
+
+        // Inventory section
+        html += `<div class="import-group">
+            <div class="import-group-title">Inventory</div>`;
+        if (inventoryFile) {
+            html += `<div class="import-file-row" onclick="parseInventoryFile('${inventoryFile.name}')">
+                <span class="import-type-chip import-type-inventory">Inventory</span>
+                <span class="import-file-date">${friendlyFileName(inventoryFile.name)}</span>
+                <span class="import-parse-btn">Parse</span>
+            </div>`;
+        } else {
+            html += `<div class="import-file-row import-row-missing">
+                <span class="import-type-chip import-type-missing">Inventory</span>
+                <span class="import-missing-text">Not uploaded</span>
+            </div>`;
+        }
+        html += `</div>`;
+
+        container.innerHTML = html;
     } catch (e) {
         container.innerHTML = `
             <div class="empty-state">
@@ -579,6 +645,75 @@ async function parseStorageFile(fileName) {
     }
 }
 
+async function parseInventoryFile(fileName) {
+    showToast('Parsing inventory...', 'info');
+    try {
+        const res = await fetch(API + `/storage/files/${encodeURIComponent(fileName)}/parse-inventory`, { method: 'POST' });
+        if (!res.ok) {
+            const err = await res.json().catch(() => null);
+            const msg = err && err.detail ? err.detail : 'Failed to parse inventory';
+            showToast(msg, 'error');
+            return;
+        }
+        const data = await res.json();
+        // Reload inventory cache immediately
+        inventoryData = null;
+        await loadInventory();
+        // Re-render if currently showing location sort
+        if (itemSortMode === 'location') renderItemList();
+        showToast(`Inventory saved: ${data.item_count} items (${data.date})`, 'success');
+    } catch (e) {
+        showToast('Failed to parse inventory', 'error');
+    }
+}
+
+async function parseHighCountFile(fileName) {
+    showToast('Parsing high count...', 'info');
+    try {
+        const res = await fetch(API + `/storage/files/${encodeURIComponent(fileName)}/parse-high-count`, { method: 'POST' });
+        if (!res.ok) {
+            const err = await res.json().catch(() => null);
+            const msg = err && err.detail ? err.detail : 'Failed to parse high count';
+            showToast(msg, 'error');
+            return;
+        }
+        const data = await res.json();
+        showToast(`High count saved: ${data.nonzero_count} items with forecast data (${data.date})`, 'success');
+        // Reload high count data if we're currently on a delivery with the same date
+        if (currentDelivery && currentDelivery.delivery_date === data.date) {
+            await loadHighCount(data.date);
+            renderDetail();
+        }
+    } catch (e) {
+        showToast('Failed to parse high count', 'error');
+    }
+}
+
+// ---- High Count Data ----
+async function loadHighCount(dateStr) {
+    if (!dateStr) { highCountData = null; return; }
+    try {
+        const data = await apiGet(`/high-counts/${dateStr}`);
+        const items = data.items || {};
+        highCountData = Object.keys(items).length > 0 ? items : null;
+    } catch (e) {
+        highCountData = null;
+    }
+}
+
+// ---- Inventory Data ----
+async function loadInventory() {
+    // Skip only if already loaded with actual data
+    if (inventoryData && Object.keys(inventoryData).length > 0) return;
+    try {
+        const data = await apiGet('/inventory/latest');
+        const items = data.items || {};
+        inventoryData = Object.keys(items).length > 0 ? items : null;
+    } catch (e) {
+        inventoryData = null;
+    }
+}
+
 // ---- Delivery Detail ----
 async function openDelivery(id) {
     try {
@@ -586,6 +721,10 @@ async function openDelivery(id) {
         currentDelivery = delivery;
         completionShown = false;
         updateLiveStatusBtn();
+        await Promise.all([
+            loadHighCount(delivery.delivery_date || null),
+            loadInventory(),
+        ]);
 
         // If already completed, show the delivery-over screen
         if (delivery.status === 'completed') {
@@ -595,6 +734,7 @@ async function openDelivery(id) {
 
         supplierFilter = null; // reset filter
         expandedSuppliers = new Set(); // reset accordion
+        expandedLocations = new Set(); // reset location accordion
         showReceived = false; // reset to pending view
         searchQuery = ''; // reset search
         // Reset supplier filter UI
@@ -728,6 +868,7 @@ function renderItemList() {
     // Update sort button states — only one active at a time
     document.getElementById('sort-alpha').classList.toggle('active', itemSortMode === 'alpha');
     document.getElementById('sort-qty').classList.toggle('active', itemSortMode === 'qty');
+    document.getElementById('sort-location').classList.toggle('active', itemSortMode === 'location');
     const supplierBtn = document.getElementById('sort-supplier');
     supplierBtn.classList.toggle('active', itemSortMode === 'supplier');
     supplierBtn.classList.toggle('hidden', supplierFilter !== null);
@@ -756,19 +897,6 @@ function renderItemList() {
         );
     }
 
-    // Sort based on current mode
-    if (itemSortMode === 'qty') {
-        flatItems.sort((a, b) => {
-            const diff = b.quantity_expected - a.quantity_expected;
-            if (diff !== 0) return diff;
-            return a.raw_description.toLowerCase().localeCompare(b.raw_description.toLowerCase());
-        });
-    } else {
-        flatItems.sort((a, b) => {
-            return a.raw_description.toLowerCase().localeCompare(b.raw_description.toLowerCase());
-        });
-    }
-
     if (!flatItems.length) {
         let emptyMsg;
         if (multiFilter) {
@@ -784,19 +912,95 @@ function renderItemList() {
         return;
     }
 
-    const crossMap = buildCrossSupplierMap();
-    container.innerHTML = flatItems.map(item => renderCompactRow(item, supplierFilter === null, crossMap)).join('');
+    // Group by description to deduplicate cross-supplier items
+    const groups = new Map();
+    flatItems.forEach(item => {
+        const key = item.raw_description.toLowerCase();
+        if (!groups.has(key)) groups.set(key, []);
+        groups.get(key).push(item);
+    });
+
+    let sortedGroups = [...groups.values()];
+    if (itemSortMode === 'qty') {
+        sortedGroups.sort((a, b) => {
+            const totalA = a.reduce((s, i) => s + i.quantity_expected, 0);
+            const totalB = b.reduce((s, i) => s + i.quantity_expected, 0);
+            const diff = totalB - totalA;
+            return diff !== 0 ? diff : a[0].raw_description.toLowerCase().localeCompare(b[0].raw_description.toLowerCase());
+        });
+    } else {
+        // alpha sort (used as base for both 'alpha' and 'location' modes)
+        sortedGroups.sort((a, b) =>
+            a[0].raw_description.toLowerCase().localeCompare(b[0].raw_description.toLowerCase())
+        );
+    }
+
+    if (itemSortMode === 'location') {
+        if (!inventoryData || Object.keys(inventoryData).length === 0) {
+            container.innerHTML = '<div class="empty-state"><p>No inventory data</p><p class="subtitle">Parse the inventory worksheet from the import screen first</p></div>';
+            return;
+        }
+        const locationOrder = ['G', 'X', 'Y'];
+        const locationGroups = new Map();
+        sortedGroups.forEach(group => {
+            const key = group[0].raw_description.toLowerCase();
+            const inv = inventoryData && inventoryData[key];
+            const locFirst = inv ? (inv.basement_location || '').charAt(0).toUpperCase() : '';
+            const bucket = locationOrder.includes(locFirst) ? locFirst : 'Other';
+            if (!locationGroups.has(bucket)) locationGroups.set(bucket, []);
+            locationGroups.get(bucket).push(group);
+        });
+        const orderedKeys = [
+            ...locationOrder.filter(k => locationGroups.has(k)),
+            ...[...locationGroups.keys()].filter(k => !locationOrder.includes(k)),
+        ];
+        let html = '';
+        orderedKeys.forEach(locKey => {
+            const isExpanded = expandedLocations.has(locKey);
+            const groups = locationGroups.get(locKey);
+            const itemCount = groups.reduce((n, g) => n + g.length, 0);
+            const chevronClass = isExpanded ? 'accordion-chevron expanded' : 'accordion-chevron';
+            html += `<div class="location-zone-header" onclick="toggleLocationZone('${locKey}')">
+                <span class="${chevronClass}">&#9654;</span>
+                <span class="location-zone-name">${locKey}</span>
+                <span class="location-zone-count">${itemCount}</span>
+            </div>`;
+            if (isExpanded) {
+                html += groups.map(group =>
+                    group.length === 1
+                        ? renderCompactRow(group[0], supplierFilter === null, null)
+                        : renderMultiSupplierRow(group)
+                ).join('');
+            }
+        });
+        container.innerHTML = html;
+        return;
+    }
+
+    container.innerHTML = sortedGroups.map(group =>
+        group.length === 1
+            ? renderCompactRow(group[0], supplierFilter === null, null)
+            : renderMultiSupplierRow(group)
+    ).join('');
 }
 
 function buildCrossSupplierMap() {
-    // Build a map: description -> [{ supplierName, supplierIdx, qty }] for all suppliers
+    // Build a map: description -> [{ supplierName, supplierIdx, itemIdx, qty, received_status, pull_quantity, pull_confirmed }]
     if (!currentDelivery) return new Map();
     const map = new Map();
     currentDelivery.suppliers.forEach((supplier, sIdx) => {
         supplier.items.forEach((item, iIdx) => {
             const key = item.raw_description.toLowerCase();
             if (!map.has(key)) map.set(key, []);
-            map.get(key).push({ supplierName: supplier.supplier_name, supplierIdx: sIdx, itemIdx: iIdx, qty: item.quantity_expected });
+            map.get(key).push({
+                supplierName: supplier.supplier_name,
+                supplierIdx: sIdx,
+                itemIdx: iIdx,
+                qty: item.quantity_expected,
+                received_status: item.received_status,
+                pull_quantity: item.pull_quantity,
+                pull_confirmed: item.pull_confirmed,
+            });
         });
     });
     return map;
@@ -818,33 +1022,97 @@ function renderCompactRow(item, showSupplier, crossMap = null) {
 
     const pullConfirmedClass = item.pull_confirmed ? 'pull-confirmed' : '';
     const pullQty = item.pull_quantity != null
-        ? `<span class="pull-qty ${pullConfirmedClass}" onclick="event.stopPropagation(); togglePullFromList(${item.supplierIdx}, ${item.itemIdx})">(${item.pull_quantity})</span> `
+        ? `<span class="pull-qty ${pullConfirmedClass}" onclick="event.stopPropagation(); openPullPopup(event, ${item.supplierIdx}, ${item.itemIdx})">(${item.pull_quantity})</span> `
         : '';
 
     const supplierChip = showSupplier
         ? `<div class="compact-supplier" onclick="event.stopPropagation(); filterBySupplier(${item.supplierIdx})">${item.supplierAbbrev}</div>`
         : '';
 
-    // Build "also from" sub-row for items shared across suppliers
+    // Build "also from" sub-rows for items shared across suppliers
     let alsoRow = '';
     if (crossMap) {
         const others = (crossMap.get(item.raw_description.toLowerCase()) || [])
             .filter(e => e.supplierIdx !== item.supplierIdx);
         if (others.length > 0) {
-            const parts = others.map(e => `${e.qty} cases from <span class="also-supplier-link" onclick="event.stopPropagation(); openCheckInModalFlat(${e.supplierIdx}, ${e.itemIdx})">${e.supplierName}</span>`);
-            const alsoText = `<span class="also-label">Also</span> ` + parts.join(', and ');
-            alsoRow = `<div class="cross-supplier-row ${statusClass}">${alsoText}</div>`;
+            alsoRow = others.map(e => {
+                const eStatus = e.received_status === 'pending' ? '' : `checked-${e.received_status}`;
+                const ePullConfirmedClass = e.pull_confirmed ? 'pull-confirmed' : '';
+                const ePullQty = e.pull_quantity != null
+                    ? `<span class="pull-qty ${ePullConfirmedClass}" onclick="event.stopPropagation(); openPullPopup(event, ${e.supplierIdx}, ${e.itemIdx})">(${e.pull_quantity})</span> `
+                    : '';
+                const eCheckIcon = e.received_status === 'pending'
+                    ? '<div class="compact-check pending"></div>'
+                    : `<div class="compact-check done"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20,6 9,17 4,12"/></svg></div>`;
+                return `<div class="compact-row supplier-sub-row ${eStatus}" onclick="openCheckInModalFlat(${e.supplierIdx}, ${e.itemIdx})">
+                    <div class="compact-qty">${ePullQty}${e.qty}</div>
+                    <div class="compact-supplier sub-row-supplier" onclick="event.stopPropagation(); filterBySupplier(${e.supplierIdx})">${e.supplierName}</div>
+                    ${eCheckIcon}
+                </div>`;
+            }).join('');
         }
     }
+
+    // High count forecast strip
+    const hcKey = item.raw_description.toLowerCase();
+    const hc = highCountData && highCountData[hcKey];
+    const hcStrip = (hc && (hc.sat !== 0 || hc.sun !== 0 || hc.mon !== 0))
+        ? `<div class="hc-strip"><span class="hc-day">${hc.sat}</span><span class="hc-day">${hc.sun}</span><span class="hc-day">${hc.mon}</span></div>`
+        : '';
 
     return `
     <div class="compact-row ${statusClass} ${processingClass} ${floorClass}${showSupplier ? '' : ' accordion-item'}"
          onclick="openCheckInModalFlat(${item.supplierIdx}, ${item.itemIdx})">
         <div class="compact-qty">${pullQty}${item.quantity_expected}</div>
         <div class="compact-name">${item.raw_description}</div>
+        ${hcStrip}
         ${supplierChip}
         ${checkIcon}
     </div>${alsoRow}`;
+}
+
+function renderMultiSupplierRow(items) {
+    const totalQty = items.reduce((sum, item) => sum + item.quantity_expected, 0);
+    const firstName = items[0].raw_description;
+
+    // High count strip (same item name across all)
+    const hcKey = firstName.toLowerCase();
+    const hc = highCountData && highCountData[hcKey];
+    const hcStrip = (hc && (hc.sat !== 0 || hc.sun !== 0 || hc.mon !== 0))
+        ? `<div class="hc-strip"><span class="hc-day">${hc.sat}</span><span class="hc-day">${hc.sun}</span><span class="hc-day">${hc.mon}</span></div>`
+        : '';
+
+    const mainRow = `
+    <div class="compact-row multi-supplier-header">
+        <div class="compact-qty">${totalQty}</div>
+        <div class="compact-name">${firstName}</div>
+        ${hcStrip}
+    </div>`;
+
+    const subRows = items.map(item => {
+        const isPending = item.received_status === 'pending';
+        const statusClass = isPending ? '' : `checked-${item.received_status}`;
+        const pullConfirmedClass = item.pull_confirmed ? 'pull-confirmed' : '';
+        const pullQty = item.pull_quantity != null
+            ? `<span class="pull-qty ${pullConfirmedClass}" onclick="event.stopPropagation(); openPullPopup(event, ${item.supplierIdx}, ${item.itemIdx})">(${item.pull_quantity})</span> `
+            : '';
+        const checkIcon = isPending
+            ? '<div class="compact-check pending"></div>'
+            : `<div class="compact-check done">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
+                    <polyline points="20,6 9,17 4,12"/>
+                </svg>
+               </div>`;
+        return `
+        <div class="compact-row supplier-sub-row ${statusClass}"
+             onclick="openCheckInModalFlat(${item.supplierIdx}, ${item.itemIdx})">
+            <div class="compact-qty">${pullQty}${item.quantity_expected}</div>
+            <div class="compact-supplier sub-row-supplier" onclick="event.stopPropagation(); filterBySupplier(${item.supplierIdx})">${item.supplierName}</div>
+            ${checkIcon}
+        </div>`;
+    }).join('');
+
+    return mainRow + subRows;
 }
 
 function renderSupplierAccordion(container, flatItems) {
@@ -957,6 +1225,32 @@ function toggleSupplierView() {
     } else {
         setItemSort('supplier');
     }
+}
+
+function toggleLocationView() {
+    if (itemSortMode === 'location') {
+        toggleAllLocations();
+    } else {
+        setItemSort('location');
+    }
+}
+
+function toggleAllLocations() {
+    if (expandedLocations.size > 0) {
+        expandedLocations = new Set();
+    } else {
+        ['G', 'X', 'Y', 'Other'].forEach(k => expandedLocations.add(k));
+    }
+    renderItemList();
+}
+
+function toggleLocationZone(locKey) {
+    if (expandedLocations.has(locKey)) {
+        expandedLocations.delete(locKey);
+    } else {
+        expandedLocations.add(locKey);
+    }
+    renderItemList();
 }
 
 function toggleExpandAll() {
@@ -1118,9 +1412,10 @@ function clearSearch() {
     input.focus();
 }
 
-function setItemSort(mode) {
+async function setItemSort(mode) {
     if (mode !== 'alpha') multiFilter = false;
     itemSortMode = mode;
+    if (mode === 'location') await loadInventory();
     renderItemList();
 }
 
@@ -1273,6 +1568,130 @@ async function togglePullConfirmed() {
         cb.classList.toggle('checked'); // revert on error
         showToast('Failed to update', 'error');
     }
+}
+
+// ---- Pull Popup ----
+function openPullPopup(event, supplierIdx, itemIdx) {
+    const item = currentDelivery.suppliers[supplierIdx].items[itemIdx];
+    pullPopupItem = { supplierIdx, itemIdx };
+
+    document.getElementById('pull-popup-name').textContent = item.raw_description;
+    const qty = item.pull_quantity ?? 0;
+    document.getElementById('pull-popup-qty').value = qty;
+
+    const hasQty = qty > 0;
+    document.getElementById('pull-popup-submit').classList.toggle('hidden', !hasQty);
+    document.getElementById('pull-popup-confirm').classList.toggle('hidden', !hasQty);
+    // Submit always starts unchecked; Confirmed reflects current state
+    document.getElementById('pull-popup-submit').querySelector('.pull-checkbox').classList.remove('checked');
+    document.getElementById('pull-popup-checkbox').classList.toggle('checked', !!item.pull_confirmed);
+
+    // Position near the tapped element
+    const popup = document.getElementById('pull-popup');
+    popup.classList.remove('hidden');
+    document.getElementById('pull-popup-backdrop').classList.remove('hidden');
+
+    const rect = event.target.getBoundingClientRect();
+    const pw = popup.offsetWidth || 220;
+    const ph = popup.offsetHeight || 160;
+    const margin = 10;
+
+    let top = rect.bottom + margin;
+    let left = rect.left;
+    if (left + pw > window.innerWidth - margin) left = window.innerWidth - pw - margin;
+    if (left < margin) left = margin;
+    if (top + ph > window.innerHeight - margin) top = rect.top - ph - margin;
+
+    popup.style.top = top + 'px';
+    popup.style.left = left + 'px';
+}
+
+function closePullPopup() {
+    document.getElementById('pull-popup').classList.add('hidden');
+    document.getElementById('pull-popup-backdrop').classList.add('hidden');
+    pullPopupItem = null;
+}
+
+function _pullPopupShowHideRows(qty) {
+    const hasQty = qty > 0;
+    document.getElementById('pull-popup-submit').classList.toggle('hidden', !hasQty);
+    document.getElementById('pull-popup-confirm').classList.toggle('hidden', !hasQty);
+}
+
+async function adjustPullPopupQty(delta) {
+    if (!pullPopupItem) return;
+    const input = document.getElementById('pull-popup-qty');
+    const newQty = Math.max(0, (parseInt(input.value) || 0) + delta);
+    input.value = newQty;
+    _pullPopupShowHideRows(newQty);
+    // Qty changed — clear both checkboxes to await explicit Submit or Confirm
+    document.getElementById('pull-popup-submit').querySelector('.pull-checkbox').classList.remove('checked');
+    document.getElementById('pull-popup-checkbox').classList.remove('checked');
+
+    const { supplierIdx, itemIdx } = pullPopupItem;
+    try {
+        await apiPatch(
+            `/deliveries/${currentDelivery.id}/suppliers/${supplierIdx}/items/${itemIdx}/set-pull`,
+            { quantity: newQty }
+        );
+        lastWriteTimestamp = Date.now();
+        const item = currentDelivery.suppliers[supplierIdx].items[itemIdx];
+        item.pull_quantity = newQty > 0 ? newQty : null;
+        item.pull_for_floor = newQty > 0;
+        renderItemList();
+    } catch (e) {
+        showToast('Failed to update pull quantity', 'error');
+    }
+}
+
+async function submitPullPopup() {
+    // Submit: mark as requested for pulling. Resets confirmed since qty may have changed.
+    if (!pullPopupItem) return;
+    const { supplierIdx, itemIdx } = pullPopupItem;
+    const item = currentDelivery.suppliers[supplierIdx].items[itemIdx];
+    try {
+        if (!item.pull_submitted) {
+            await apiPatch(
+                `/deliveries/${currentDelivery.id}/suppliers/${supplierIdx}/items/${itemIdx}/pull-submit`,
+                {}
+            );
+            lastWriteTimestamp = Date.now();
+            item.pull_submitted = true;
+        }
+        if (item.pull_confirmed) {
+            await apiPatch(
+                `/deliveries/${currentDelivery.id}/suppliers/${supplierIdx}/items/${itemIdx}/pull-confirm`,
+                {}
+            );
+            lastWriteTimestamp = Date.now();
+            item.pull_confirmed = false;
+        }
+        renderItemList();
+    } catch (e) {
+        showToast('Failed to submit pull', 'error');
+        return;
+    }
+    closePullPopup();
+}
+
+async function confirmPullPopup() {
+    // Toggle pull_confirmed — works whether currently confirmed or not.
+    if (!pullPopupItem) return;
+    const { supplierIdx, itemIdx } = pullPopupItem;
+    const item = currentDelivery.suppliers[supplierIdx].items[itemIdx];
+    try {
+        await apiPatch(
+            `/deliveries/${currentDelivery.id}/suppliers/${supplierIdx}/items/${itemIdx}/pull-confirm`,
+            {}
+        );
+        lastWriteTimestamp = Date.now();
+        item.pull_confirmed = !item.pull_confirmed;
+        renderItemList();
+    } catch (e) {
+        showToast('Failed to update pull confirmation', 'error');
+        return;
+    }
+    closePullPopup();
 }
 
 async function togglePullFromList(supplierIdx, itemIdx) {
@@ -1601,6 +2020,15 @@ function formatTimestamp(ts) {
     });
 }
 
+function friendlyDateStr(dateStr) {
+    // Convert "2026-02-27" -> "Feb 27, 2026"
+    const m = dateStr.match(/(\d{4})-(\d{2})-(\d{2})/);
+    if (!m) return dateStr;
+    const d = new Date(parseInt(m[1]), parseInt(m[2]) - 1, parseInt(m[3]));
+    if (isNaN(d)) return dateStr;
+    return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+}
+
 function friendlyFileName(name) {
     // Strip extension
     const base = name.replace(/\.[^.]+$/, '');
@@ -1908,6 +2336,15 @@ function closeVersionModal() {
 
 // ---- Init ----
 document.addEventListener('DOMContentLoaded', async () => {
+    const now = new Date();
+    const startOfYear = new Date(now.getFullYear(), 0, 0);
+    const julianDay = Math.floor((now - startOfYear) / 86400000);
+    const weekNum = Math.ceil(julianDay / 7);
+    document.getElementById('julian-day').innerHTML =
+        `<span class="julian-label">Day</span> ${julianDay}&nbsp;&nbsp;<span class="julian-label">Week</span> ${weekNum}`;
+    const weekColors = ['week-red', 'week-blue', 'week-yellow', 'week-green'];
+    document.getElementById('app-header').classList.add(weekColors[(weekNum - 1) % 4]);
+
     const currentVersion = VERSION_HISTORY[0].version;
     let commitHash = 'dev';
     try {
