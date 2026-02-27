@@ -99,3 +99,119 @@ async def get_latest_file(request: Request):
     if not latest:
         return {"message": "No files in incoming folder", "file": None}
     return {"file": latest}
+
+
+@router.get("/high-counts/{date_str}")
+async def get_high_count(date_str: str, request: Request):
+    """Get high count forecast data for a specific date."""
+    db = request.app.state.delivery_service._db
+    if not db:
+        return {"date": date_str, "items": {}}
+    doc = db.collection('high_counts').document(date_str).get()
+    if not doc.exists:
+        return {"date": date_str, "items": {}}
+    data = doc.to_dict()
+    return {"date": date_str, "items": data.get("items", {})}
+
+
+@router.post("/storage/files/{file_name}/parse-inventory")
+async def parse_inventory_file(file_name: str, request: Request):
+    """
+    Download an inventory worksheet CSV from Firebase Storage,
+    parse name→location mappings, and save to Firestore inventory/latest.
+    """
+    import re
+    from datetime import datetime
+    from delivery.config import STORAGE_INCOMING
+    from delivery.parser.inventory_parser import parse_inventory
+
+    storage = _get_storage(request)
+    firebase_path = f"{STORAGE_INCOMING}/{file_name}"
+
+    try:
+        local_path = storage.download_file(firebase_path)
+    except FileNotFoundError:
+        raise HTTPException(status_code=404, detail=f"File not found in Storage: {file_name}")
+
+    try:
+        items = parse_inventory(local_path)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Parse error: {str(e)}")
+
+    date_match = re.search(r'(\d{4}-\d{2}-\d{2})', file_name)
+    date_str = date_match.group(1) if date_match else datetime.utcnow().strftime('%Y-%m-%d')
+
+    db = request.app.state.delivery_service._db
+    if db:
+        db.collection('inventory').document('latest').set({
+            'date': date_str,
+            'source_filename': file_name,
+            'parsed_at': datetime.utcnow().isoformat(),
+            'items': items,
+        })
+
+    return {
+        'date': date_str,
+        'source_filename': file_name,
+        'item_count': len(items),
+    }
+
+
+@router.get("/inventory/latest")
+async def get_inventory_latest(request: Request):
+    """Get the most recently imported inventory worksheet."""
+    db = request.app.state.delivery_service._db
+    if not db:
+        return {"items": {}, "date": None}
+    doc = db.collection('inventory').document('latest').get()
+    if not doc.exists:
+        return {"items": {}, "date": None}
+    data = doc.to_dict()
+    return {"items": data.get("items", {}), "date": data.get("date")}
+
+
+@router.post("/storage/files/{file_name}/parse-high-count")
+async def parse_high_count_file(file_name: str, request: Request):
+    """
+    Download a High Count Basement List PDF from Firebase Storage,
+    parse the 3-day forecast, and save to Firestore high_counts collection.
+    """
+    import re
+    from datetime import datetime
+    from delivery.config import STORAGE_INCOMING
+    from delivery.parser.high_count_parser import parse_high_count
+
+    storage = _get_storage(request)
+    firebase_path = f"{STORAGE_INCOMING}/{file_name}"
+
+    try:
+        local_path = storage.download_file(firebase_path)
+    except FileNotFoundError:
+        raise HTTPException(status_code=404, detail=f"File not found in Storage: {file_name}")
+
+    try:
+        items = parse_high_count(local_path)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Parse error: {str(e)}")
+
+    # Extract date from filename (e.g., "basement_high_count_fri_2026-02-27.pdf")
+    date_match = re.search(r'(\d{4}-\d{2}-\d{2})', file_name)
+    date_str = date_match.group(1) if date_match else datetime.utcnow().strftime('%Y-%m-%d')
+
+    # Save to Firestore
+    db = request.app.state.delivery_service._db
+    if db:
+        db.collection('high_counts').document(date_str).set({
+            'date': date_str,
+            'source_filename': file_name,
+            'parsed_at': datetime.utcnow().isoformat(),
+            'items': items,
+        })
+
+    nonzero = sum(1 for v in items.values() if v['sat'] or v['sun'] or v['mon'])
+    return {
+        'date': date_str,
+        'source_filename': file_name,
+        'item_count': len(items),
+        'nonzero_count': nonzero,
+    }

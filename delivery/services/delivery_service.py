@@ -104,10 +104,14 @@ class DeliveryService:
             for d in existing:
                 if (d.delivery_date == delivery.delivery_date
                         and d.status != DeliveryStatus.COMPLETED):
-                    raise ValueError(
-                        f"Delivery already in progress for {delivery.day_of_week} "
-                        f"{delivery.delivery_date}"
-                    )
+                    if d.item_count == 0:
+                        # Empty/bad parse (e.g. wrong file type) — delete and allow replacement
+                        self.delete_delivery(d.id)
+                    else:
+                        raise ValueError(
+                            f"Delivery already in progress for {delivery.day_of_week} "
+                            f"{delivery.delivery_date}"
+                        )
 
         # Persist
         self._save_delivery(delivery)
@@ -226,6 +230,23 @@ class DeliveryService:
         item = supplier.items[item_idx]
         item.pull_for_floor = quantity > 0
         item.pull_quantity = quantity if quantity > 0 else None
+        self._save_delivery(delivery)
+        return item
+
+    def toggle_pull_submitted(
+        self, delivery_id: str, supplier_idx: int, item_idx: int
+    ) -> Optional[LineItem]:
+        """Toggle pull_submitted on a single item."""
+        delivery = self._load_delivery(delivery_id)
+        if not delivery:
+            return None
+        if supplier_idx >= len(delivery.suppliers):
+            return None
+        supplier = delivery.suppliers[supplier_idx]
+        if item_idx >= len(supplier.items):
+            return None
+        item = supplier.items[item_idx]
+        item.pull_submitted = not item.pull_submitted
         self._save_delivery(delivery)
         return item
 

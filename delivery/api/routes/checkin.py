@@ -67,6 +67,27 @@ async def set_pull(
 
 
 @router.patch(
+    "/deliveries/{delivery_id}/suppliers/{supplier_idx}/items/{item_idx}/pull-submit",
+    response_model=CheckInResponse,
+)
+async def toggle_pull_submitted(
+    delivery_id: str,
+    supplier_idx: int,
+    item_idx: int,
+    request: Request,
+):
+    """Toggle pull_submitted on an item."""
+    service = _get_service(request)
+    item = service.toggle_pull_submitted(delivery_id, supplier_idx, item_idx)
+    if not item:
+        raise HTTPException(status_code=404, detail="Item not found.")
+    return CheckInResponse(
+        message=f"Pull {'submitted' if item.pull_submitted else 'unsubmitted'}: {item.raw_description}",
+        items_updated=1,
+    )
+
+
+@router.patch(
     "/deliveries/{delivery_id}/suppliers/{supplier_idx}/items/{item_idx}/pull-confirm",
     response_model=CheckInResponse,
 )

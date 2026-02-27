@@ -21,17 +21,17 @@
         <!-- Header -->
         <header id="app-header">
             <div id="header-brand" class="header-brand">
-                <button id="menu-btn" class="icon-btn menu-btn" onclick="openAdminModal()" aria-label="Menu">
+                <button id="menu-btn" class="icon-btn menu-btn" onclick="openAdminModal()" aria-label="Menu" data-tooltip="Files">
                     <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
                         <line x1="3" y1="6" x2="21" y2="6"/>
                         <line x1="3" y1="12" x2="21" y2="12"/>
                         <line x1="3" y1="18" x2="21" y2="18"/>
                     </svg>
                 </button>
-                <button id="header-continue-btn" class="icon-btn hidden" onclick="goHome()" aria-label="Continue Delivery">
+                <button id="header-continue-btn" class="icon-btn hidden" onclick="goHome()" aria-label="Continue Delivery" data-tooltip="Main View">
                     <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5,3 19,12 5,21"/></svg>
                 </button>
-                <button id="live-status-btn" class="icon-btn hidden" onclick="showLiveReport()" aria-label="Street View">
+                <button id="live-status-btn" class="icon-btn hidden" onclick="showLiveReport()" aria-label="Street View" data-tooltip="Street View">
                     <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <line x1="4" y1="3" x2="4" y2="21"/>
                         <line x1="20" y1="3" x2="20" y2="21"/>
@@ -115,8 +115,7 @@
                     <button id="sort-alpha" class="sort-btn" onclick="setItemSort('alpha')">Items</button>
                     <button id="sort-qty" class="sort-btn" onclick="setItemSort('qty')">Cases</button>
                     <button id="sort-location" class="sort-btn" onclick="toggleLocationView()">Location</button>
-                    <button id="sort-hide-received" class="sort-btn" onclick="toggleReceivedView()">Show Received</button>
-                    <div class="sort-search-wrapper">
+<div class="sort-search-wrapper">
                         <svg class="search-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                             <circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/>
                         </svg>

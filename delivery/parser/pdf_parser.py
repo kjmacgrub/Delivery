@@ -415,7 +415,7 @@ class PDFWorksheetParser(WorksheetParser):
                 return True
         if re.match(r'^\d{1,2}/\d{1,2}/\d{4}$', t):
             return True
-        if re.match(r'^Day\s+\d+\s+Week\s+\d+', t):
+        if re.search(r'Day\s+\d+\s+Week\s+\d+', t):
             return True
         if 'Delivery List' in t:
             return True

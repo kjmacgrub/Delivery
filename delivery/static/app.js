@@ -94,6 +94,7 @@ function showView(name) {
     const title = document.getElementById('page-title');
     const badge = document.getElementById('status-badge');
     const brandText = document.getElementById('header-brand-text');
+    document.getElementById('app-header').classList.remove('street-view-active');
 
     // Always show delivery date in brand text when a delivery is loaded
     brandText.textContent = currentDelivery
@@ -103,34 +104,35 @@ function showView(name) {
     switch (name) {
 
         case 'deliveries':
-            title.textContent = 'Deliveries';
+            title.textContent = '(Main View)';
             badge.textContent = '';
             badge.className = 'badge';
             break;
         case 'storage':
-            title.textContent = 'Import File';
+            title.textContent = '(Main View)';
             badge.textContent = '';
             badge.className = 'badge';
             break;
         case 'detail':
-            title.textContent = '';
+            title.textContent = '(Main View)';
             badge.textContent = '';
             badge.className = 'badge';
             break;
         case 'complete':
-            title.textContent = 'Delivery Complete';
+            title.textContent = '(Main View)';
             badge.textContent = 'completed';
             badge.className = 'badge badge-completed';
             break;
         case 'reports':
-            title.textContent = 'Adjustment Reports';
+            title.textContent = '(Main View)';
             badge.textContent = '';
             badge.className = 'badge';
             break;
         case 'pullsheet':
-            title.textContent = '';
+            title.textContent = '(Street View)';
             badge.textContent = '';
             badge.className = 'badge';
+            document.getElementById('app-header').classList.add('street-view-active');
             break;
     }
 }
@@ -707,7 +709,12 @@ async function loadInventory() {
     if (inventoryData && Object.keys(inventoryData).length > 0) return;
     try {
         const data = await apiGet('/inventory/latest');
-        const items = data.items || {};
+        const raw = data.items || {};
+        // Normalize keys: collapse multiple spaces so lookup matches delivery names
+        const items = {};
+        for (const [k, v] of Object.entries(raw)) {
+            items[k.replace(/\s+/g, ' ').trim()] = v;
+        }
         inventoryData = Object.keys(items).length > 0 ? items : null;
     } catch (e) {
         inventoryData = null;
@@ -781,8 +788,6 @@ function renderDetail() {
             progressBar(rcvCases, totalCases);
     }
 
-    updateReceivedToggle();
-
     // Sync search input with state
     const searchInput = document.getElementById('item-search');
     if (searchInput) {
@@ -793,17 +798,9 @@ function renderDetail() {
     renderItemList();
 }
 
-function toggleReceivedView() {
-    showReceived = !showReceived;
-    updateReceivedToggle();
+function setShowReceived(val) {
+    showReceived = val;
     renderDetail();
-}
-
-function updateReceivedToggle() {
-    const btn = document.getElementById('sort-hide-received');
-    if (!btn) return;
-    btn.textContent = showReceived ? 'Hide Received' : 'Show Received';
-    btn.classList.toggle('active', showReceived);
 }
 
 // ---- Supplier abbreviation ----
@@ -868,10 +865,20 @@ function renderItemList() {
     // Update sort button states — only one active at a time
     document.getElementById('sort-alpha').classList.toggle('active', itemSortMode === 'alpha');
     document.getElementById('sort-qty').classList.toggle('active', itemSortMode === 'qty');
-    document.getElementById('sort-location').classList.toggle('active', itemSortMode === 'location');
+
+    const locBtn = document.getElementById('sort-location');
+    locBtn.classList.toggle('active', itemSortMode === 'location');
+    const allLocsExpanded = itemSortMode === 'location' && currentDelivery && expandedLocations.size > 0;
+    locBtn.classList.toggle('chevron-expanded', allLocsExpanded);
+    locBtn.classList.toggle('chevron-collapsed', itemSortMode === 'location' && !allLocsExpanded);
+
     const supplierBtn = document.getElementById('sort-supplier');
     supplierBtn.classList.toggle('active', itemSortMode === 'supplier');
     supplierBtn.classList.toggle('hidden', supplierFilter !== null);
+    const allSuppExpanded = itemSortMode === 'supplier' && currentDelivery &&
+        currentDelivery.suppliers.every((s, idx) => expandedSuppliers.has(idx));
+    supplierBtn.classList.toggle('chevron-expanded', allSuppExpanded);
+    supplierBtn.classList.toggle('chevron-collapsed', itemSortMode === 'supplier' && !allSuppExpanded);
 
     // Multi button: only in Items mode
     const multiBtn = document.getElementById('sort-multi');
@@ -943,7 +950,7 @@ function renderItemList() {
         const locationOrder = ['G', 'X', 'Y'];
         const locationGroups = new Map();
         sortedGroups.forEach(group => {
-            const key = group[0].raw_description.toLowerCase();
+            const key = group[0].raw_description.toLowerCase().replace(/\s+/g, ' ').trim();
             const inv = inventoryData && inventoryData[key];
             const locFirst = inv ? (inv.basement_location || '').charAt(0).toUpperCase() : '';
             const bucket = locationOrder.includes(locFirst) ? locFirst : 'Other';
@@ -1012,13 +1019,6 @@ function renderCompactRow(item, showSupplier, crossMap = null) {
     const processingClass = item.needs_processing ? 'needs-processing' : '';
     const floorClass = item.pull_for_floor ? 'pull-for-floor' : '';
 
-    const checkIcon = isPending
-        ? '<div class="compact-check pending"></div>'
-        : `<div class="compact-check done">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
-                <polyline points="20,6 9,17 4,12"/>
-            </svg>
-           </div>`;
 
     const pullConfirmedClass = item.pull_confirmed ? 'pull-confirmed' : '';
     const pullQty = item.pull_quantity != null
@@ -1041,13 +1041,9 @@ function renderCompactRow(item, showSupplier, crossMap = null) {
                 const ePullQty = e.pull_quantity != null
                     ? `<span class="pull-qty ${ePullConfirmedClass}" onclick="event.stopPropagation(); openPullPopup(event, ${e.supplierIdx}, ${e.itemIdx})">(${e.pull_quantity})</span> `
                     : '';
-                const eCheckIcon = e.received_status === 'pending'
-                    ? '<div class="compact-check pending"></div>'
-                    : `<div class="compact-check done"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20,6 9,17 4,12"/></svg></div>`;
                 return `<div class="compact-row supplier-sub-row ${eStatus}" onclick="openCheckInModalFlat(${e.supplierIdx}, ${e.itemIdx})">
                     <div class="compact-qty">${ePullQty}${e.qty}</div>
                     <div class="compact-supplier sub-row-supplier" onclick="event.stopPropagation(); filterBySupplier(${e.supplierIdx})">${e.supplierName}</div>
-                    ${eCheckIcon}
                 </div>`;
             }).join('');
         }
@@ -1067,7 +1063,6 @@ function renderCompactRow(item, showSupplier, crossMap = null) {
         <div class="compact-name">${item.raw_description}</div>
         ${hcStrip}
         ${supplierChip}
-        ${checkIcon}
     </div>${alsoRow}`;
 }
 
@@ -1996,8 +1991,8 @@ function progressBar(done, total) {
     <div class="progress-bar-summary">
         <div class="progress-bar-count"><span class="${done > 0 ? 'count-green' : ''}">${fmtNum(done)}</span> / ${fmtNum(total)}</div>
         <div class="progress-bar-label">
-            <span class="progress-bar-title">Received</span>
-            <span class="progress-bar-title">Expected</span>
+            <span class="progress-bar-title ${showReceived ? 'progress-title-received' : ''}" onclick="setShowReceived(${!showReceived})">Received</span>
+            <span class="progress-bar-title ${showReceived ? '' : 'progress-title-expected'}" onclick="setShowReceived(${!showReceived})">Expected</span>
         </div>
         <div class="progress-bar-track">
             <div class="progress-bar-fill" style="width: ${pct}%; transition: width 0.4s ease"></div>
@@ -2021,12 +2016,12 @@ function formatTimestamp(ts) {
 }
 
 function friendlyDateStr(dateStr) {
-    // Convert "2026-02-27" -> "Feb 27, 2026"
+    // Convert "2026-02-27" -> "Friday, Feb 27, 2026"
     const m = dateStr.match(/(\d{4})-(\d{2})-(\d{2})/);
     if (!m) return dateStr;
     const d = new Date(parseInt(m[1]), parseInt(m[2]) - 1, parseInt(m[3]));
     if (isNaN(d)) return dateStr;
-    return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    return d.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric', year: 'numeric' });
 }
 
 function friendlyFileName(name) {
@@ -2339,7 +2334,11 @@ document.addEventListener('DOMContentLoaded', async () => {
     const now = new Date();
     const startOfYear = new Date(now.getFullYear(), 0, 0);
     const julianDay = Math.floor((now - startOfYear) / 86400000);
-    const weekNum = Math.ceil(julianDay / 7);
+    // ISO week number: weeks run Mon–Sun
+    const d = new Date(Date.UTC(now.getFullYear(), now.getMonth(), now.getDate()));
+    d.setUTCDate(d.getUTCDate() + 4 - (d.getUTCDay() || 7));
+    const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+    const weekNum = Math.ceil((((d - yearStart) / 86400000) + 1) / 7);
     document.getElementById('julian-day').innerHTML =
         `<span class="julian-label">Day</span> ${julianDay}&nbsp;&nbsp;<span class="julian-label">Week</span> ${weekNum}`;
     const weekColors = ['week-red', 'week-blue', 'week-yellow', 'week-green'];

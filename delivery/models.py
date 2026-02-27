@@ -78,6 +78,7 @@ class LineItem(LineItemBase):
     received_status: ReceivedStatus = ReceivedStatus.PENDING
     received_notes: Optional[str] = None
     checked_in_at: Optional[datetime] = None
+    pull_submitted: bool = False
     pull_confirmed: bool = False
 
 
