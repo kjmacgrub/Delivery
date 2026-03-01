@@ -253,6 +253,7 @@ function applyDeliveryUpdate(data) {
 
     // Replace delivery data (client-side state like sort/filter/expanded is preserved)
     currentDelivery = data;
+    applyWeekColor(data.delivery_date);
     updateLiveStatusBtn();
 
     // Re-render whichever view is active
@@ -726,6 +727,7 @@ async function openDelivery(id) {
     try {
         const delivery = await apiGet(`/deliveries/${id}`);
         currentDelivery = delivery;
+        applyWeekColor(delivery.delivery_date);
         completionShown = false;
         updateLiveStatusBtn();
         await Promise.all([
@@ -2329,20 +2331,28 @@ function closeVersionModal() {
     document.getElementById('version-modal').classList.add('hidden');
 }
 
-// ---- Init ----
-document.addEventListener('DOMContentLoaded', async () => {
-    const now = new Date();
-    const startOfYear = new Date(now.getFullYear(), 0, 0);
-    const julianDay = Math.floor((now - startOfYear) / 86400000);
+// ---- Week color ----
+function applyWeekColor(dateStr) {
+    // dateStr: 'YYYY-MM-DD', or omit to use today
+    const base = dateStr ? new Date(dateStr + 'T00:00:00') : new Date();
+    const startOfYear = new Date(base.getFullYear(), 0, 0);
+    const julianDay = Math.floor((base - startOfYear) / 86400000);
     // ISO week number: weeks run Mon–Sun
-    const d = new Date(Date.UTC(now.getFullYear(), now.getMonth(), now.getDate()));
+    const d = new Date(Date.UTC(base.getFullYear(), base.getMonth(), base.getDate()));
     d.setUTCDate(d.getUTCDate() + 4 - (d.getUTCDay() || 7));
     const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
     const weekNum = Math.ceil((((d - yearStart) / 86400000) + 1) / 7);
     document.getElementById('julian-day').innerHTML =
         `<span class="julian-label">Day</span> ${julianDay}&nbsp;&nbsp;<span class="julian-label">Week</span> ${weekNum}`;
     const weekColors = ['week-red', 'week-blue', 'week-yellow', 'week-green'];
-    document.getElementById('app-header').classList.add(weekColors[(weekNum - 1) % 4]);
+    const header = document.getElementById('app-header');
+    header.classList.remove(...weekColors);
+    header.classList.add(weekColors[(weekNum - 1) % 4]);
+}
+
+// ---- Init ----
+document.addEventListener('DOMContentLoaded', async () => {
+    applyWeekColor();
 
     const currentVersion = VERSION_HISTORY[0].version;
     let commitHash = 'dev';
