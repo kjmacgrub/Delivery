@@ -1093,19 +1093,11 @@ function renderMultiSupplierRow(items) {
         const pullQty = item.pull_quantity != null
             ? `<span class="pull-qty ${pullConfirmedClass}" onclick="event.stopPropagation(); openPullPopup(event, ${item.supplierIdx}, ${item.itemIdx})">(${item.pull_quantity})</span> `
             : '';
-        const checkIcon = isPending
-            ? '<div class="compact-check pending"></div>'
-            : `<div class="compact-check done">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
-                    <polyline points="20,6 9,17 4,12"/>
-                </svg>
-               </div>`;
         return `
         <div class="compact-row supplier-sub-row ${statusClass}"
              onclick="openCheckInModalFlat(${item.supplierIdx}, ${item.itemIdx})">
             <div class="compact-qty">${pullQty}${item.quantity_expected}</div>
             <div class="compact-supplier sub-row-supplier" onclick="event.stopPropagation(); filterBySupplier(${item.supplierIdx})">${item.supplierName}</div>
-            ${checkIcon}
         </div>`;
     }).join('');
 
@@ -1168,7 +1160,6 @@ function renderSupplierAccordion(container, flatItems) {
 
         const statusClass = allDone ? 'supplier-complete' : '';
         const chevronClass = isExpanded ? 'accordion-chevron expanded' : 'accordion-chevron';
-        const pct = expCases > 0 ? Math.round((rcvCases / expCases) * 100) : 0;
 
         // Receive All / Unreceive All button (only when expanded)
         let receiveBtn = '';
@@ -1182,16 +1173,7 @@ function renderSupplierAccordion(container, flatItems) {
         html += `
         <div class="supplier-accordion-header ${statusClass}" onclick="toggleSupplierAccordion(${sIdx})">
             <span class="${chevronClass}">&#9654;</span>
-            <span class="accordion-supplier-name">${supplier.supplier_name} <span class="accordion-case-count">${fmtNum(expCases)}</span></span>
-            <span class="accordion-focus" onclick="event.stopPropagation(); filterBySupplier(${sIdx})" title="Focus on ${supplier.supplier_name}">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M9 18l6-6-6-6"/><path d="M16 18l6-6-6-6"/></svg>
-            </span>
-            <span class="accordion-progress">
-                <span class="accordion-progress-track">
-                    <span class="accordion-progress-fill" style="width: ${pct}%"></span>
-                </span>
-                <span class="accordion-progress-label">${fmtNum(rcvCases)}/${fmtNum(expCases)}</span>
-            </span>
+            <span class="accordion-supplier-name">${supplier.supplier_name} <span class="accordion-case-count"><span class="count-green">${fmtNum(rcvCases)}</span>/${fmtNum(expCases)}</span></span>
             ${receiveBtn ? `<span class="accordion-receive-all">${receiveBtn}</span>` : ''}
         </div>`;
 
@@ -1989,9 +1971,10 @@ function casesExpected(items) {
 
 function progressBar(done, total) {
     const pct = total > 0 ? Math.round((done / total) * 100) : 0;
+    const countClickable = done > 0;
     return `
     <div class="progress-bar-summary">
-        <div class="progress-bar-count"><span class="${done > 0 ? 'count-green' : ''}">${fmtNum(done)}</span> / ${fmtNum(total)}</div>
+        <div class="progress-bar-count${countClickable ? ' progress-bar-count-toggle' : ''}"${countClickable ? ` onclick="setShowReceived(${!showReceived})"` : ''}><span class="${done > 0 ? 'count-green' : ''}">${fmtNum(done)}</span> / ${fmtNum(total)}</div>
         <div class="progress-bar-label">
             <span class="progress-bar-title ${showReceived ? 'progress-title-received' : ''}" onclick="setShowReceived(${!showReceived})">Received</span>
             <span class="progress-bar-title ${showReceived ? '' : 'progress-title-expected'}" onclick="setShowReceived(${!showReceived})">Expected</span>

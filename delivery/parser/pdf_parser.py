@@ -340,8 +340,12 @@ class PDFWorksheetParser(WorksheetParser):
                 ))
                 continue
 
-            # Standard line item
-            im = self.CATEGORY_PATTERN.match(text)
+            # Standard line item — also try to recover mangled "10 VEGItem" lines
+            # where PDF dropped the space between category code and description
+            fixed_text = self.CATEGORY_CONCAT_FIX.sub(r'\1\2 \3', text)
+            im = self.CATEGORY_PATTERN.match(fixed_text)
+            if im:
+                text = fixed_text
             if im:
                 qty = int(im.group(1))
                 cat = im.group(2)
@@ -436,7 +440,13 @@ class PDFWorksheetParser(WorksheetParser):
 
     # Pattern: "Supplier Name 123" — text ending with a case count
     SUPPLIER_HEADER_PATTERN = re.compile(
-        r'^([A-Z][A-Za-z\'\.\-\&\/ ]+?)\s+(\d+)\s*$'
+        r'^([A-Z][A-Za-z\'\.\-\&\/\, ]+?)\s+(\d+)\s*$'
+    )
+
+    # Pattern to recover mangled category lines where PDF dropped a space:
+    # e.g. "10 VEGBrussels" → "10 VEG Brussels"
+    CATEGORY_CONCAT_FIX = re.compile(
+        r'^(\d+\s+)(' + '|'.join(PRODUCT_CATEGORIES) + r')([A-Z])'
     )
 
     def _match_supplier(self, text: str) -> Optional[Tuple[str, int]]:

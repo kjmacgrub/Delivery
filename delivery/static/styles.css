@@ -607,10 +607,13 @@ html, body {
     color: var(--text);
     text-align: center;
     margin-bottom: 4px;
+}
+
+.progress-bar-count-toggle {
     cursor: pointer;
 }
 
-.progress-bar-count .count-green {
+.count-green {
     color: var(--success);
 }
 
@@ -1040,7 +1043,7 @@ html, body {
 }
 
 .compact-name {
-    flex: 1;
+    flex: 0 1 auto;
     font-size: 14px;
     font-weight: 500;
     min-width: 0;
@@ -1077,7 +1080,7 @@ html, body {
 .sub-row-supplier {
     position: static;
     transform: none;
-    margin-left: auto;
+    margin-left: 8px;
 }
 
 .hc-strip {
@@ -1107,7 +1110,7 @@ html, body {
     cursor: pointer;
     -webkit-tap-highlight-color: transparent;
     flex-shrink: 0;
-    margin-left: auto;
+    margin-left: 8px;
 }
 
 .compact-supplier:active {
@@ -1115,29 +1118,6 @@ html, body {
 }
 
 
-.compact-check {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: 24px;
-    height: 24px;
-    border-radius: 50%;
-    flex-shrink: 0;
-}
-
-.compact-check.pending {
-    border: 2px solid var(--border);
-}
-
-.compact-check.done {
-    background: var(--success);
-    color: white;
-}
-
-.compact-check svg {
-    width: 14px;
-    height: 14px;
-}
 
 /* Supplier filter bar (shown when filtering by one supplier) */
 .supplier-filter-bar {
@@ -2004,7 +1984,7 @@ textarea {
 }
 
 .accordion-case-count {
-    font-size: 12px;
+    font-size: 17px;
     font-weight: 500;
     color: var(--text-secondary);
 }
