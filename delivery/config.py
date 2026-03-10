@@ -58,6 +58,7 @@ PRODUCT_CATEGORIES = [
     "APPLES",
     "NUTS",
     "FLOWERS",
+    "PLANTS",
 ]
 
 # Known brands that appear embedded in product descriptions

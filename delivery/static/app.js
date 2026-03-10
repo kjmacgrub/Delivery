@@ -1063,8 +1063,8 @@ function renderCompactRow(item, showSupplier, crossMap = null) {
          onclick="openCheckInModalFlat(${item.supplierIdx}, ${item.itemIdx})">
         <div class="compact-qty">${pullQty}${item.quantity_expected}</div>
         <div class="compact-name">${item.raw_description}</div>
-        ${hcStrip}
         ${supplierChip}
+        ${hcStrip}
     </div>${alsoRow}`;
 }
 

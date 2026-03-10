@@ -1046,7 +1046,7 @@ html, body {
     flex: 0 1 auto;
     font-size: 14px;
     font-weight: 500;
-    min-width: 0;
+    min-width: 240px;
     overflow-wrap: break-word;
     word-break: break-word;
 }
@@ -1106,6 +1106,7 @@ html, body {
     color: var(--primary);
     white-space: nowrap;
     padding: 4px 6px;
+    min-width: 80px;
     border-radius: 4px;
     cursor: pointer;
     -webkit-tap-highlight-color: transparent;

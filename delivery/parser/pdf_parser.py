@@ -371,6 +371,12 @@ class PDFWorksheetParser(WorksheetParser):
                 # Skip continuation if it's just "Total" or a bare number
                 if re.match(r'^(Total|[\d,]+\s*Total|Total\s+[\d,]+)$', cleaned, re.I):
                     continue
+                # Skip pack-size annotations like ".75oz organic"
+                if re.match(r'^\.\d', cleaned):
+                    continue
+                # Skip pack-count/ratio lines like "3/4/2" or "1/2"
+                if re.match(r'^\d+/\d+', cleaned):
+                    continue
                 prev = current_block.items[-1]
                 prev.raw_description += " " + cleaned
                 prev.parsed = self.product_parser.parse(prev.raw_description)
