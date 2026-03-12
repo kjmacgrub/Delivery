@@ -528,6 +528,20 @@ class DeliveryService:
         self._db.collection(self.REPORTS_COLLECTION).document(report_id).delete()
         return True
 
+    def wipe_all(self) -> dict:
+        """Delete ALL deliveries and reports. Nuclear option — no recovery."""
+        delivery_count = 0
+        report_count = 0
+        if self._use_firestore:
+            for doc in self._db.collection(self.COLLECTION).stream():
+                doc.reference.delete()
+                delivery_count += 1
+            for doc in self._db.collection(self.REPORTS_COLLECTION).stream():
+                doc.reference.delete()
+                report_count += 1
+        self._cache.clear()
+        return {"deliveries_deleted": delivery_count, "reports_deleted": report_count}
+
     def _raw_to_delivery(self, raw: dict) -> Delivery:
         """Convert raw parser output dict to Delivery model."""
         header = raw['header']

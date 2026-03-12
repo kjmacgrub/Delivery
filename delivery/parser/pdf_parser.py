@@ -377,6 +377,9 @@ class PDFWorksheetParser(WorksheetParser):
                 # Skip pack-count/ratio lines like "3/4/2" or "1/2"
                 if re.match(r'^\d+/\d+', cleaned):
                     continue
+                # Skip day/week metadata fragments like "ay 72 Week 11"
+                if re.search(r'\bWeek\s+\d+\b', cleaned) or re.search(r'\bDay\s+\d+\b', cleaned):
+                    continue
                 prev = current_block.items[-1]
                 prev.raw_description += " " + cleaned
                 prev.parsed = self.product_parser.parse(prev.raw_description)
@@ -426,6 +429,11 @@ class PDFWorksheetParser(WorksheetParser):
         if re.match(r'^\d{1,2}/\d{1,2}/\d{4}$', t):
             return True
         if re.search(r'Day\s+\d+\s+Week\s+\d+', t):
+            return True
+        # Fragments of day/week metadata (e.g. "ay 72 Week 11" where "D" was cut off)
+        if re.search(r'\bWeek\s+\d+\b', t):
+            return True
+        if re.search(r'\bDay\s+\d+\b', t):
             return True
         if 'Delivery List' in t:
             return True

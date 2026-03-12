@@ -988,6 +988,13 @@ html, body {
     background: #c8e6c9;
 }
 
+.pull-qty.pull-qty-empty {
+    color: #d0d0d0;
+    font-size: 11px;
+    font-style: italic;
+    font-weight: 400;
+}
+
 /* Pull confirmation checkbox in modal — floats above + button, out of flow */
 .pull-btn-col {
     position: relative;
@@ -1065,16 +1072,7 @@ html, body {
 }
 
 .supplier-sub-row .compact-qty {
-    position: static;
     color: var(--text-secondary);
-}
-
-.supplier-sub-row .pull-qty {
-    position: absolute;
-    left: 8px;
-    right: auto;
-    top: 50%;
-    transform: translateY(-50%);
 }
 
 .sub-row-supplier {
@@ -2518,6 +2516,40 @@ textarea {
     flex-shrink: 0;
 }
 
+.import-action-btn {
+    margin-left: auto;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--primary);
+    flex-shrink: 0;
+}
+
+.import-row-done {
+    cursor: default;
+    opacity: 0.6;
+}
+
+.import-row-done:active {
+    background: var(--surface);
+}
+
+.import-status-ok {
+    margin-left: auto;
+    font-size: 13px;
+    font-weight: 600;
+    color: #10b981;
+    flex-shrink: 0;
+}
+
+.import-group-warn {
+    font-size: 11px;
+    font-weight: 600;
+    color: #f59e0b;
+    margin-left: 8px;
+    text-transform: none;
+    letter-spacing: 0;
+}
+
 /* ---- Location Zone Accordion ---- */
 .location-zone-header {
     display: flex;
@@ -2574,6 +2606,19 @@ textarea {
     align-items: center;
     gap: 10px;
     min-width: 230px;
+}
+
+.pull-popup-title {
+    font-size: 15px;
+    font-weight: 700;
+    letter-spacing: 0.01em;
+    color: #fff;
+    background: #dc2626;
+    align-self: stretch;
+    text-align: center;
+    padding: 10px 20px;
+    margin: -16px -20px 4px;
+    border-radius: var(--radius) var(--radius) 0 0;
 }
 
 .pull-popup-name {

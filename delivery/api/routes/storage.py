@@ -113,6 +113,16 @@ async def get_latest_file(request: Request):
     return {"file": latest}
 
 
+@router.get("/high-counts/dates")
+async def list_high_count_dates(request: Request):
+    """List all dates that have stored high count data."""
+    db = request.app.state.delivery_service._db
+    if not db:
+        return {"dates": []}
+    docs = db.collection('high_counts').stream()
+    return {"dates": [doc.id for doc in docs]}
+
+
 @router.get("/high-counts/{date_str}")
 async def get_high_count(date_str: str, request: Request):
     """Get high count forecast data for a specific date."""
@@ -248,6 +258,9 @@ async def scan_downloads():
         "inventory": lambda n: "inventory" in n and n.endswith(".csv"),
     }
 
+    import re
+    from datetime import datetime
+
     result = {}
     for type_key, matcher in patterns.items():
         candidates = []
@@ -260,9 +273,15 @@ async def scan_downloads():
             pass
         if candidates:
             best = max(candidates, key=lambda x: x["mtime"])
-            from datetime import datetime
             dt = datetime.fromtimestamp(best["mtime"], tz=timezone.utc)
-            result[type_key] = {"name": best["name"], "modified": dt.isoformat()}
+            # Extract delivery date from filename (e.g. "delivery_worksheet_fri_2026-03-13.pdf")
+            date_match = re.search(r'(\d{4}-\d{2}-\d{2})', best["name"])
+            delivery_date = date_match.group(1) if date_match else None
+            result[type_key] = {
+                "name": best["name"],
+                "modified": dt.isoformat(),
+                "delivery_date": delivery_date,
+            }
         else:
             result[type_key] = None
 

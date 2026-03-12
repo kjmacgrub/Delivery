@@ -197,6 +197,24 @@ function updateLiveStatusBtn() {
 function openAdminModal() {
     document.getElementById('admin-modal').classList.remove('hidden');
     loadFileStatusPanel();
+    const isIpad = /iPad/.test(navigator.userAgent) ||
+        (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+    document.getElementById('nuclear-section').style.display = isIpad ? 'none' : 'block';
+}
+
+async function nuclearWipe() {
+    if (!confirm('☢️ WIPE ALL DATA?\n\nThis will permanently delete ALL deliveries and reports. There is no undo.')) return;
+    if (!confirm('Second confirmation: delete everything?')) return;
+    closeAdminModal();
+    try {
+        const resp = await fetch(`${API}/deliveries`, { method: 'DELETE' });
+        if (!resp.ok) throw new Error(await resp.text());
+        const data = await resp.json();
+        showToast(`Wiped ${data.deliveries_deleted} deliveries, ${data.reports_deleted} reports`, 'success');
+        loadDeliveries();
+    } catch (e) {
+        showToast('Wipe failed: ' + e.message, 'error');
+    }
 }
 
 function closeAdminModal() {
@@ -256,16 +274,25 @@ async function loadFileStatusPanel() {
             const localMs = localFile ? new Date(localFile.modified).getTime() : 0;
             const localIsNewer = localFile && localMs > existingMs;
 
-            const uploadedAt = latest && latest.updated
-                ? `${fmtDate(latest.updated)} ${fmtTime(latest.updated)}`
+            // Extract delivery date from the Storage filename if present
+            const storageDateMatch = latest && latest.name ? latest.name.match(/(\d{4}-\d{2}-\d{2})/) : null;
+            const storageDeliveryDate = storageDateMatch ? storageDateMatch[1] : null;
+            const uploadedAt = latest
+                ? storageDeliveryDate
+                    ? `<span style="color:#3b82f6;font-weight:700">Current: </span>${fmtDate(storageDeliveryDate + 'T12:00:00')}`
+                    : `<span style="color:#3b82f6;font-weight:700">Current: </span>${fmtDate(latest.updated)} ${fmtTime(latest.updated)}`
                 : 'Not uploaded';
 
             // Build the info lines
             let infoHtml = `<div style="font-size:12px;color:#64748b">${uploadedAt}</div>`;
             if (localFile) {
+                // Show the delivery date from the filename if available, else file modified time
+                const localDateDisplay = localFile.delivery_date
+                    ? fmtDate(localFile.delivery_date + 'T12:00:00')
+                    : `${fmtDate(localFile.modified)} ${fmtTime(localFile.modified)}`;
                 const localLabel = localIsNewer
-                    ? `<span style="color:#10b981;font-weight:700">Available: </span>${fmtDate(localFile.modified)} ${fmtTime(localFile.modified)}`
-                    : `<span style="color:#94a3b8">In Downloads: </span>${fmtDate(localFile.modified)} ${fmtTime(localFile.modified)} <span style="color:#94a3b8">(same or older)</span>`;
+                    ? `<span style="color:#10b981;font-weight:700">Available: </span>${localDateDisplay}`
+                    : `<span style="color:#94a3b8">In Downloads: </span>${localDateDisplay} <span style="color:#94a3b8">(same or older)</span>`;
                 infoHtml += `<div style="font-size:11px;margin-top:2px">${localLabel}</div>`;
             }
 
@@ -519,157 +546,159 @@ async function deleteDelivery(id, name) {
 }
 
 // ---- Adjustment Reports ----
+let cachedDeliveryList = [];
+
 async function showReports() {
     showView('reports');
+    const picker = document.getElementById('delivery-report-picker');
     const container = document.getElementById('report-list');
-    container.innerHTML = '<div class="loading">Loading reports...</div>';
+    container.innerHTML = '<div class="loading">Loading...</div>';
+    picker.innerHTML = '';
 
     try {
-        const data = await apiGet('/reports');
-        if (!data.reports || !data.reports.length) {
-            container.innerHTML = `
-                <div class="empty-state">
-                    <p>No reports yet</p>
-                    <p class="subtitle">Adjustment reports are created when deliveries are completed</p>
-                </div>`;
+        const data = await apiGet('/deliveries');
+        const deliveries = (data.deliveries || []).sort((a, b) => {
+            const da = a.delivery_date || '';
+            const db = b.delivery_date || '';
+            return da < db ? 1 : da > db ? -1 : 0;
+        });
+        cachedDeliveryList = deliveries;
+
+        if (!deliveries.length) {
+            container.innerHTML = `<div class="empty-state"><p>No deliveries yet</p></div>`;
             return;
         }
-        renderReportList(data.reports);
+
+        // Build picker
+        picker.innerHTML = `<select id="delivery-report-select" onchange="loadDeliveryReport(this.value)"
+            style="width:100%;padding:8px 10px;font-size:15px;border:1px solid var(--border);border-radius:8px;background:var(--surface);color:var(--text);margin-bottom:4px">
+            ${deliveries.map(d => {
+                const label = `${d.day_of_week} ${d.delivery_date ? formatDate(d.delivery_date) : ''} — ${d.status}`;
+                return `<option value="${d.id}">${label}</option>`;
+            }).join('')}
+        </select>`;
+
+        // Auto-load the most recent
+        loadDeliveryReport(deliveries[0].id);
     } catch (e) {
-        container.innerHTML = `<div class="empty-state"><p>Failed to load reports</p></div>`;
-        showToast('Failed to load reports', 'error');
+        container.innerHTML = `<div class="empty-state"><p>Failed to load deliveries</p></div>`;
+        showToast('Failed to load deliveries', 'error');
     }
 }
 
-let cachedReports = [];
-
-function renderReportList(reports) {
-    cachedReports = reports;
+async function loadDeliveryReport(deliveryId) {
     const container = document.getElementById('report-list');
-    container.innerHTML = reports.map((r, idx) => {
-        const completedDate = r.completed_at ? new Date(r.completed_at).toLocaleDateString('en-US', {
-            month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit'
-        }) : '';
-        const deliveryDate = r.delivery_date ? formatDate(r.delivery_date) : '';
-        const hasExceptions = r.total_exceptions > 0;
-        const exceptionBadge = hasExceptions
-            ? `<span class="report-exception-count">${r.total_exceptions} adjustment${r.total_exceptions !== 1 ? 's' : ''}</span>`
-            : `<span class="report-no-exceptions">No adjustments</span>`;
+    container.innerHTML = '<div class="loading">Loading report...</div>';
+    try {
+        const delivery = await apiGet(`/deliveries/${deliveryId}`);
+        renderDeliveryReport(delivery);
+    } catch (e) {
+        container.innerHTML = `<div class="empty-state"><p>Failed to load delivery</p></div>`;
+    }
+}
 
-        const adjItems = (r.exception_items || []).map(i => ({
-            name: i.raw_description, supplier: i.supplier_name, status: i.received_status,
+function renderDeliveryReport(delivery) {
+    const container = document.getElementById('report-list');
+    const allItems = (delivery.suppliers || []).flatMap(s =>
+        (s.items || []).map(i => ({ ...i, supplierName: s.supplier_name }))
+    );
+
+    // Supplier totals
+    const supplierRows = (delivery.suppliers || []).map(s => {
+        const rcv = casesReceived(s.items || []);
+        const exp = casesExpected(s.items || []);
+        const pct = exp > 0 ? Math.round(rcv / exp * 100) : 0;
+        const color = rcv >= exp ? 'var(--success-dark)' : rcv > 0 ? '#f59e0b' : 'var(--text-secondary)';
+        return `<div class="report-item-row">
+            <div class="report-item-info">
+                <span class="report-item-name">${s.supplier_name}</span>
+            </div>
+            <span class="report-item-cases" style="color:${color};font-weight:700">${fmtNum(rcv)} / ${fmtNum(exp)}</span>
+        </div>`;
+    }).join('');
+
+    // Adjustments (non-ok, non-pending)
+    const adjItems = allItems
+        .filter(i => i.received_status === 'short' || i.received_status === 'over' || i.received_status === 'return')
+        .map(i => ({
+            name: i.raw_description, supplier: i.supplierName, status: i.received_status,
             diff: i.received_status === 'short' ? Math.max(0, (i.quantity_expected || 0) - (i.quantity_received || 0))
                 : i.received_status === 'over' ? Math.max(0, (i.quantity_received || 0) - (i.quantity_expected || 0))
                 : (i.quantity_expected || 0),
         }));
-        const normPulls = (r.pull_items || []).map(i => ({
-            name: i.raw_description, supplier: i.supplier_name,
+
+    // Pulls
+    const pullItems = allItems
+        .filter(i => (i.pull_quantity || 0) > 0)
+        .map(i => ({
+            name: i.raw_description, supplier: i.supplierName,
             cases: i.pull_quantity, confirmed: i.pull_confirmed,
         }));
 
-        return `
-        <div class="card report-card" onclick="toggleReportDetail(${idx})">
+    const rcvTotal = casesReceived(allItems);
+    const expTotal = casesExpected(allItems);
+    const statusChip = `<span style="font-size:12px;font-weight:600;padding:3px 8px;border-radius:10px;background:${delivery.status === 'completed' ? '#dcfce7' : '#fef9c3'};color:${delivery.status === 'completed' ? '#166534' : '#854d0e'}">${delivery.status}</span>`;
+
+    container.innerHTML = `
+        <div class="card report-card">
             <div class="card-header">
                 <div>
-                    <div class="card-title">${r.day_of_week} ${deliveryDate}</div>
-                    <div class="card-subtitle">Completed ${completedDate}</div>
+                    <div class="card-title">${delivery.day_of_week || ''} ${delivery.delivery_date ? formatDate(delivery.delivery_date) : ''}</div>
+                    <div class="card-subtitle">${delivery.source_filename || ''}</div>
                 </div>
-                <div class="card-header-right">
-                    ${exceptionBadge}
-                </div>
+                <div class="card-header-right">${statusChip}</div>
             </div>
-            <div class="card-meta">
-                <span class="card-meta-item">${r.total_items} items</span>
-                <span class="card-meta-item">${r.source_filename}</span>
-            </div>
-            <div class="report-detail" id="report-detail-${idx}" style="display:none;">
-                <div class="report-section-header">Returns and Adjustments</div>
+            <div style="margin-top:12px">
+                <div class="report-section-header">Received by Supplier</div>
+                <div style="font-size:12px;color:var(--text-secondary);margin-bottom:6px;text-align:right;padding-right:4px">received / expected</div>
+                ${supplierRows || '<div class="report-section-empty">No suppliers</div>'}
+                <div class="report-section-header" style="margin-top:12px">Returns and Adjustments</div>
                 ${buildAdjustmentStatsHtml(adjItems)}
-                <div class="report-section-header">Pulls</div>
-                ${buildPullStatsHtml(normPulls)}
-                <button class="report-delete-btn" onclick="event.stopPropagation(); deleteReport(${idx})">Delete Report</button>
+                <div class="report-section-header" style="margin-top:12px">Pulls</div>
+                ${buildPullStatsHtml(pullItems)}
             </div>
         </div>`;
-    }).join('');
 }
 
-function toggleReportDetail(idx) {
-    const detail = document.getElementById(`report-detail-${idx}`);
-    if (detail) {
-        detail.style.display = detail.style.display === 'none' ? 'block' : 'none';
-    }
-}
-
-async function showReportById(reportId) {
-    showView('reports');
-    const container = document.getElementById('report-list');
-    container.innerHTML = '<div class="loading">Loading report...</div>';
-
-    try {
-        const data = await apiGet('/reports');
-        if (!data.reports || !data.reports.length) {
-            container.innerHTML = `<div class="empty-state"><p>Report not found</p></div>`;
-            return;
-        }
-        renderReportList(data.reports);
-        // Find and auto-expand the matching report
-        const idx = data.reports.findIndex(r => r.id === reportId);
-        if (idx >= 0) {
-            const detail = document.getElementById(`report-detail-${idx}`);
-            if (detail) detail.style.display = 'block';
-        }
-    } catch (e) {
-        container.innerHTML = `<div class="empty-state"><p>Failed to load report</p></div>`;
-        showToast('Failed to load report', 'error');
-    }
-}
-
-async function deleteReport(idx) {
-    const report = cachedReports[idx];
-    if (!report) return;
-    const label = `${report.day_of_week} ${report.delivery_date || ''}`.trim();
-    if (!confirm(`Delete report for "${label}"?`)) return;
-
-    try {
-        await apiDelete(`/reports/${report.id}`);
-        cachedReports.splice(idx, 1);
-        if (cachedReports.length === 0) {
-            document.getElementById('report-list').innerHTML = `
-                <div class="empty-state">
-                    <p>No reports yet</p>
-                    <p class="subtitle">Adjustment reports are created when deliveries are completed</p>
-                </div>`;
-        } else {
-            renderReportList(cachedReports);
-        }
-        showToast('Report deleted', 'success');
-    } catch (e) {
-        showToast('Failed to delete report', 'error');
-    }
-}
-
-// ---- Storage Files ----
+// ---- Import Screen ----
 async function showStorageFiles() {
     showView('storage');
     const container = document.getElementById('storage-list');
-    container.innerHTML = '<div class="loading">Loading files from Firebase Storage...</div>';
+    container.innerHTML = '<div class="loading">Loading...</div>';
 
     try {
-        const data = await apiGet('/storage/files');
-        if (!data.files || !data.files.length) {
+        const [storageData, deliveriesData, inventoryLatest, hcDates] = await Promise.all([
+            apiGet('/storage/files'),
+            apiGet('/deliveries'),
+            apiGet('/inventory/latest').catch(() => ({ date: null })),
+            apiGet('/high-counts/dates').catch(() => ({ dates: [] })),
+        ]);
+
+        const storageFiles = storageData.files || [];
+
+        if (!storageFiles.length) {
             container.innerHTML = `
                 <div class="empty-state">
-                    <p>No files in incoming folder</p>
-                    <p class="subtitle">Upload PDF/CSV files to Firebase Storage incoming folder</p>
+                    <p>No files uploaded yet</p>
+                    <p class="subtitle">Use the menu ☰ to upload files from your device</p>
                 </div>`;
             return;
         }
 
-        // Categorize files by type and date
-        const dateGroups = new Map(); // dateStr -> { delivery: file|null, highCount: file|null }
+        // Sets of already-imported dates for comparison
+        const importedDeliveryDates = new Set(
+            (deliveriesData.deliveries || [])
+                .filter(d => d.delivery_date)
+                .map(d => d.delivery_date)
+        );
+        const importedInventoryDate = inventoryLatest.date || null;
+        const importedHighCountDates = new Set(hcDates.dates || []);
+
+        // Categorize storage files
+        const dateGroups = new Map();
         let inventoryFile = null;
 
-        data.files.forEach(f => {
+        storageFiles.forEach(f => {
             const lname = f.name.toLowerCase();
             const dateMatch = f.name.match(/(\d{4}-\d{2}-\d{2})/);
             const dateStr = dateMatch ? dateMatch[1] : null;
@@ -689,42 +718,82 @@ async function showStorageFiles() {
         [...dateGroups.keys()].sort().reverse().forEach(dateStr => {
             const g = dateGroups.get(dateStr);
             const dateLabel = friendlyDateStr(dateStr);
+            const deliveryImported = importedDeliveryDates.has(dateStr);
+            const highCountImported = importedHighCountDates.has(dateStr);
+            const incomplete = !g.delivery || !g.highCount;
+            const warningHtml = incomplete
+                ? `<span class="import-group-warn">⚠ missing ${!g.delivery ? 'delivery' : 'high count'}</span>`
+                : '';
+
             html += `<div class="import-group">
-                <div class="import-group-title">${dateLabel}</div>`;
+                <div class="import-group-title">${dateLabel}${warningHtml}</div>`;
+
             if (g.delivery) {
-                html += `<div class="import-file-row" onclick="parseStorageFile('${g.delivery.name}')">
-                    <span class="import-type-chip import-type-delivery">Delivery</span>
-                    <span class="import-parse-btn">Parse</span>
-                </div>`;
+                if (deliveryImported) {
+                    html += `<div class="import-file-row import-row-done">
+                        <span class="import-type-chip import-type-delivery">Delivery</span>
+                        <span style="flex:1"></span>
+                        <span class="import-status-ok">✓ Imported</span>
+                    </div>`;
+                } else {
+                    html += `<div class="import-file-row" onclick="importDelivery('${g.delivery.name}')">
+                        <span class="import-type-chip import-type-delivery">Delivery</span>
+                        <span style="flex:1"></span>
+                        <span class="import-action-btn">Import</span>
+                    </div>`;
+                }
             } else {
                 html += `<div class="import-file-row import-row-missing">
                     <span class="import-type-chip import-type-missing">Delivery</span>
                     <span class="import-missing-text">Not uploaded</span>
                 </div>`;
             }
+
             if (g.highCount) {
-                html += `<div class="import-file-row" onclick="parseHighCountFile('${g.highCount.name}')">
-                    <span class="import-type-chip import-type-highcount">High Count</span>
-                    <span class="import-parse-btn">Parse</span>
-                </div>`;
+                if (highCountImported) {
+                    html += `<div class="import-file-row import-row-done">
+                        <span class="import-type-chip import-type-highcount">High Count</span>
+                        <span style="flex:1"></span>
+                        <span class="import-status-ok">✓ Imported</span>
+                    </div>`;
+                } else {
+                    html += `<div class="import-file-row" onclick="importHighCount('${g.highCount.name}')">
+                        <span class="import-type-chip import-type-highcount">High Count</span>
+                        <span style="flex:1"></span>
+                        <span class="import-action-btn">Import</span>
+                    </div>`;
+                }
             } else {
                 html += `<div class="import-file-row import-row-missing">
                     <span class="import-type-chip import-type-missing">High Count</span>
                     <span class="import-missing-text">Not uploaded</span>
                 </div>`;
             }
+
             html += `</div>`;
         });
 
-        // Inventory section
+        // Inventory — can be a different date than delivery
         html += `<div class="import-group">
             <div class="import-group-title">Inventory</div>`;
         if (inventoryFile) {
-            html += `<div class="import-file-row" onclick="parseInventoryFile('${inventoryFile.name}')">
-                <span class="import-type-chip import-type-inventory">Inventory</span>
-                <span class="import-file-date">${friendlyFileName(inventoryFile.name)}</span>
-                <span class="import-parse-btn">Parse</span>
-            </div>`;
+            const invMatch = inventoryFile.name.match(/(\d{4}-\d{2}-\d{2})/);
+            const invDateStr = invMatch ? invMatch[1] : null;
+            const alreadyImported = invDateStr && invDateStr === importedInventoryDate;
+            const invDateLabel = invDateStr ? friendlyDateStr(invDateStr) : '—';
+            if (alreadyImported) {
+                html += `<div class="import-file-row import-row-done">
+                    <span class="import-type-chip import-type-inventory">Inventory</span>
+                    <span class="import-file-date">${invDateLabel}</span>
+                    <span class="import-status-ok">✓ Imported</span>
+                </div>`;
+            } else {
+                html += `<div class="import-file-row" onclick="importInventory('${inventoryFile.name}')">
+                    <span class="import-type-chip import-type-inventory">Inventory</span>
+                    <span class="import-file-date">${invDateLabel}</span>
+                    <span class="import-action-btn">Import</span>
+                </div>`;
+            }
         } else {
             html += `<div class="import-file-row import-row-missing">
                 <span class="import-type-chip import-type-missing">Inventory</span>
@@ -737,71 +806,67 @@ async function showStorageFiles() {
     } catch (e) {
         container.innerHTML = `
             <div class="empty-state">
-                <p>Could not connect to Firebase Storage</p>
+                <p>Could not load import data</p>
                 <p class="subtitle">${e.message}</p>
             </div>`;
     }
 }
 
-async function parseStorageFile(fileName) {
-    showToast('Parsing file...', 'info');
+async function importDelivery(fileName) {
+    showToast('Importing delivery...', 'info');
     try {
         const res = await fetch(API + `/storage/files/${encodeURIComponent(fileName)}/parse`, { method: 'POST' });
         if (!res.ok) {
             const err = await res.json().catch(() => null);
-            const msg = err && err.detail ? err.detail : 'Failed to parse file';
-            showToast(msg, 'error');
+            showToast(err && err.detail ? err.detail : 'Import failed', 'error');
             return;
         }
         const data = await res.json();
-        showToast(`Parsed: ${data.supplier_count} suppliers, ${data.item_count} items`, 'success');
+        showToast(`Imported: ${data.supplier_count} suppliers, ${data.item_count} items`, 'success');
         openDelivery(data.delivery_id);
     } catch (e) {
-        showToast('Failed to parse file', 'error');
+        showToast('Import failed', 'error');
     }
 }
 
-async function parseInventoryFile(fileName) {
-    showToast('Parsing inventory...', 'info');
+async function importInventory(fileName) {
+    showToast('Importing inventory...', 'info');
     try {
         const res = await fetch(API + `/storage/files/${encodeURIComponent(fileName)}/parse-inventory`, { method: 'POST' });
         if (!res.ok) {
             const err = await res.json().catch(() => null);
-            const msg = err && err.detail ? err.detail : 'Failed to parse inventory';
-            showToast(msg, 'error');
+            showToast(err && err.detail ? err.detail : 'Import failed', 'error');
             return;
         }
         const data = await res.json();
-        // Reload inventory cache immediately
         inventoryData = null;
         await loadInventory();
-        // Re-render if currently showing location sort
         if (itemSortMode === 'location') renderItemList();
-        showToast(`Inventory saved: ${data.item_count} items (${data.date})`, 'success');
+        showToast(`Inventory imported: ${data.item_count} items (${data.date})`, 'success');
+        showStorageFiles(); // refresh to show ✓ Imported
     } catch (e) {
-        showToast('Failed to parse inventory', 'error');
+        showToast('Import failed', 'error');
     }
 }
 
-async function parseHighCountFile(fileName) {
-    showToast('Parsing high count...', 'info');
+async function importHighCount(fileName) {
+    showToast('Importing high count...', 'info');
     try {
         const res = await fetch(API + `/storage/files/${encodeURIComponent(fileName)}/parse-high-count`, { method: 'POST' });
         if (!res.ok) {
             const err = await res.json().catch(() => null);
-            const msg = err && err.detail ? err.detail : 'Failed to parse high count';
-            showToast(msg, 'error');
+            showToast(err && err.detail ? err.detail : 'Import failed', 'error');
             return;
         }
         const data = await res.json();
-        showToast(`High count saved: ${data.nonzero_count} items with forecast data (${data.date})`, 'success');
-        // Reload high count data if we're currently on a delivery with the same date
+        showToast(`High count imported: ${data.nonzero_count} items (${data.date})`, 'success');
         if (currentDelivery && currentDelivery.delivery_date === data.date) {
             await loadHighCount(data.date);
             renderDetail();
         }
+        showStorageFiles(); // refresh to show ✓ Imported
     } catch (e) {
-        showToast('Failed to parse high count', 'error');
+        showToast('Import failed', 'error');
     }
 }
 
@@ -1138,7 +1203,7 @@ function renderCompactRow(item, showSupplier, crossMap = null) {
     const pullConfirmedClass = item.pull_confirmed ? 'pull-confirmed' : '';
     const pullQty = item.pull_quantity != null
         ? `<span class="pull-qty ${pullConfirmedClass}" onclick="event.stopPropagation(); openPullPopup(event, ${item.supplierIdx}, ${item.itemIdx})">(${item.pull_quantity})</span> `
-        : '';
+        : `<span class="pull-qty pull-qty-empty" onclick="event.stopPropagation(); openPullPopup(event, ${item.supplierIdx}, ${item.itemIdx})">p</span> `;
 
     const supplierChip = showSupplier
         ? `<div class="compact-supplier" onclick="event.stopPropagation(); filterBySupplier(${item.supplierIdx})">${item.supplierAbbrev}</div>`
@@ -1155,7 +1220,7 @@ function renderCompactRow(item, showSupplier, crossMap = null) {
                 const ePullConfirmedClass = e.pull_confirmed ? 'pull-confirmed' : '';
                 const ePullQty = e.pull_quantity != null
                     ? `<span class="pull-qty ${ePullConfirmedClass}" onclick="event.stopPropagation(); openPullPopup(event, ${e.supplierIdx}, ${e.itemIdx})">(${e.pull_quantity})</span> `
-                    : '';
+                    : `<span class="pull-qty pull-qty-empty" onclick="event.stopPropagation(); openPullPopup(event, ${e.supplierIdx}, ${e.itemIdx})">p</span> `;
                 return `<div class="compact-row supplier-sub-row ${eStatus}" onclick="openCheckInModalFlat(${e.supplierIdx}, ${e.itemIdx})">
                     <div class="compact-qty">${ePullQty}${e.qty}</div>
                     <div class="compact-supplier sub-row-supplier" onclick="event.stopPropagation(); filterBySupplier(${e.supplierIdx})">${e.supplierName}</div>
@@ -1205,7 +1270,7 @@ function renderMultiSupplierRow(items) {
         const pullConfirmedClass = item.pull_confirmed ? 'pull-confirmed' : '';
         const pullQty = item.pull_quantity != null
             ? `<span class="pull-qty ${pullConfirmedClass}" onclick="event.stopPropagation(); openPullPopup(event, ${item.supplierIdx}, ${item.itemIdx})">(${item.pull_quantity})</span> `
-            : '';
+            : `<span class="pull-qty pull-qty-empty" onclick="event.stopPropagation(); openPullPopup(event, ${item.supplierIdx}, ${item.itemIdx})">p</span> `;
         return `
         <div class="compact-row supplier-sub-row ${statusClass}"
              onclick="openCheckInModalFlat(${item.supplierIdx}, ${item.itemIdx})">
@@ -1656,6 +1721,7 @@ async function togglePullConfirmed() {
         lastWriteTimestamp = Date.now();
         item.pull_confirmed = !item.pull_confirmed;
         renderItemList();
+        if (item.pull_confirmed) closeModal();
     } catch (e) {
         cb.classList.toggle('checked'); // revert on error
         showToast('Failed to update', 'error');
@@ -1796,7 +1862,7 @@ async function togglePullFromList(supplierIdx, itemIdx) {
         lastWriteTimestamp = Date.now();
         item.pull_confirmed = !item.pull_confirmed;
         renderItemList();
-        showToast(item.pull_confirmed ? 'Pull confirmed' : 'Pull unconfirmed', 'success');
+        showToast(item.pull_confirmed ? 'Marked pulled' : 'Unmarked pulled', 'success');
     } catch (e) {
         showToast('Failed to update pull status', 'error');
     }

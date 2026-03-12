@@ -67,6 +67,14 @@ async def parse_local_file(
     )
 
 
+@router.delete("/deliveries")
+async def wipe_all_deliveries(request: Request):
+    """Delete ALL deliveries and reports. Nuclear option."""
+    service = _get_service(request)
+    result = service.wipe_all()
+    return {"message": "All data wiped", **result}
+
+
 @router.delete("/deliveries/{delivery_id}")
 async def delete_delivery(delivery_id: str, request: Request):
     """Delete a delivery."""

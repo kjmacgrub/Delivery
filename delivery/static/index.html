@@ -69,7 +69,7 @@
                         <path d="M9 17H7v-7h2m4 7h-2V7h2m4 10h-2v-4h2"/>
                         <rect x="2" y="2" width="20" height="20" rx="2"/>
                     </svg>
-                    Reports
+                    Delivery Report
                 </button>
             </div>
             <div id="delivery-list" class="card-list">
@@ -82,8 +82,9 @@
 
         <!-- View: Reports -->
         <div id="view-reports" class="view">
+            <div id="delivery-report-picker" style="padding:12px 16px 0"></div>
             <div id="report-list" class="card-list">
-                <div class="loading">Loading reports...</div>
+                <div class="loading">Loading...</div>
             </div>
         </div>
 
@@ -168,7 +169,7 @@
                                     <input type="number" id="modal-pull-qty" min="0" inputmode="numeric">
                                     <div class="pull-btn-col">
                                         <div id="pull-confirm-inline" class="pull-confirm-inline hidden" onclick="togglePullConfirmed()">
-                                            <span class="pull-confirm-text">Confirmed</span>
+                                            <span class="pull-confirm-text">Pulled</span>
                                             <span id="pull-confirm-checkbox" class="pull-checkbox"></span>
                                         </div>
                                         <button class="qty-btn" onclick="adjustPullQty(1)">+</button>
@@ -200,9 +201,10 @@
         <!-- Pop-up: Pull Quantity (positioned near tap) -->
         <div id="pull-popup-backdrop" class="pull-popup-backdrop hidden" onclick="closePullPopup()"></div>
         <div id="pull-popup" class="pull-popup hidden">
+            <div class="pull-popup-title">Pull Status</div>
             <div id="pull-popup-name" class="pull-popup-name"></div>
             <div id="pull-popup-submit" class="pull-popup-row hidden" onclick="submitPullPopup()">
-                <span class="pull-popup-row-label">Submit</span>
+                <span class="pull-popup-row-label">Request</span>
                 <span class="pull-checkbox"></span>
             </div>
             <div class="qty-input-row pull-popup-stepper">
@@ -211,7 +213,7 @@
                 <button class="qty-btn" onclick="adjustPullPopupQty(1)">+</button>
             </div>
             <div id="pull-popup-confirm" class="pull-popup-row hidden" onclick="confirmPullPopup()">
-                <span class="pull-popup-row-label">Confirmed</span>
+                <span class="pull-popup-row-label">Pulled</span>
                 <span id="pull-popup-checkbox" class="pull-checkbox"></span>
             </div>
         </div>
@@ -284,8 +286,14 @@
                     </button>
                     <button class="admin-menu-btn" onclick="closeAdminModal(); showReports()">
                         <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14,2 14,8 20,8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10,9 9,9 8,9"/></svg>
-                        Adjustment Reports
+                        Delivery Report
                     </button>
+
+                    <div id="nuclear-section" style="display:none;margin-top:16px;padding-top:16px;border-top:1px solid #fee2e2">
+                        <button class="admin-menu-btn" style="background:#fff1f2;color:#dc2626;border:2px solid #fecdd3" onclick="nuclearWipe()">
+                            ☢️ Wipe All Data
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>
