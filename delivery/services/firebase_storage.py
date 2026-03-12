@@ -70,6 +70,13 @@ class FirebaseStorageService:
 
         return new_path
 
+    def upload_file(self, filename: str, content: bytes, content_type: str) -> str:
+        """Upload a file to the incoming folder in Firebase Storage."""
+        path = f"{STORAGE_INCOMING}/{filename}"
+        blob = self.bucket.blob(path)
+        blob.upload_from_string(content, content_type=content_type)
+        return path
+
     def get_latest_file(self) -> Optional[StorageFile]:
         """Get the most recently uploaded file in incoming."""
         files = self.list_incoming_files()

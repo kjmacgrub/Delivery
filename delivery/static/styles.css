@@ -2290,6 +2290,17 @@ textarea {
     background: var(--border);
 }
 
+.admin-menu-btn--highlight {
+    background: #f0fdf4;
+    border: 2px solid #10b981;
+    color: #065f46;
+    font-weight: 700;
+}
+
+.admin-menu-btn--highlight:active {
+    background: #dcfce7;
+}
+
 /* ---- Live Report ---- */
 .report-section-header {
     padding: 16px 16px 8px;

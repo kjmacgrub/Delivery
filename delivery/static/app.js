@@ -196,10 +196,73 @@ function updateLiveStatusBtn() {
 // ---- Admin Menu ----
 function openAdminModal() {
     document.getElementById('admin-modal').classList.remove('hidden');
+    loadFileStatusPanel();
 }
 
 function closeAdminModal() {
     document.getElementById('admin-modal').classList.add('hidden');
+}
+
+function showCloverHelp(type) {
+    const titles = { delivery: 'Delivery worksheet', highcount: 'High count', inventory: 'Inventory worksheet' };
+    const imgs = { delivery: '/static/images/clover-delivery.png', highcount: '/static/images/clover-highcount.png', inventory: '/static/images/clover-inventory.png' };
+    document.getElementById('clover-help-title').textContent = 'Where to find: ' + titles[type];
+    document.getElementById('clover-help-img').src = imgs[type];
+    document.getElementById('clover-help-modal').classList.remove('hidden');
+}
+
+async function loadFileStatusPanel() {
+    const container = document.getElementById('file-status-rows');
+    container.innerHTML = '<div style="color:#94a3b8;font-size:14px">Loading...</div>';
+    const today = new Date();
+    const todayStr = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-${String(today.getDate()).padStart(2,'0')}`;
+    try {
+        const res = await fetch('/api/v1/storage/files');
+        const data = await res.json();
+        const files = data.files || [];
+        const delivery = files.filter(f => f.name.toLowerCase().includes('delivery') && f.name.toLowerCase().includes('worksheet'));
+        const highcount = files.filter(f => f.name.toLowerCase().includes('high_count'));
+        const inventory = files.filter(f => f.name.toLowerCase().includes('inventory'));
+        const rows = [
+            { label: 'Delivery worksheet', type: 'delivery', match: delivery, needsToday: true },
+            { label: 'High count', type: 'highcount', match: highcount, needsToday: true },
+            { label: 'Inventory', type: 'inventory', match: inventory, needsToday: false },
+        ];
+        container.innerHTML = rows.map(row => {
+            const latest = row.match[0];
+            const hasToday = latest && latest.name.includes(todayStr);
+            const ok = row.needsToday ? hasToday : !!latest;
+            const label = latest ? latest.name.match(/\d{4}-\d{2}-\d{2}/) ? latest.name.match(/(\d{4}-\d{2}-\d{2})/)[1] : latest.name : 'None';
+            return `<div style="display:flex;align-items:center;gap:10px;padding:8px 10px;background:${ok?'#f0fdf4':'#fff7ed'};border-radius:8px;border:1px solid ${ok?'#10b981':'#f59e0b'}">
+                <span style="font-size:18px">${ok?'✅':'⚠️'}</span>
+                <div style="flex:1;min-width:0">
+                    <div style="font-weight:700;font-size:14px;color:#1e293b">${row.label}</div>
+                    <div style="font-size:12px;color:#64748b">${latest ? label : 'Not uploaded'}</div>
+                </div>
+                <button onclick="document.getElementById('upload-input-${row.type}').click()" style="padding:4px 12px;background:${ok?'#e2e8f0':'#f59e0b'};color:${ok?'#475569':'white'};border:none;border-radius:6px;font-size:12px;font-weight:700;cursor:pointer">${ok?'Replace':'Upload'}</button>
+                <button onclick="showCloverHelp('${row.type}')" style="padding:4px 8px;background:#f1f5f9;color:#64748b;border:none;border-radius:6px;font-size:12px;font-weight:700;cursor:pointer" title="Where to find this in Clover">?</button>
+            </div>`;
+        }).join('');
+    } catch(e) {
+        container.innerHTML = '<div style="color:#ef4444;font-size:14px">Could not load file status</div>';
+    }
+}
+
+async function handleTypedUpload(event, type) {
+    const file = event.target.files[0];
+    event.target.value = '';
+    if (!file) return;
+    showToast(`Uploading ${file.name}...`, 'info');
+    try {
+        const formData = new FormData();
+        formData.append('file', file);
+        const res = await fetch('/api/v1/storage/upload', { method: 'POST', body: formData });
+        if (!res.ok) throw new Error(await res.text());
+        showToast(`Uploaded: ${file.name}`, 'success');
+        loadFileStatusPanel();
+    } catch (err) {
+        showToast(`Upload failed: ${err.message}`, 'error');
+    }
 }
 
 

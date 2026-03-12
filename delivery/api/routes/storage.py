@@ -2,7 +2,7 @@
 Firebase Storage endpoints for managing delivery worksheet files.
 """
 
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, HTTPException, Request, UploadFile, File
 
 from delivery.schemas import ParseResponse, StorageFilesResponse
 
@@ -21,6 +21,16 @@ def _get_storage(request: Request):
 
 def _get_delivery_service(request: Request):
     return request.app.state.delivery_service
+
+
+@router.post("/storage/upload")
+async def upload_delivery_file(request: Request, file: UploadFile = File(...)):
+    """Upload a delivery file to Firebase Storage incoming folder."""
+    storage = _get_storage(request)
+    content = await file.read()
+    content_type = file.content_type or "application/octet-stream"
+    path = storage.upload_file(file.filename, content, content_type)
+    return {"path": path, "filename": file.filename}
 
 
 @router.get("/storage/files", response_model=StorageFilesResponse)
