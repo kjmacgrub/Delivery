@@ -2085,9 +2085,13 @@ function casesExpected(items) {
 function progressBar(done, total) {
     const pct = total > 0 ? Math.round((done / total) * 100) : 0;
     const countClickable = done > 0;
+    const toggleBtn = `<button onclick="setShowReceived(${!showReceived})" style="padding:5px 12px;font-size:13px;font-weight:600;border:1px solid var(--border);border-radius:8px;background:${showReceived ? 'var(--success)' : 'var(--surface)'};color:${showReceived ? '#fff' : 'var(--text-secondary)'};cursor:pointer;white-space:nowrap">${showReceived ? 'Hide received' : 'Show received'}</button>`;
     return `
     <div class="progress-bar-summary">
-        <div class="progress-bar-count${countClickable ? ' progress-bar-count-toggle' : ''}"${countClickable ? ` onclick="setShowReceived(${!showReceived})"` : ''}><span class="${done > 0 ? 'count-green' : ''}">${fmtNum(done)}</span> / ${fmtNum(total)}</div>
+        <div style="display:flex;align-items:center;justify-content:center;gap:12px;margin-bottom:4px">
+            <div class="progress-bar-count${countClickable ? ' progress-bar-count-toggle' : ''}" style="margin-bottom:0"${countClickable ? ` onclick="setShowReceived(${!showReceived})"` : ''}><span class="${done > 0 ? 'count-green' : ''}">${fmtNum(done)}</span> / ${fmtNum(total)}</div>
+            ${toggleBtn}
+        </div>
         <div class="progress-bar-label">
             <span class="progress-bar-title ${showReceived ? 'progress-title-received' : ''}" onclick="setShowReceived(${!showReceived})">Received</span>
             <span class="progress-bar-title ${showReceived ? '' : 'progress-title-expected'}" onclick="setShowReceived(${!showReceived})">Expected</span>
