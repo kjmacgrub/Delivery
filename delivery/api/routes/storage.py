@@ -2,6 +2,8 @@
 Firebase Storage endpoints for managing delivery worksheet files.
 """
 
+import os
+from pathlib import Path
 from fastapi import APIRouter, HTTPException, Request, UploadFile, File
 
 from delivery.schemas import ParseResponse, StorageFilesResponse
@@ -225,3 +227,43 @@ async def parse_high_count_file(file_name: str, request: Request):
         'item_count': len(items),
         'nonzero_count': nonzero,
     }
+
+
+@router.get("/local/downloads-scan")
+async def scan_downloads():
+    """
+    Scan the local ~/Downloads folder for delivery-related files.
+    Returns the most recent match per file type.
+    Only useful when running locally — returns empty results on Cloud Run.
+    """
+    from datetime import timezone
+
+    downloads = Path.home() / "Downloads"
+    if not downloads.exists():
+        return {"delivery": None, "highcount": None, "inventory": None}
+
+    patterns = {
+        "delivery": lambda n: ("delivery" in n and "worksheet" in n) and (n.endswith(".pdf") or n.endswith(".csv")),
+        "highcount": lambda n: "high_count" in n and (n.endswith(".pdf") or n.endswith(".csv")),
+        "inventory": lambda n: "inventory" in n and n.endswith(".csv"),
+    }
+
+    result = {}
+    for type_key, matcher in patterns.items():
+        candidates = []
+        try:
+            for entry in downloads.iterdir():
+                if entry.is_file() and matcher(entry.name.lower()):
+                    mtime = entry.stat().st_mtime
+                    candidates.append({"name": entry.name, "mtime": mtime})
+        except PermissionError:
+            pass
+        if candidates:
+            best = max(candidates, key=lambda x: x["mtime"])
+            from datetime import datetime
+            dt = datetime.fromtimestamp(best["mtime"], tz=timezone.utc)
+            result[type_key] = {"name": best["name"], "modified": dt.isoformat()}
+        else:
+            result[type_key] = None
+
+    return result

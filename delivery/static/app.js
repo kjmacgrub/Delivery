@@ -217,29 +217,71 @@ async function loadFileStatusPanel() {
     const today = new Date();
     const todayStr = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-${String(today.getDate()).padStart(2,'0')}`;
     try {
-        const res = await fetch('/api/v1/storage/files');
-        const data = await res.json();
+        const [storageRes, downloadsRes] = await Promise.all([
+            fetch('/api/v1/storage/files'),
+            fetch('/api/v1/local/downloads-scan').catch(() => null),
+        ]);
+        const data = await storageRes.json();
+        const downloads = downloadsRes && downloadsRes.ok ? await downloadsRes.json() : {};
         const files = data.files || [];
         const delivery = files.filter(f => f.name.toLowerCase().includes('delivery') && f.name.toLowerCase().includes('worksheet'));
         const highcount = files.filter(f => f.name.toLowerCase().includes('high_count'));
         const inventory = files.filter(f => f.name.toLowerCase().includes('inventory'));
+        const fmtTime = iso => {
+            if (!iso) return '';
+            const d = new Date(iso);
+            return d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
+        };
+        const fmtDate = iso => {
+            if (!iso) return '';
+            const d = new Date(iso);
+            return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+        };
         const rows = [
             { label: 'Delivery worksheet', type: 'delivery', match: delivery, needsToday: true },
             { label: 'High count', type: 'highcount', match: highcount, needsToday: true },
             { label: 'Inventory', type: 'inventory', match: inventory, needsToday: false },
         ];
+        rows.forEach(row => {
+            const latest = row.match[0];
+            const input = document.getElementById(`upload-input-${row.type}`);
+            if (input) input.dataset.existingUpdated = latest && latest.updated ? latest.updated : '';
+        });
         container.innerHTML = rows.map(row => {
             const latest = row.match[0];
             const hasToday = latest && latest.name.includes(todayStr);
             const ok = row.needsToday ? hasToday : !!latest;
-            const label = latest ? latest.name.match(/\d{4}-\d{2}-\d{2}/) ? latest.name.match(/(\d{4}-\d{2}-\d{2})/)[1] : latest.name : 'None';
+            const existingMs = latest && latest.updated ? new Date(latest.updated).getTime() : 0;
+            const localFile = downloads[row.type];
+            const localMs = localFile ? new Date(localFile.modified).getTime() : 0;
+            const localIsNewer = localFile && localMs > existingMs;
+
+            const uploadedAt = latest && latest.updated
+                ? `${fmtDate(latest.updated)} ${fmtTime(latest.updated)}`
+                : 'Not uploaded';
+
+            // Build the info lines
+            let infoHtml = `<div style="font-size:12px;color:#64748b">${uploadedAt}</div>`;
+            if (localFile) {
+                const localLabel = localIsNewer
+                    ? `<span style="color:#10b981;font-weight:700">Available: </span>${fmtDate(localFile.modified)} ${fmtTime(localFile.modified)}`
+                    : `<span style="color:#94a3b8">In Downloads: </span>${fmtDate(localFile.modified)} ${fmtTime(localFile.modified)} <span style="color:#94a3b8">(same or older)</span>`;
+                infoHtml += `<div style="font-size:11px;margin-top:2px">${localLabel}</div>`;
+            }
+
+            const uploadBtn = !ok
+                ? `<button onclick="document.getElementById('upload-input-${row.type}').click()" style="padding:4px 12px;background:#f59e0b;color:white;border:none;border-radius:6px;font-size:12px;font-weight:700;cursor:pointer">Upload</button>`
+                : localIsNewer
+                    ? `<button onclick="document.getElementById('upload-input-${row.type}').click()" style="padding:4px 10px;background:#f59e0b;color:white;border:none;border-radius:6px;font-size:12px;font-weight:700;cursor:pointer">Replace</button>`
+                    : `<button onclick="document.getElementById('upload-input-${row.type}').click()" style="padding:4px 10px;background:#f1f5f9;color:#94a3b8;border:1px solid #e2e8f0;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer">Replace</button>`;
+
             return `<div style="display:flex;align-items:center;gap:10px;padding:8px 10px;background:${ok?'#f0fdf4':'#fff7ed'};border-radius:8px;border:1px solid ${ok?'#10b981':'#f59e0b'}">
                 <span style="font-size:18px">${ok?'✅':'⚠️'}</span>
                 <div style="flex:1;min-width:0">
                     <div style="font-weight:700;font-size:14px;color:#1e293b">${row.label}</div>
-                    <div style="font-size:12px;color:#64748b">${latest ? label : 'Not uploaded'}</div>
+                    ${infoHtml}
                 </div>
-                <button onclick="document.getElementById('upload-input-${row.type}').click()" style="padding:4px 12px;background:${ok?'#e2e8f0':'#f59e0b'};color:${ok?'#475569':'white'};border:none;border-radius:6px;font-size:12px;font-weight:700;cursor:pointer">${ok?'Replace':'Upload'}</button>
+                ${uploadBtn}
                 <button onclick="showCloverHelp('${row.type}')" style="padding:4px 8px;background:#f1f5f9;color:#64748b;border:none;border-radius:6px;font-size:12px;font-weight:700;cursor:pointer" title="Where to find this in Clover">?</button>
             </div>`;
         }).join('');
@@ -250,8 +292,16 @@ async function loadFileStatusPanel() {
 
 async function handleTypedUpload(event, type) {
     const file = event.target.files[0];
+    const existingUpdated = event.target.dataset.existingUpdated || '';
     event.target.value = '';
     if (!file) return;
+    if (existingUpdated) {
+        const existingMs = new Date(existingUpdated).getTime();
+        if (file.lastModified <= existingMs) {
+            showToast(`Not uploaded — file is not newer than current version (${new Date(existingUpdated).toLocaleString()})`, 'error');
+            return;
+        }
+    }
     showToast(`Uploading ${file.name}...`, 'info');
     try {
         const formData = new FormData();
