@@ -8,8 +8,9 @@
 - Format: v1.XX (minor increments)
 
 ## Dev Server
-- `python3 -m uvicorn delivery.api.app:create_app --factory --host 0.0.0.0 --port 8000 --reload`
-- Check for stale processes on port 8000 before starting
+- `python3 -m uvicorn delivery.api.app:create_app --factory --host 0.0.0.0 --port 8001 --reload`
+- Use port **8001** — port 8000 is reserved for the CEF investments app (Budget Planner investments tab links there)
+- Check for stale processes on port 8001 before starting
 
 ## Deploy
 - `./deploy.sh` deploys to Google Cloud Run

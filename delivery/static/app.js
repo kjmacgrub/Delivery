@@ -69,6 +69,9 @@ let supplierFilter = null; // null = show all, or { idx, name } to filter to one
 let itemSortMode = 'supplier'; // 'alpha', 'qty', or 'supplier'
 let multiFilter = false;   // show only items shared across 2+ suppliers
 let showReceived = false; // false = show pending items, true = show received items
+let showPulled = false; // false = hide confirmed pull lines in street view
+let pullChangeAlerts = new Set(); // "supplierIdx-itemIdx" keys for items changed since last ack
+let pullPopupOriginalQty = null; // qty when popup was opened, to detect changes
 let searchQuery = ''; // search filter for item list
 let completionShown = false; // prevent duplicate completion modal
 let expandedSuppliers = new Set(); // supplier indices expanded in accordion view
@@ -383,8 +386,10 @@ function cleanupListeners() {
 function isModalOpen() {
     const checkinModal = document.getElementById('checkin-modal');
     const completeModal = document.getElementById('complete-modal');
+    const pullPopup = document.getElementById('pull-popup');
     return (checkinModal && !checkinModal.classList.contains('hidden')) ||
-           (completeModal && !completeModal.classList.contains('hidden'));
+           (completeModal && !completeModal.classList.contains('hidden')) ||
+           (pullPopup && !pullPopup.classList.contains('hidden'));
 }
 
 function applyDeliveryUpdate(data) {
@@ -407,19 +412,37 @@ function applyDeliveryUpdate(data) {
     window.scrollTo(0, scrollY);
 }
 
+function detectPullChanges(newData) {
+    if (!currentDelivery || !newData.suppliers) return;
+    newData.suppliers.forEach((supplier, sIdx) => {
+        const oldSupplier = currentDelivery.suppliers[sIdx];
+        if (!oldSupplier) return;
+        supplier.items.forEach((item, iIdx) => {
+            const oldItem = oldSupplier.items[iIdx];
+            if (!oldItem) return;
+            if ((item.pull_quantity ?? 0) !== (oldItem.pull_quantity ?? 0)) {
+                pullChangeAlerts.add(`${sIdx}-${iIdx}`);
+            }
+        });
+    });
+}
+
 function listenToDelivery(deliveryId) {
     const unsub = db.collection('deliveries').doc(deliveryId)
         .onSnapshot((doc) => {
             if (!doc.exists) return;
             if (!currentDelivery || currentDelivery.id !== deliveryId) return;
 
+            const data = doc.data();
+
+            // Always detect pull quantity changes before skipping
+            detectPullChanges(data);
+
             // Skip if this is likely our own write echoing back
             if (Date.now() - lastWriteTimestamp < 2000) {
                 lastWriteTimestamp = 0;
                 return;
             }
-
-            const data = doc.data();
 
             if (isModalOpen()) {
                 pendingDeliveryUpdate = data;
@@ -1203,7 +1226,7 @@ function renderCompactRow(item, showSupplier, crossMap = null) {
     const pullConfirmedClass = item.pull_confirmed ? 'pull-confirmed' : '';
     const pullQty = item.pull_quantity != null
         ? `<span class="pull-qty ${pullConfirmedClass}" onclick="event.stopPropagation(); openPullPopup(event, ${item.supplierIdx}, ${item.itemIdx})">(${item.pull_quantity})</span> `
-        : `<span class="pull-qty pull-qty-empty" onclick="event.stopPropagation(); openPullPopup(event, ${item.supplierIdx}, ${item.itemIdx})">p</span> `;
+        : `<span class="pull-qty pull-qty-empty" onclick="event.stopPropagation(); openPullPopup(event, ${item.supplierIdx}, ${item.itemIdx})">+</span> `;
 
     const supplierChip = showSupplier
         ? `<div class="compact-supplier" onclick="event.stopPropagation(); filterBySupplier(${item.supplierIdx})">${item.supplierAbbrev}</div>`
@@ -1220,7 +1243,7 @@ function renderCompactRow(item, showSupplier, crossMap = null) {
                 const ePullConfirmedClass = e.pull_confirmed ? 'pull-confirmed' : '';
                 const ePullQty = e.pull_quantity != null
                     ? `<span class="pull-qty ${ePullConfirmedClass}" onclick="event.stopPropagation(); openPullPopup(event, ${e.supplierIdx}, ${e.itemIdx})">(${e.pull_quantity})</span> `
-                    : `<span class="pull-qty pull-qty-empty" onclick="event.stopPropagation(); openPullPopup(event, ${e.supplierIdx}, ${e.itemIdx})">p</span> `;
+                    : `<span class="pull-qty pull-qty-empty" onclick="event.stopPropagation(); openPullPopup(event, ${e.supplierIdx}, ${e.itemIdx})" ></span> `;
                 return `<div class="compact-row supplier-sub-row ${eStatus}" onclick="openCheckInModalFlat(${e.supplierIdx}, ${e.itemIdx})">
                     <div class="compact-qty">${ePullQty}${e.qty}</div>
                     <div class="compact-supplier sub-row-supplier" onclick="event.stopPropagation(); filterBySupplier(${e.supplierIdx})">${e.supplierName}</div>
@@ -1270,7 +1293,7 @@ function renderMultiSupplierRow(items) {
         const pullConfirmedClass = item.pull_confirmed ? 'pull-confirmed' : '';
         const pullQty = item.pull_quantity != null
             ? `<span class="pull-qty ${pullConfirmedClass}" onclick="event.stopPropagation(); openPullPopup(event, ${item.supplierIdx}, ${item.itemIdx})">(${item.pull_quantity})</span> `
-            : `<span class="pull-qty pull-qty-empty" onclick="event.stopPropagation(); openPullPopup(event, ${item.supplierIdx}, ${item.itemIdx})">p</span> `;
+            : `<span class="pull-qty pull-qty-empty" onclick="event.stopPropagation(); openPullPopup(event, ${item.supplierIdx}, ${item.itemIdx})">+</span> `;
         return `
         <div class="compact-row supplier-sub-row ${statusClass}"
              onclick="openCheckInModalFlat(${item.supplierIdx}, ${item.itemIdx})">
@@ -1485,6 +1508,26 @@ function renderLiveReport() {
     if (!currentDelivery) return;
     let html = '';
 
+    // --- Change Alerts section ---
+    if (pullChangeAlerts.size > 0) {
+        html += '<div class="report-section-header change-alert-header">Change Alert!</div>';
+        pullChangeAlerts.forEach(key => {
+            const [sIdx, iIdx] = key.split('-').map(Number);
+            const supplier = currentDelivery.suppliers[sIdx];
+            if (!supplier) return;
+            const item = supplier.items[iIdx];
+            if (!item) return;
+            html += `
+            <div class="change-alert-row">
+                <div class="change-alert-info">
+                    <div class="change-alert-name">${item.raw_description}</div>
+                    <div class="change-alert-detail">${supplier.supplier_name} — Pull: ${item.pull_quantity ?? 'cleared'}</div>
+                </div>
+                <button class="change-alert-btn" onclick="acknowledgePullAlert(${sIdx}, ${iIdx})">Got it</button>
+            </div>`;
+        });
+    }
+
     // --- Adjustments section ---
     const exceptions = getExceptionItems();
     const adjItems = exceptions.map(e => ({
@@ -1510,28 +1553,37 @@ function renderLiveReport() {
         return sup !== 0 ? sup : a.raw_description.toLowerCase().localeCompare(b.raw_description.toLowerCase());
     });
 
-    html += '<div class="report-section-header">Pulls</div>';
+    const confirmedCount = pullItems.filter(i => i.pull_confirmed).length;
+    const toggleLabel = showPulled ? 'Hide pulled' : `Show pulled (${confirmedCount})`;
+    html += `<div class="report-section-header">Pulls
+        ${confirmedCount > 0 ? `<button class="pull-toggle-btn" onclick="toggleShowPulled()">${toggleLabel}</button>` : ''}
+    </div>`;
 
     if (pullItems.length === 0) {
         html += '<div class="report-section-empty">No pull items</div>';
     } else {
-        let currentSupplierName = null;
-        pullItems.forEach(item => {
-            if (item.supplierName !== currentSupplierName) {
-                currentSupplierName = item.supplierName;
-                html += `<div class="pull-sheet-supplier">${item.supplierName}</div>`;
-            }
-            const confirmedClass = item.pull_confirmed ? 'pull-confirmed' : '';
-            const statusChip = item.pull_confirmed
-                ? `<div class="pull-sheet-check done"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20,6 9,17 4,12"/></svg></div>`
-                : `<div class="pull-sheet-check pending"></div>`;
-            html += `
-            <div class="pull-sheet-row ${confirmedClass}" onclick="togglePullFromReport(${item.supplierIdx}, ${item.itemIdx})">
-                <span class="pull-sheet-qty">${item.pull_quantity} <span class="pull-sheet-of">(of ${item.quantity_expected})</span></span>
-                <span class="pull-sheet-name">${item.raw_description}</span>
-                ${statusChip}
-            </div>`;
-        });
+        const visibleItems = showPulled ? pullItems : pullItems.filter(i => !i.pull_confirmed);
+        if (visibleItems.length === 0) {
+            html += '<div class="report-section-empty">All items pulled</div>';
+        } else {
+            let currentSupplierName = null;
+            visibleItems.forEach(item => {
+                if (item.supplierName !== currentSupplierName) {
+                    currentSupplierName = item.supplierName;
+                    html += `<div class="pull-sheet-supplier">${item.supplierName}</div>`;
+                }
+                const confirmedClass = item.pull_confirmed ? 'pull-confirmed' : '';
+                const statusChip = item.pull_confirmed
+                    ? `<div class="pull-sheet-check done"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20,6 9,17 4,12"/></svg></div>`
+                    : `<div class="pull-sheet-check pending"></div>`;
+                html += `
+                <div class="pull-sheet-row ${confirmedClass}" onclick="togglePullFromReport(${item.supplierIdx}, ${item.itemIdx})">
+                    <span class="pull-sheet-qty">${item.pull_quantity} <span class="pull-sheet-of">(of ${item.quantity_expected})</span></span>
+                    <span class="pull-sheet-name">${item.raw_description}</span>
+                    ${statusChip}
+                </div>`;
+            });
+        }
     }
 
     document.getElementById('live-report-content').innerHTML = html;
@@ -1551,6 +1603,11 @@ async function togglePullFromReport(supplierIdx, itemIdx) {
     } catch (e) {
         showToast('Failed to update pull status', 'error');
     }
+}
+
+function toggleShowPulled() {
+    showPulled = !showPulled;
+    renderLiveReport();
 }
 
 function onSearchInput() {
@@ -1584,6 +1641,7 @@ function toggleMultiFilter() {
 // ---- Check-in Modal ----
 
 let modalExpectedQty = 0; // track expected qty for the open modal
+let modalPullOriginalQty = 0; // track pull qty when modal opened, to detect changes
 let selectedReason = null; // 'short', 'over', or 'return'
 
 // Called from flat item list (Items tab)
@@ -1613,7 +1671,8 @@ function openCheckInModal(itemIdx) {
     }
 
     // Floor Pull stepper
-    document.getElementById('modal-pull-qty').value = item.pull_quantity ?? 0;
+    modalPullOriginalQty = item.pull_quantity ?? 0;
+    document.getElementById('modal-pull-qty').value = modalPullOriginalQty;
 
     // Pull confirmation checkbox
     const pullConfirmLabel = document.getElementById('pull-confirm-inline');
@@ -1735,13 +1794,14 @@ function openPullPopup(event, supplierIdx, itemIdx) {
 
     document.getElementById('pull-popup-name').textContent = item.raw_description;
     const qty = item.pull_quantity ?? 0;
+    pullPopupOriginalQty = qty;
     document.getElementById('pull-popup-qty').value = qty;
 
     const hasQty = qty > 0;
     document.getElementById('pull-popup-submit').classList.toggle('hidden', !hasQty);
     document.getElementById('pull-popup-confirm').classList.toggle('hidden', !hasQty);
-    // Submit always starts unchecked; Confirmed reflects current state
-    document.getElementById('pull-popup-submit').querySelector('.pull-checkbox').classList.remove('checked');
+    // Submit defaults to checked when qty exists; Confirmed reflects current state
+    document.getElementById('pull-popup-submit').querySelector('.pull-checkbox').classList.toggle('checked', hasQty && !item.pull_confirmed);
     document.getElementById('pull-popup-checkbox').classList.toggle('checked', !!item.pull_confirmed);
 
     // Position near the tapped element
@@ -1765,9 +1825,23 @@ function openPullPopup(event, supplierIdx, itemIdx) {
 }
 
 function closePullPopup() {
+    if (pullPopupItem !== null) {
+        const currentQty = parseInt(document.getElementById('pull-popup-qty').value) || 0;
+        if (pullPopupOriginalQty !== null && currentQty !== pullPopupOriginalQty) {
+            pullChangeAlerts.add(`${pullPopupItem.supplierIdx}-${pullPopupItem.itemIdx}`);
+        }
+    }
     document.getElementById('pull-popup').classList.add('hidden');
     document.getElementById('pull-popup-backdrop').classList.add('hidden');
     pullPopupItem = null;
+    pullPopupOriginalQty = null;
+    applyPendingUpdate();
+    if (currentView === 'pullsheet') renderLiveReport();
+}
+
+function acknowledgePullAlert(supplierIdx, itemIdx) {
+    pullChangeAlerts.delete(`${supplierIdx}-${itemIdx}`);
+    renderLiveReport();
 }
 
 function _pullPopupShowHideRows(qty) {
@@ -1796,7 +1870,11 @@ async function adjustPullPopupQty(delta) {
         const item = currentDelivery.suppliers[supplierIdx].items[itemIdx];
         item.pull_quantity = newQty > 0 ? newQty : null;
         item.pull_for_floor = newQty > 0;
+        if (pullPopupOriginalQty !== null && newQty !== pullPopupOriginalQty) {
+            pullChangeAlerts.add(`${supplierIdx}-${itemIdx}`);
+        }
         renderItemList();
+        if (currentView === 'pullsheet') renderLiveReport();
     } catch (e) {
         showToast('Failed to update pull quantity', 'error');
     }
@@ -1912,6 +1990,10 @@ async function adjustPullQty(delta) {
         const item = currentDelivery.suppliers[supplierIdx].items[itemIdx];
         item.pull_quantity = newQty > 0 ? newQty : null;
         item.pull_for_floor = newQty > 0;
+
+        if (newQty !== modalPullOriginalQty) {
+            pullChangeAlerts.add(`${supplierIdx}-${itemIdx}`);
+        }
 
         // Re-render item list in background (no toast)
         renderItemList();
@@ -2501,8 +2583,7 @@ function closeVersionModal() {
 function applyWeekColor(dateStr) {
     // dateStr: 'YYYY-MM-DD', or omit to use today
     const base = dateStr ? new Date(dateStr + 'T00:00:00') : new Date();
-    const startOfYear = new Date(base.getFullYear(), 0, 0);
-    const julianDay = Math.floor((base - startOfYear) / 86400000);
+    const julianDay = Math.floor((Date.UTC(base.getFullYear(), base.getMonth(), base.getDate()) - Date.UTC(base.getFullYear(), 0, 0)) / 86400000);
     // ISO week number: weeks run Mon–Sun
     const d = new Date(Date.UTC(base.getFullYear(), base.getMonth(), base.getDate()));
     d.setUTCDate(d.getUTCDate() + 4 - (d.getUTCDay() || 7));
