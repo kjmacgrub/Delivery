@@ -133,6 +133,7 @@
 
         <!-- View: Live Report -->
         <div id="view-pullsheet" class="view">
+            <div id="change-alert-sticky"></div>
             <div id="live-report-content" class="compact-list"></div>
         </div>
 
@@ -203,18 +204,20 @@
         <div id="pull-popup" class="pull-popup hidden">
             <div class="pull-popup-title">Pull Status<button class="pull-popup-close" onclick="closePullPopup()">✕</button></div>
             <div id="pull-popup-name" class="pull-popup-name"></div>
-            <div id="pull-popup-submit" class="pull-popup-row hidden" onclick="submitPullPopup()">
-                <span class="pull-popup-row-label">Request</span>
-                <span class="pull-checkbox"></span>
-            </div>
             <div class="qty-input-row pull-popup-stepper">
                 <button class="qty-btn" onclick="adjustPullPopupQty(-1)">-</button>
                 <input type="number" id="pull-popup-qty" min="0" inputmode="numeric">
                 <button class="qty-btn" onclick="adjustPullPopupQty(1)">+</button>
             </div>
-            <div id="pull-popup-confirm" class="pull-popup-row hidden" onclick="confirmPullPopup()">
-                <span class="pull-popup-row-label">Pulled</span>
-                <span id="pull-popup-checkbox" class="pull-checkbox"></span>
+            <div class="pull-popup-actions-row">
+                <div id="pull-popup-submit" class="pull-popup-action hidden" onclick="submitPullPopup()">
+                    <span class="pull-checkbox"></span>
+                    <span class="pull-popup-row-label">Request</span>
+                </div>
+                <div id="pull-popup-confirm" class="pull-popup-action hidden" onclick="confirmPullPopup()">
+                    <span id="pull-popup-checkbox" class="pull-checkbox"></span>
+                    <span class="pull-popup-row-label">Confirm</span>
+                </div>
             </div>
         </div>
 

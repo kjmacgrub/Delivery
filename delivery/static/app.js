@@ -69,9 +69,10 @@ let supplierFilter = null; // null = show all, or { idx, name } to filter to one
 let itemSortMode = 'supplier'; // 'alpha', 'qty', or 'supplier'
 let multiFilter = false;   // show only items shared across 2+ suppliers
 let showReceived = false; // false = show pending items, true = show received items
-let showPulled = false; // false = hide confirmed pull lines in street view
+let showPulled = true; // true = show confirmed pull lines in street view by default
 let pullChangeAlerts = new Set(); // "supplierIdx-itemIdx" keys for items changed since last ack
 let pullPopupOriginalQty = null; // qty when popup was opened, to detect changes
+let pullSessionOriginals = {}; // qty before any popup edits this session, keyed by "sIdx-iIdx"
 let searchQuery = ''; // search filter for item list
 let completionShown = false; // prevent duplicate completion modal
 let expandedSuppliers = new Set(); // supplier indices expanded in accordion view
@@ -194,6 +195,22 @@ function updateLiveStatusBtn() {
     if (liveBtn) liveBtn.classList.toggle('hidden', !active);
     const continueBtn = document.getElementById('header-continue-btn');
     if (continueBtn) continueBtn.classList.toggle('hidden', !active);
+}
+
+function updateAlertBadge() {
+    const liveBtn = document.getElementById('live-status-btn');
+    if (!liveBtn) return;
+    let badge = liveBtn.querySelector('.alert-badge');
+    if (pullChangeAlerts.size > 0) {
+        if (!badge) {
+            badge = document.createElement('span');
+            badge.className = 'alert-badge';
+            liveBtn.appendChild(badge);
+        }
+        badge.textContent = pullChangeAlerts.size;
+    } else {
+        if (badge) badge.remove();
+    }
 }
 
 // ---- Admin Menu ----
@@ -412,20 +429,6 @@ function applyDeliveryUpdate(data) {
     window.scrollTo(0, scrollY);
 }
 
-function detectPullChanges(newData) {
-    if (!currentDelivery || !newData.suppliers) return;
-    newData.suppliers.forEach((supplier, sIdx) => {
-        const oldSupplier = currentDelivery.suppliers[sIdx];
-        if (!oldSupplier) return;
-        supplier.items.forEach((item, iIdx) => {
-            const oldItem = oldSupplier.items[iIdx];
-            if (!oldItem) return;
-            if ((item.pull_quantity ?? 0) !== (oldItem.pull_quantity ?? 0)) {
-                pullChangeAlerts.add(`${sIdx}-${iIdx}`);
-            }
-        });
-    });
-}
 
 function listenToDelivery(deliveryId) {
     const unsub = db.collection('deliveries').doc(deliveryId)
@@ -435,12 +438,8 @@ function listenToDelivery(deliveryId) {
 
             const data = doc.data();
 
-            // Always detect pull quantity changes before skipping
-            detectPullChanges(data);
-
-            // Skip if this is likely our own write echoing back
+            // Skip UI update if this is our own write echoing back
             if (Date.now() - lastWriteTimestamp < 2000) {
-                lastWriteTimestamp = 0;
                 return;
             }
 
@@ -943,6 +942,8 @@ async function openDelivery(id) {
         }
 
         supplierFilter = null; // reset filter
+        pullChangeAlerts = new Set();
+        pullSessionOriginals = {};
         expandedSuppliers = new Set(); // reset accordion
         expandedLocations = new Set(); // reset location accordion
         showReceived = false; // reset to pending view
@@ -1502,22 +1503,24 @@ function updateFilteredSupplierSummary() {
 function showLiveReport() {
     showView('pullsheet');
     renderLiveReport();
+    window.scrollTo(0, 0);
 }
 
 function renderLiveReport() {
     if (!currentDelivery) return;
     let html = '';
 
-    // --- Change Alerts section ---
+    // --- Change Alerts (sticky banner) ---
+    let alertHtml = '';
     if (pullChangeAlerts.size > 0) {
-        html += '<div class="report-section-header change-alert-header">Change Alert!</div>';
+        alertHtml += '<div class="report-section-header change-alert-header">Change Alert!</div>';
         pullChangeAlerts.forEach(key => {
             const [sIdx, iIdx] = key.split('-').map(Number);
             const supplier = currentDelivery.suppliers[sIdx];
             if (!supplier) return;
             const item = supplier.items[iIdx];
             if (!item) return;
-            html += `
+            alertHtml += `
             <div class="change-alert-row">
                 <div class="change-alert-info">
                     <div class="change-alert-name">${item.raw_description}</div>
@@ -1527,6 +1530,9 @@ function renderLiveReport() {
             </div>`;
         });
     }
+    const stickyEl = document.getElementById('change-alert-sticky');
+    stickyEl.innerHTML = alertHtml;
+    stickyEl.style.top = (document.getElementById('app-header').offsetHeight) + 'px';
 
     // --- Adjustments section ---
     const exceptions = getExceptionItems();
@@ -1794,15 +1800,20 @@ function openPullPopup(event, supplierIdx, itemIdx) {
 
     document.getElementById('pull-popup-name').textContent = item.raw_description;
     const qty = item.pull_quantity ?? 0;
-    pullPopupOriginalQty = qty;
+    const popupKey = `${supplierIdx}-${itemIdx}`;
+    if (!(popupKey in pullSessionOriginals)) {
+        pullSessionOriginals[popupKey] = qty;
+    }
+    pullPopupOriginalQty = pullSessionOriginals[popupKey];
+    pullChangeAlerts.delete(popupKey);
     document.getElementById('pull-popup-qty').value = qty;
 
     const hasQty = qty > 0;
     document.getElementById('pull-popup-submit').classList.toggle('hidden', !hasQty);
     document.getElementById('pull-popup-confirm').classList.toggle('hidden', !hasQty);
-    // Submit defaults to checked when qty exists; Confirmed reflects current state
-    document.getElementById('pull-popup-submit').querySelector('.pull-checkbox').classList.toggle('checked', hasQty && !item.pull_confirmed);
-    document.getElementById('pull-popup-checkbox').classList.toggle('checked', !!item.pull_confirmed);
+    // Both checkboxes always open blank
+    document.getElementById('pull-popup-submit').querySelector('.pull-checkbox').classList.remove('checked');
+    document.getElementById('pull-popup-checkbox').classList.remove('checked');
 
     // Position near the tapped element
     const popup = document.getElementById('pull-popup');
@@ -1827,8 +1838,13 @@ function openPullPopup(event, supplierIdx, itemIdx) {
 function closePullPopup() {
     if (pullPopupItem !== null) {
         const currentQty = parseInt(document.getElementById('pull-popup-qty').value) || 0;
-        if (pullPopupOriginalQty !== null && currentQty !== pullPopupOriginalQty) {
-            pullChangeAlerts.add(`${pullPopupItem.supplierIdx}-${pullPopupItem.itemIdx}`);
+        if (pullPopupOriginalQty !== null) {
+            const key = `${pullPopupItem.supplierIdx}-${pullPopupItem.itemIdx}`;
+            if (currentQty !== pullPopupOriginalQty) {
+                pullChangeAlerts.add(key);
+            } else {
+                pullChangeAlerts.delete(key);
+            }
         }
     }
     document.getElementById('pull-popup').classList.add('hidden');
@@ -1836,11 +1852,13 @@ function closePullPopup() {
     pullPopupItem = null;
     pullPopupOriginalQty = null;
     applyPendingUpdate();
-    if (currentView === 'pullsheet') renderLiveReport();
+    updateAlertBadge();
+    renderLiveReport();
 }
 
 function acknowledgePullAlert(supplierIdx, itemIdx) {
     pullChangeAlerts.delete(`${supplierIdx}-${itemIdx}`);
+    updateAlertBadge();
     renderLiveReport();
 }
 
@@ -1861,20 +1879,16 @@ async function adjustPullPopupQty(delta) {
     document.getElementById('pull-popup-checkbox').classList.remove('checked');
 
     const { supplierIdx, itemIdx } = pullPopupItem;
+    lastWriteTimestamp = Date.now();
     try {
         await apiPatch(
             `/deliveries/${currentDelivery.id}/suppliers/${supplierIdx}/items/${itemIdx}/set-pull`,
             { quantity: newQty }
         );
-        lastWriteTimestamp = Date.now();
         const item = currentDelivery.suppliers[supplierIdx].items[itemIdx];
         item.pull_quantity = newQty > 0 ? newQty : null;
         item.pull_for_floor = newQty > 0;
-        if (pullPopupOriginalQty !== null && newQty !== pullPopupOriginalQty) {
-            pullChangeAlerts.add(`${supplierIdx}-${itemIdx}`);
-        }
         renderItemList();
-        if (currentView === 'pullsheet') renderLiveReport();
     } catch (e) {
         showToast('Failed to update pull quantity', 'error');
     }
