@@ -69,7 +69,6 @@ let supplierFilter = null; // null = show all, or { idx, name } to filter to one
 let itemSortMode = 'supplier'; // 'alpha', 'qty', or 'supplier'
 let multiFilter = false;   // show only items shared across 2+ suppliers
 let showReceived = false; // false = show pending items, true = show received items
-let showPulled = true; // true = show confirmed pull lines in street view by default
 let collapsedPullSuppliers = new Set(); // supplier names collapsed in street view
 let pullChangeAlerts = new Set(); // "supplierIdx-itemIdx" keys for items changed since last ack
 let pullPopupOriginalQty = null; // qty when popup was opened, to detect changes
@@ -1560,11 +1559,7 @@ function renderLiveReport() {
         return sup !== 0 ? sup : a.raw_description.toLowerCase().localeCompare(b.raw_description.toLowerCase());
     });
 
-    const confirmedCount = pullItems.filter(i => i.pull_confirmed).length;
-    const toggleLabel = showPulled ? 'Hide pulled' : `Show pulled (${confirmedCount})`;
-    html += `<div class="report-section-header">Pulls
-        ${confirmedCount > 0 ? `<button class="pull-toggle-btn" onclick="toggleShowPulled()">${toggleLabel}</button>` : ''}
-    </div>`;
+    html += `<div class="report-section-header">Pulls</div>`;
 
     if (pullItems.length === 0) {
         html += '<div class="report-section-empty">No pull items</div>';
@@ -1584,11 +1579,11 @@ function renderLiveReport() {
 
         supplierGroups.forEach(group => {
             const pulledCount = group.items.filter(i => i.pull_confirmed).length;
-            const itemsToShow = showPulled ? group.items : group.items.filter(i => !i.pull_confirmed);
+            const itemsToShow = group.items;
             const isCollapsed = collapsedPullSuppliers.has(group.name);
             const countBadge = pulledCount > 0
                 ? `<span class="pull-supplier-count" onclick="toggleCollapsePullSupplier(event,'${group.name.replace(/'/g,"\\'")}')">
-                       ${pulledCount} items pulled
+                       ${pulledCount} item(s) pulled
                        <svg class="pull-supplier-chevron${isCollapsed ? ' collapsed' : ''}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6,9 12,15 18,9"/></svg>
                    </span>`
                 : '';
@@ -1626,11 +1621,6 @@ async function togglePullFromReport(supplierIdx, itemIdx) {
     } catch (e) {
         showToast('Failed to update pull status', 'error');
     }
-}
-
-function toggleShowPulled() {
-    showPulled = !showPulled;
-    renderLiveReport();
 }
 
 function toggleCollapsePullSupplier(event, supplierName) {
