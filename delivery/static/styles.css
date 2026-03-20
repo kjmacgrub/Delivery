@@ -2438,11 +2438,36 @@ textarea {
 }
 
 .pull-sheet-supplier {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
     padding: 6px 10px;
     background: var(--bg);
     font-size: 15px;
     font-weight: 700;
     color: var(--text);
+}
+
+.pull-supplier-count {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--success);
+    flex-shrink: 0;
+    cursor: pointer;
+    user-select: none;
+}
+
+.pull-supplier-chevron {
+    width: 14px;
+    height: 14px;
+    transition: transform 0.2s;
+}
+
+.pull-supplier-chevron.collapsed {
+    transform: rotate(-90deg);
 }
 
 .pull-sheet-row {

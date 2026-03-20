@@ -70,6 +70,7 @@ let itemSortMode = 'supplier'; // 'alpha', 'qty', or 'supplier'
 let multiFilter = false;   // show only items shared across 2+ suppliers
 let showReceived = false; // false = show pending items, true = show received items
 let showPulled = true; // true = show confirmed pull lines in street view by default
+let collapsedPullSuppliers = new Set(); // supplier names collapsed in street view
 let pullChangeAlerts = new Set(); // "supplierIdx-itemIdx" keys for items changed since last ack
 let pullPopupOriginalQty = null; // qty when popup was opened, to detect changes
 let pullSessionOriginals = {}; // qty before any popup edits this session, keyed by "sIdx-iIdx"
@@ -1568,16 +1569,32 @@ function renderLiveReport() {
     if (pullItems.length === 0) {
         html += '<div class="report-section-empty">No pull items</div>';
     } else {
-        const visibleItems = showPulled ? pullItems : pullItems.filter(i => !i.pull_confirmed);
-        if (visibleItems.length === 0) {
-            html += '<div class="report-section-empty">All items pulled</div>';
-        } else {
-            let currentSupplierName = null;
-            visibleItems.forEach(item => {
-                if (item.supplierName !== currentSupplierName) {
-                    currentSupplierName = item.supplierName;
-                    html += `<div class="pull-sheet-supplier">${item.supplierName}</div>`;
-                }
+        // Group by supplier
+        const supplierGroups = [];
+        let lastSupplierName = null;
+        let currentGroup = null;
+        pullItems.forEach(item => {
+            if (item.supplierName !== lastSupplierName) {
+                currentGroup = { name: item.supplierName, items: [] };
+                supplierGroups.push(currentGroup);
+                lastSupplierName = item.supplierName;
+            }
+            currentGroup.items.push(item);
+        });
+
+        supplierGroups.forEach(group => {
+            const pulledCount = group.items.filter(i => i.pull_confirmed).length;
+            const itemsToShow = showPulled ? group.items : group.items.filter(i => !i.pull_confirmed);
+            const isCollapsed = collapsedPullSuppliers.has(group.name);
+            const countBadge = pulledCount > 0
+                ? `<span class="pull-supplier-count" onclick="toggleCollapsePullSupplier(event,'${group.name.replace(/'/g,"\\'")}')">
+                       ${pulledCount} items pulled
+                       <svg class="pull-supplier-chevron${isCollapsed ? ' collapsed' : ''}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6,9 12,15 18,9"/></svg>
+                   </span>`
+                : '';
+            html += `<div class="pull-sheet-supplier">${group.name}${countBadge}</div>`;
+            itemsToShow.forEach(item => {
+                if (isCollapsed && item.pull_confirmed) return;
                 const confirmedClass = item.pull_confirmed ? 'pull-confirmed' : '';
                 const statusChip = item.pull_confirmed
                     ? `<div class="pull-sheet-check done"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20,6 9,17 4,12"/></svg></div>`
@@ -1589,7 +1606,7 @@ function renderLiveReport() {
                     ${statusChip}
                 </div>`;
             });
-        }
+        });
     }
 
     document.getElementById('live-report-content').innerHTML = html;
@@ -1613,6 +1630,16 @@ async function togglePullFromReport(supplierIdx, itemIdx) {
 
 function toggleShowPulled() {
     showPulled = !showPulled;
+    renderLiveReport();
+}
+
+function toggleCollapsePullSupplier(event, supplierName) {
+    event.stopPropagation();
+    if (collapsedPullSuppliers.has(supplierName)) {
+        collapsedPullSuppliers.delete(supplierName);
+    } else {
+        collapsedPullSuppliers.add(supplierName);
+    }
     renderLiveReport();
 }
 
