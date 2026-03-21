@@ -1245,9 +1245,14 @@ function renderCompactRow(item, showSupplier, crossMap = null) {
                 const ePullQty = e.pull_quantity != null
                     ? `<span class="pull-qty ${ePullConfirmedClass}" onclick="event.stopPropagation(); openPullPopup(event, ${e.supplierIdx}, ${e.itemIdx})">(${e.pull_quantity})</span> `
                     : `<span class="pull-qty pull-qty-empty" onclick="event.stopPropagation(); openPullPopup(event, ${e.supplierIdx}, ${e.itemIdx})" ></span> `;
+                const eIsPending = e.received_status === 'pending';
+                const eCircle = eIsPending
+                    ? `<div class="quick-receive-circle pending" onclick="event.stopPropagation(); quickReceiveItem(${e.supplierIdx}, ${e.itemIdx})"></div>`
+                    : `<div class="quick-receive-circle done" onclick="event.stopPropagation(); openCheckInModalFlat(${e.supplierIdx}, ${e.itemIdx})"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20,6 9,17 4,12"/></svg></div>`;
                 return `<div class="compact-row supplier-sub-row ${eStatus}" onclick="openCheckInModalFlat(${e.supplierIdx}, ${e.itemIdx})">
                     <div class="compact-qty">${ePullQty}${e.qty}</div>
                     <div class="compact-supplier sub-row-supplier" onclick="event.stopPropagation(); filterBySupplier(${e.supplierIdx})">${e.supplierName}</div>
+                    ${eCircle}
                 </div>`;
             }).join('');
         }
@@ -1260,6 +1265,10 @@ function renderCompactRow(item, showSupplier, crossMap = null) {
         ? `<div class="hc-strip"><span class="hc-day">${hc.sat}</span><span class="hc-day">${hc.sun}</span><span class="hc-day">${hc.mon}</span></div>`
         : '';
 
+    const quickCircle = isPending
+        ? `<div class="quick-receive-circle pending" onclick="event.stopPropagation(); quickReceiveItem(${item.supplierIdx}, ${item.itemIdx})"></div>`
+        : `<div class="quick-receive-circle done" onclick="event.stopPropagation(); openCheckInModalFlat(${item.supplierIdx}, ${item.itemIdx})"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20,6 9,17 4,12"/></svg></div>`;
+
     return `
     <div class="compact-row ${statusClass} ${processingClass} ${floorClass}${showSupplier ? '' : ' accordion-item'}"
          onclick="openCheckInModalFlat(${item.supplierIdx}, ${item.itemIdx})">
@@ -1267,6 +1276,7 @@ function renderCompactRow(item, showSupplier, crossMap = null) {
         <div class="compact-name">${item.raw_description}</div>
         ${supplierChip}
         ${hcStrip}
+        ${quickCircle}
     </div>${alsoRow}`;
 }
 
@@ -1295,11 +1305,15 @@ function renderMultiSupplierRow(items) {
         const pullQty = item.pull_quantity != null
             ? `<span class="pull-qty ${pullConfirmedClass}" onclick="event.stopPropagation(); openPullPopup(event, ${item.supplierIdx}, ${item.itemIdx})">(${item.pull_quantity})</span> `
             : `<span class="pull-qty pull-qty-empty" onclick="event.stopPropagation(); openPullPopup(event, ${item.supplierIdx}, ${item.itemIdx})">+</span> `;
+        const msCircle = isPending
+            ? `<div class="quick-receive-circle pending" onclick="event.stopPropagation(); quickReceiveItem(${item.supplierIdx}, ${item.itemIdx})"></div>`
+            : `<div class="quick-receive-circle done" onclick="event.stopPropagation(); openCheckInModalFlat(${item.supplierIdx}, ${item.itemIdx})"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20,6 9,17 4,12"/></svg></div>`;
         return `
         <div class="compact-row supplier-sub-row ${statusClass}"
              onclick="openCheckInModalFlat(${item.supplierIdx}, ${item.itemIdx})">
             <div class="compact-qty">${pullQty}${item.quantity_expected}</div>
             <div class="compact-supplier sub-row-supplier" onclick="event.stopPropagation(); filterBySupplier(${item.supplierIdx})">${item.supplierName}</div>
+            ${msCircle}
         </div>`;
     }).join('');
 
@@ -1363,20 +1377,10 @@ function renderSupplierAccordion(container, flatItems) {
         const statusClass = allDone ? 'supplier-complete' : '';
         const chevronClass = isExpanded ? 'accordion-chevron expanded' : 'accordion-chevron';
 
-        // Receive All / Unreceive All button (only when expanded)
-        let receiveBtn = '';
-        if (isExpanded) {
-            const pendingCount = allItems.filter(i => i.received_status === 'pending').length;
-            receiveBtn = pendingCount === 0
-                ? `<button class="receive-all-btn unreceive" onclick="event.stopPropagation(); unreceiveAllSupplier(${sIdx})">Unreceive All</button>`
-                : `<button class="receive-all-btn" onclick="event.stopPropagation(); receiveAllSupplier(${sIdx})">Receive All</button>`;
-        }
-
         html += `
         <div class="supplier-accordion-header ${statusClass}" onclick="toggleSupplierAccordion(${sIdx})">
             <span class="${chevronClass}">&#9654;</span>
             <span class="accordion-supplier-name">${supplier.supplier_name} <span class="accordion-case-count"><span class="count-green">${fmtNum(rcvCases)}</span>/${fmtNum(expCases)}</span></span>
-            ${receiveBtn ? `<span class="accordion-receive-all">${receiveBtn}</span>` : ''}
         </div>`;
 
         if (isExpanded && supplierItems.length > 0) {
@@ -1466,9 +1470,6 @@ function filterBySupplier(supplierIdx) {
     const detailTitle = document.getElementById('detail-title');
     detailTitle.classList.remove('hidden');
     document.getElementById('detail-title-text').textContent = supplier.supplier_name;
-
-    // Receive All / Unreceive All button in sort bar
-    renderReceiveAllButton(supplierIdx, 'item-receive-all-btn');
 
     renderItemList();
     // Scroll to top
@@ -2116,6 +2117,35 @@ async function submitCheckIn() {
         }
     } catch (e) {
         showToast('Failed to check in item', 'error');
+    }
+}
+
+// ---- Quick Receive (target circle in main view) ----
+
+async function quickReceiveItem(supplierIdx, itemIdx) {
+    const item = currentDelivery.suppliers[supplierIdx].items[itemIdx];
+    if (item.received_status !== 'pending') return;
+
+    const qty = item.quantity_expected;
+    try {
+        await apiPatch(
+            `/deliveries/${currentDelivery.id}/suppliers/${supplierIdx}/items/${itemIdx}/checkin`,
+            { quantity_received: qty, received_status: 'ok', received_notes: null }
+        );
+        lastWriteTimestamp = Date.now();
+        item.quantity_received = qty;
+        item.received_status = 'ok';
+        item.received_notes = null;
+
+        if (supplierFilter !== null) updateFilteredSupplierSummary();
+        renderDetail();
+
+        if (!completionShown && checkAllItemsReceived()) {
+            completionShown = true;
+            showCompletionModal();
+        }
+    } catch (e) {
+        showToast('Failed to receive item', 'error');
     }
 }
 

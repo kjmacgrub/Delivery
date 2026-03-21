@@ -2540,6 +2540,39 @@ textarea {
     height: 14px;
 }
 
+/* ---- Quick Receive Circle (main view item rows) ---- */
+.compact-row {
+    padding-right: 46px;
+}
+
+.quick-receive-circle {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    position: absolute;
+    right: 10px;
+    top: 50%;
+    transform: translateY(-50%);
+    -webkit-tap-highlight-color: transparent;
+}
+
+.quick-receive-circle.pending {
+    border: 2px solid var(--border);
+}
+
+.quick-receive-circle.done {
+    background: var(--success);
+    color: white;
+}
+
+.quick-receive-circle svg {
+    width: 14px;
+    height: 14px;
+}
+
 /* ---- Import Screen (grouped by date) ---- */
 .import-group {
     background: var(--surface);
