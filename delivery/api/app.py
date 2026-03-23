@@ -13,7 +13,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, HTMLResponse
 
-from delivery.api.routes import deliveries, items, checkin, storage
+from delivery.api.routes import deliveries, items, checkin, storage, notes
 
 logger = logging.getLogger(__name__)
 
@@ -81,6 +81,7 @@ def create_app(use_firebase: bool = True) -> FastAPI:
     app.include_router(items.router, prefix="/api/v1", tags=["items"])
     app.include_router(checkin.router, prefix="/api/v1", tags=["checkin"])
     app.include_router(storage.router, prefix="/api/v1", tags=["storage"])
+    app.include_router(notes.router, prefix="/api/v1", tags=["notes"])
 
     # Resolve commit hash once at startup
     def _get_commit_hash() -> str:

@@ -965,19 +965,14 @@ html, body {
     border-left-color: var(--primary);
 }
 
-.checked-ok .compact-qty,
-.checked-short .compact-qty,
-.checked-over .compact-qty,
-.checked-return .compact-qty {
-    color: var(--success);
-}
-
 .compact-qty {
     font-size: 15px;
     font-weight: 700;
     color: #000;
     min-width: 28px;
-    text-align: right;
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
     flex-shrink: 0;
     white-space: nowrap;
     position: relative;
@@ -2544,37 +2539,329 @@ textarea {
     height: 14px;
 }
 
-/* ---- Quick Receive Circle (main view item rows) ---- */
+/* ---- Qty Receive Circle (left side of item rows) ---- */
 .compact-row {
-    padding-right: 46px;
+    padding-right: 40px;
 }
 
-.quick-receive-circle {
-    display: flex;
+.qty-circle {
+    display: inline-flex;
     align-items: center;
     justify-content: center;
     width: 28px;
     height: 28px;
     border-radius: 50%;
-    position: absolute;
-    right: 10px;
-    top: 50%;
-    transform: translateY(-50%);
+    font-size: 13px;
+    font-weight: 700;
     -webkit-tap-highlight-color: transparent;
+    cursor: pointer;
+    flex-shrink: 0;
 }
 
-.quick-receive-circle.pending {
+.qty-circle.pending {
     border: 2px solid var(--border);
+    color: #000;
 }
 
-.quick-receive-circle.done {
+.qty-circle.done {
     background: var(--success);
     color: white;
 }
 
-.quick-receive-circle svg {
+.qty-circle.qty-3digit {
+    font-size: 10px;
+}
+
+.qty-circle svg {
     width: 14px;
     height: 14px;
+}
+
+/* ---- Item Note Button (right side of item rows) ---- */
+.item-note-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    position: absolute;
+    right: 8px;
+    top: 50%;
+    transform: translateY(-50%);
+    -webkit-tap-highlight-color: transparent;
+    cursor: pointer;
+    color: var(--border);
+    opacity: 0.4;
+}
+
+.item-note-btn.has-note {
+    color: var(--primary);
+    opacity: 1;
+}
+
+.item-note-btn svg {
+    width: 18px;
+    height: 18px;
+}
+
+/* ---- Note Popup ---- */
+.note-popup {
+    position: fixed;
+    left: 50%;
+    top: 40%;
+    transform: translate(-50%, -50%);
+    z-index: 1100;
+    background: var(--surface);
+    border-radius: var(--radius);
+    box-shadow: 0 8px 32px rgba(0,0,0,0.25);
+    padding: 16px;
+    width: 320px;
+    max-width: 90vw;
+}
+
+.note-popup textarea {
+    width: 100%;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px;
+    font-size: 14px;
+    font-family: inherit;
+    resize: vertical;
+    margin-top: 8px;
+    box-sizing: border-box;
+}
+
+.note-popup-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+    margin-top: 12px;
+}
+
+.btn-sm {
+    padding: 6px 14px;
+    font-size: 13px;
+}
+
+/* ---- Edit Trigger & Pull Indicator (left margin) ---- */
+.qty-left-stack {
+    position: absolute;
+    right: calc(100% + 4px);
+    top: 50%;
+    transform: translateY(-50%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 36px;
+    text-align: center;
+}
+
+.pull-indicator {
+    font-weight: 700;
+    font-size: 13px;
+    color: #888;
+    line-height: 1;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+}
+
+.pull-indicator.pull-confirmed {
+    color: var(--primary);
+}
+
+.edit-trigger {
+    font-size: 10px;
+    font-weight: 600;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    cursor: pointer;
+    padding: 1px 4px;
+    border-radius: 3px;
+    line-height: 1;
+    -webkit-tap-highlight-color: transparent;
+}
+
+.edit-trigger:active,
+.edit-trigger.active {
+    background: var(--primary);
+    color: white;
+}
+
+/* ---- Inline Edit Panel ---- */
+.inline-edit-panel {
+    background: #f5f5f7;
+    border-left: 3px solid var(--primary);
+    padding: 10px 14px 10px 50px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.ie-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.ie-label {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-secondary);
+    min-width: 68px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    transition: color 0.15s;
+}
+
+.ie-label.ie-confirmed {
+    color: var(--success);
+}
+
+.ie-checkbox {
+    width: 22px;
+    height: 22px;
+    border-radius: 4px;
+    border: 2px solid var(--border);
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+    flex-shrink: 0;
+    position: relative;
+}
+
+.ie-checkbox.checked {
+    background: var(--success);
+    border-color: var(--success);
+}
+
+.ie-checkbox.checked::after {
+    content: '';
+    position: absolute;
+    left: 6px;
+    top: 2px;
+    width: 6px;
+    height: 11px;
+    border: solid white;
+    border-width: 0 2px 2px 0;
+    transform: rotate(45deg);
+}
+
+.ie-return-details {
+    gap: 8px;
+}
+
+.ie-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-secondary);
+    padding: 3px 10px;
+    border-radius: 12px;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+}
+
+.ie-tag.checked {
+    background: var(--primary);
+    color: white;
+    border-color: var(--primary);
+}
+
+.ie-tag-check {
+    width: 12px;
+    height: 12px;
+    border-radius: 3px;
+    border: 1.5px solid currentColor;
+    position: relative;
+    flex-shrink: 0;
+}
+
+.ie-tag.checked .ie-tag-check {
+    border-color: white;
+}
+
+.ie-tag.checked .ie-tag-check::after {
+    content: '';
+    position: absolute;
+    left: 2px;
+    top: 0px;
+    width: 4px;
+    height: 7px;
+    border: solid white;
+    border-width: 0 1.5px 1.5px 0;
+    transform: rotate(45deg);
+}
+
+.ie-done {
+    padding: 6px 16px;
+    border-radius: 8px;
+    border: none;
+    background: var(--primary);
+    color: white;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+    margin-left: 8px;
+    white-space: nowrap;
+}
+
+.ie-done:active {
+    opacity: 0.8;
+}
+
+.ie-note-input {
+    flex: 1;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 6px 10px;
+    font-size: 13px;
+    font-family: inherit;
+    background: var(--surface);
+    box-sizing: border-box;
+}
+
+.ie-stepper {
+    display: flex;
+    align-items: center;
+    gap: 0;
+    background: var(--surface);
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    overflow: hidden;
+}
+
+.ie-btn {
+    width: 36px;
+    height: 32px;
+    border: none;
+    background: none;
+    font-size: 18px;
+    font-weight: 600;
+    color: var(--text-secondary);
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+}
+
+.ie-btn:active {
+    background: var(--bg);
+}
+
+.ie-value {
+    min-width: 32px;
+    text-align: center;
+    font-size: 15px;
+    font-weight: 700;
+    color: #000;
+}
+
+
+.ie-done:active {
+    opacity: 0.8;
 }
 
 /* ---- Import Screen (grouped by date) ---- */
