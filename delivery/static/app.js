@@ -100,40 +100,40 @@ function showView(name) {
     const brandText = document.getElementById('header-brand-text');
     document.getElementById('app-header').classList.remove('street-view-active');
 
-    // Always show delivery date in brand text when a delivery is loaded
-    brandText.textContent = currentDelivery
+    // Show delivery date in the secondary header (page-title)
+    title.textContent = currentDelivery
         ? `${currentDelivery.day_of_week} ${formatDate(currentDelivery.delivery_date)}`
         : '';
 
     switch (name) {
 
         case 'deliveries':
-            title.textContent = '(Main View)';
+            brandText.textContent = 'Delivery View';
             badge.textContent = '';
             badge.className = 'badge';
             break;
         case 'storage':
-            title.textContent = '(Main View)';
+            brandText.textContent = 'Delivery View';
             badge.textContent = '';
             badge.className = 'badge';
             break;
         case 'detail':
-            title.textContent = '(Main View)';
+            brandText.textContent = 'Delivery View';
             badge.textContent = '';
             badge.className = 'badge';
             break;
         case 'complete':
-            title.textContent = '(Main View)';
+            brandText.textContent = 'Delivery View';
             badge.textContent = 'completed';
             badge.className = 'badge badge-completed';
             break;
         case 'reports':
-            title.textContent = '(Main View)';
+            brandText.textContent = 'Delivery View';
             badge.textContent = '';
             badge.className = 'badge';
             break;
         case 'pullsheet':
-            title.textContent = '(Street View)';
+            brandText.textContent = 'Street View';
             badge.textContent = '';
             badge.className = 'badge';
             document.getElementById('app-header').classList.add('street-view-active');
