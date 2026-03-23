@@ -1560,7 +1560,7 @@ function renderLiveReport() {
         return sup !== 0 ? sup : a.raw_description.toLowerCase().localeCompare(b.raw_description.toLowerCase());
     });
 
-    html += `<div class="report-section-header">Pulls</div>`;
+    html += `<div class="report-section-header">Pull</div>`;
 
     if (pullItems.length === 0) {
         html += '<div class="report-section-empty">No pull items</div>';
