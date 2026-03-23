@@ -1000,6 +1000,15 @@ function renderDetail() {
     }
 
     renderItemList();
+    updateSortBarStickyTop();
+}
+
+function updateSortBarStickyTop() {
+    const summary = document.getElementById('delivery-summary');
+    const sortBar = document.querySelector('#tab-content-items .sort-bar');
+    if (summary && sortBar) {
+        sortBar.style.top = summary.offsetHeight + 'px';
+    }
 }
 
 function setShowReceived(val) {
