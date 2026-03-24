@@ -1019,6 +1019,8 @@ function toggleInlineEdit(supplierIdx, itemIdx) {
         item._iePullConfirmed = item.pull_confirmed || false;
         item._ieRcvQty = item.quantity_received ?? item.quantity_expected;
         item._ieRcvConfirmed = item.received_status !== 'pending';
+        item._ieOosQty = 0;
+        item._ieOosConfirmed = false;
         item._ieReturnQty = 0;
         item._ieReturnConfirmed = false;
         item._ieReturnAll = false;
@@ -1031,6 +1033,7 @@ function toggleInlineEdit(supplierIdx, itemIdx) {
             pull_confirmed: item.pull_confirmed,
             pull_submitted: item.pull_submitted,
             pull_for_floor: item.pull_for_floor,
+            quantity_expected: item.quantity_expected,
             quantity_received: item.quantity_received,
             received_status: item.received_status,
             received_notes: item.received_notes,
@@ -1046,6 +1049,8 @@ function cleanupInlineEditState() {
     delete item._iePullConfirmed;
     delete item._ieRcvQty;
     delete item._ieRcvConfirmed;
+    delete item._ieOosQty;
+    delete item._ieOosConfirmed;
     delete item._ieReturnQty;
     delete item._ieReturnConfirmed;
     delete item._ieReturnAll;
@@ -1062,6 +1067,8 @@ function renderInlineEditPanel(item) {
     const pullConfirmed = item._iePullConfirmed || false;
     const rcvQty = item._ieRcvQty ?? item.quantity_expected;
     const rcvConfirmed = item._ieRcvConfirmed || false;
+    const oosQty = item._ieOosQty ?? 0;
+    const oosConfirmed = item._ieOosConfirmed || false;
     const retQty = item._ieReturnQty ?? 0;
     const retConfirmed = item._ieReturnConfirmed || false;
 
@@ -1085,6 +1092,11 @@ function renderInlineEditPanel(item) {
                     <button class="ie-btn" onclick="ieAdjustReceived(${si}, ${ii}, 1)">+</button>
                 </div>
                 <span class="ie-checkbox${rcvConfirmed ? ' checked' : ''}" onclick="ieCommitAll(${si}, ${ii})"></span>
+            </div>
+            <div class="ie-col">
+                <span class="ie-label" title="Out of Stock">O/S</span>
+                <span class="ie-oos-qty">${item.quantity_expected}</span>
+                <span class="ie-checkbox${oosConfirmed ? ' checked' : ''}" onclick="ieConfirmOos(${si}, ${ii})"></span>
             </div>
             <div class="ie-col ie-col-return">
                 <div class="ie-label-row">
@@ -1113,6 +1125,7 @@ function renderInlineEditPanel(item) {
             </div>
         </div>
         <div class="ie-bottom-row">
+            <span class="ie-accept" onclick="ieCommitAll(${si}, ${ii})">Accept</span>
             <span class="ie-cancel" onclick="ieUndo(${si}, ${ii})">cancel all changes</span>
         </div>
     </div>`;
@@ -1166,6 +1179,21 @@ function ieAdjustReceived(si, ii, delta) {
     renderItemList();
 }
 
+// -- Out of Stock: toggle (all or nothing) --
+function ieConfirmOos(si, ii) {
+    const item = currentDelivery.suppliers[si].items[ii];
+    const newState = !item._ieOosConfirmed;
+    item._ieOosConfirmed = newState;
+    if (newState) {
+        item._ieOosQty = item.quantity_expected;
+        item._ieRcvQty = 0;
+    } else {
+        item._ieOosQty = 0;
+        item._ieRcvQty = item.quantity_expected;
+    }
+    renderItemList();
+}
+
 // -- Return: adjust qty (subtracts from received) --
 function ieAdjustReturn(si, ii, delta) {
     const item = currentDelivery.suppliers[si].items[ii];
@@ -1201,31 +1229,37 @@ async function ieCommitAll(si, ii) {
     }
 
     const rcvQty = item._ieRcvQty ?? item.quantity_expected;
+    const oosQty = item._ieOosQty ?? 0;
     const retQty = item._ieReturnQty ?? 0;
     const hasReturn = retQty > 0;
+    const hasOos = oosQty > 0;
 
     // Determine status
     let status;
     if (hasReturn) {
         status = 'return';
+    } else if (hasOos || rcvQty < item.quantity_expected) {
+        status = 'short';
     } else if (rcvQty === item.quantity_expected) {
         status = 'ok';
-    } else if (rcvQty < item.quantity_expected) {
-        status = 'short';
     } else {
         status = 'over';
     }
 
-    // Build notes from return info
-    let notes = item.received_notes || null;
+    // Build notes from return and O/S info
+    let noteParts = [];
+    if (hasOos) {
+        noteParts.push(`O/S ${oosQty}`);
+    }
     if (hasReturn) {
         const tags = [];
         if (item._ieReturnQuality) tags.push('Quality');
         if (item._ieReturnMispick) tags.push('Mispick');
         const noteText = item._ieReturnNote || '';
         const returnNote = [tags.join(', '), noteText].filter(Boolean).join(' — ');
-        notes = returnNote ? `Return ${retQty}: ${returnNote}` : `Return ${retQty}`;
+        noteParts.push(returnNote ? `Return ${retQty}: ${returnNote}` : `Return ${retQty}`);
     }
+    let notes = noteParts.length > 0 ? noteParts.join('; ') : (item.received_notes || null);
 
     try {
         await apiPatch(
@@ -1703,12 +1737,13 @@ function renderCompactRow(item, showSupplier, crossMap = null) {
     const noteBtn = `<div class="item-note-btn${hasNote ? ' has-note' : ''}" onclick="event.stopPropagation(); openNotePopup('${escapeAttr(item.raw_description)}')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg></div>`;
 
     const editPanel = isEditing ? renderInlineEditPanel(item) : '';
+    const isOos = item._ieOosConfirmed || (item.received_notes && item.received_notes.includes('O/S'));
 
     return `
     <div class="compact-row ${statusClass} ${processingClass} ${floorClass}${showSupplier ? '' : ' accordion-item'}${isEditing ? ' editing' : ''}"
          onclick="toggleInlineEdit(${si}, ${ii})">
         <div class="compact-qty"><div class="qty-left-stack">${leftLabel}</div>${qtyCircle}</div>
-        <div class="compact-name">${item.raw_description}</div>
+        <div class="compact-name${isOos ? ' oos' : ''}">${item.raw_description}</div>
         ${supplierChip}
         ${hcStrip}
         ${noteBtn}
@@ -2043,7 +2078,7 @@ function renderLiveReport() {
                 <div class="pull-sheet-row ${confirmedClass}" onclick="togglePullFromReport(${item.supplierIdx}, ${item.itemIdx})">
                     <span class="pull-qty-circle ${item.pull_confirmed ? 'done' : 'pending'}">${item.pull_quantity}</span>
                     <span class="pull-sheet-of">(of ${item.quantity_expected})</span>
-                    <span class="pull-sheet-name">${item.raw_description}</span>
+                    <span class="pull-sheet-name${(item.received_notes && item.received_notes.includes('O/S')) ? ' oos' : ''}">${item.raw_description}</span>
                 </div>`;
             });
         });
@@ -2875,7 +2910,7 @@ function buildAdjustmentStatsHtml(adjItems) {
         return `
         <div class="report-item-row">
             <div class="report-item-info">
-                <span class="report-item-name">${item.name}</span>
+                <span class="report-item-name${item.notes && item.notes.includes('O/S') ? ' oos' : ''}">${item.name}</span>
                 <span class="report-item-supplier">${item.supplier}</span>
                 ${rcvLabel}${notesHtml}
             </div>

@@ -50,3 +50,25 @@ async def list_items(
             })
 
     return {"items": items, "total": len(items)}
+
+
+@router.get("/oos-items")
+async def get_oos_items(request: Request):
+    """Return item descriptions marked Out of Stock from the most recent delivery."""
+    service = _get_service(request)
+    summaries = service.list_deliveries()
+    if not summaries:
+        return {"oos": []}
+
+    # Most recent delivery first
+    latest = sorted(summaries, key=lambda s: s.delivery_date or "", reverse=True)[0]
+    delivery = service.get_delivery(latest.id)
+    if not delivery:
+        return {"oos": []}
+
+    oos = []
+    for supplier in delivery.suppliers:
+        for item in supplier.items:
+            if item.received_notes and "O/S" in item.received_notes:
+                oos.append(item.raw_description.lower().strip())
+    return {"oos": oos}

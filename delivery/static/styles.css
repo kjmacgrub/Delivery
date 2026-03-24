@@ -1090,6 +1090,11 @@ html, body {
     word-break: break-word;
 }
 
+.oos {
+    text-decoration: line-through;
+    opacity: 0.5;
+}
+
 .multi-supplier-header {
     cursor: default;
     font-weight: 700;
@@ -2767,7 +2772,32 @@ textarea {
 
 .ie-bottom-row {
     display: flex;
-    justify-content: center;
+    align-items: center;
+}
+
+.ie-bottom-row .ie-accept {
+    flex: 3;
+    text-align: center;
+}
+
+.ie-bottom-row .ie-cancel {
+    flex: 2;
+    text-align: center;
+}
+
+.ie-accept {
+    font-size: 13px;
+    font-weight: 600;
+    color: white;
+    background: var(--success);
+    padding: 5px 18px;
+    border-radius: 14px;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+}
+
+.ie-accept:active {
+    opacity: 0.8;
 }
 
 .ie-label {
@@ -2781,6 +2811,17 @@ textarea {
 
 .ie-label.ie-confirmed {
     color: var(--success);
+}
+
+.ie-subtext {
+    font-size: 11px;
+    color: var(--text-secondary);
+}
+
+.ie-oos-qty {
+    font-size: 17px;
+    font-weight: 700;
+    color: var(--text);
 }
 
 .ie-label-row {
