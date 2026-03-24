@@ -414,7 +414,8 @@ function isModalOpen() {
     const pullPopup = document.getElementById('pull-popup');
     return (checkinModal && !checkinModal.classList.contains('hidden')) ||
            (completeModal && !completeModal.classList.contains('hidden')) ||
-           (pullPopup && !pullPopup.classList.contains('hidden'));
+           (pullPopup && !pullPopup.classList.contains('hidden')) ||
+           inlineEditItem != null;
 }
 
 function applyDeliveryUpdate(data) {
@@ -655,6 +656,9 @@ function renderDeliveryReport(delivery) {
             diff: i.received_status === 'short' ? Math.max(0, (i.quantity_expected || 0) - (i.quantity_received || 0))
                 : i.received_status === 'over' ? Math.max(0, (i.quantity_received || 0) - (i.quantity_expected || 0))
                 : (i.quantity_expected || 0),
+            notes: i.received_notes || '',
+            received: i.quantity_received,
+            expected: i.quantity_expected,
         }));
 
     // Pulls
@@ -1017,9 +1021,20 @@ function toggleInlineEdit(supplierIdx, itemIdx) {
         item._ieRcvConfirmed = item.received_status !== 'pending';
         item._ieReturnQty = 0;
         item._ieReturnConfirmed = false;
+        item._ieReturnAll = false;
         item._ieReturnQuality = false;
         item._ieReturnMispick = false;
         item._ieReturnNote = '';
+        // Snapshot originals for undo
+        item._ieOriginal = {
+            pull_quantity: item.pull_quantity,
+            pull_confirmed: item.pull_confirmed,
+            pull_submitted: item.pull_submitted,
+            pull_for_floor: item.pull_for_floor,
+            quantity_received: item.quantity_received,
+            received_status: item.received_status,
+            received_notes: item.received_notes,
+        };
     }
     renderItemList();
 }
@@ -1033,9 +1048,11 @@ function cleanupInlineEditState() {
     delete item._ieRcvConfirmed;
     delete item._ieReturnQty;
     delete item._ieReturnConfirmed;
+    delete item._ieReturnAll;
     delete item._ieReturnQuality;
     delete item._ieReturnMispick;
     delete item._ieReturnNote;
+    delete item._ieOriginal;
 }
 
 function renderInlineEditPanel(item) {
@@ -1065,7 +1082,8 @@ function renderInlineEditPanel(item) {
                 <span class="ie-value">${rcvQty}</span>
                 <button class="ie-btn" onclick="ieAdjustReceived(${si}, ${ii}, 1)">+</button>
             </div>
-            <button class="ie-done" onclick="ieCommitAll(${si}, ${ii})">Done</button>
+            <button class="ie-done" onclick="ieCommitAll(${si}, ${ii})"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20,6 9,17 4,12"/></svg></button>
+            <span class="ie-cancel" onclick="ieUndo(${si}, ${ii})">cancel</span>
         </div>
         <div class="ie-row">
             <span class="ie-label">${retConfirmed ? 'Returned' : 'Return'}</span>
@@ -1074,6 +1092,9 @@ function renderInlineEditPanel(item) {
                 <span class="ie-value">${retQty}</span>
                 <button class="ie-btn" onclick="ieAdjustReturn(${si}, ${ii}, 1)">+</button>
             </div>
+            <label class="ie-tag${item._ieReturnAll ? ' checked' : ''}" onclick="ieToggleReturnAll(${si}, ${ii})">
+                <span class="ie-tag-check"></span>All
+            </label>
             <label class="ie-tag${item._ieReturnQuality ? ' checked' : ''}" onclick="ieToggleReturnTag(${si}, ${ii}, 'quality')">
                 <span class="ie-tag-check"></span>Quality
             </label>
@@ -1199,6 +1220,64 @@ async function ieCommitAll(si, ii) {
     } catch (e) {
         showToast('Failed to save', 'error');
     }
+}
+
+async function ieUndo(si, ii) {
+    const item = currentDelivery.suppliers[si].items[ii];
+    const orig = item._ieOriginal;
+    if (!orig) return;
+    try {
+        // Restore pull quantity
+        const origPullQty = orig.pull_quantity ?? 0;
+        await apiPatch(
+            `/deliveries/${currentDelivery.id}/suppliers/${si}/items/${ii}/set-pull`,
+            { quantity: origPullQty }
+        );
+        item.pull_quantity = orig.pull_quantity;
+        item.pull_for_floor = orig.pull_for_floor;
+        // Restore pull confirmed if it changed
+        if (item.pull_confirmed !== orig.pull_confirmed) {
+            await apiPatch(`/deliveries/${currentDelivery.id}/suppliers/${si}/items/${ii}/pull-confirm`, {});
+            item.pull_confirmed = orig.pull_confirmed;
+            item.pull_submitted = orig.pull_submitted;
+        }
+        // Restore received if it was changed from original
+        if (orig.received_status !== 'pending') {
+            await apiPatch(
+                `/deliveries/${currentDelivery.id}/suppliers/${si}/items/${ii}/checkin`,
+                { quantity_received: orig.quantity_received, received_status: orig.received_status, received_notes: orig.received_notes }
+            );
+        } else if (item.received_status !== 'pending') {
+            await apiPatch(`/deliveries/${currentDelivery.id}/suppliers/${si}/items/${ii}/unreceive`, {});
+        }
+        lastWriteTimestamp = Date.now();
+        item.quantity_received = orig.quantity_received;
+        item.received_status = orig.received_status;
+        item.received_notes = orig.received_notes;
+        cleanupInlineEditState();
+        inlineEditItem = null;
+        if (supplierFilter !== null) updateFilteredSupplierSummary();
+        renderDetail();
+        showToast('Reverted');
+    } catch (e) {
+        showToast('Failed to undo', 'error');
+    }
+}
+
+function ieToggleReturnAll(si, ii) {
+    const item = currentDelivery.suppliers[si].items[ii];
+    item._ieReturnAll = !item._ieReturnAll;
+    if (item._ieReturnAll) {
+        // Return everything: set return qty to current received, received to 0
+        const currentRcv = item._ieRcvQty ?? item.quantity_expected;
+        item._ieReturnQty = currentRcv;
+        item._ieRcvQty = 0;
+    } else {
+        // Undo: restore received and zero out return
+        item._ieRcvQty = (item._ieRcvQty ?? 0) + (item._ieReturnQty ?? 0);
+        item._ieReturnQty = 0;
+    }
+    renderItemList();
 }
 
 function ieToggleReturnTag(si, ii, tag) {
@@ -1509,6 +1588,7 @@ function buildCrossSupplierMap() {
                 supplierIdx: sIdx,
                 itemIdx: iIdx,
                 qty: item.quantity_expected,
+                quantity_received: item.quantity_received,
                 received_status: item.received_status,
                 pull_quantity: item.pull_quantity,
                 pull_confirmed: item.pull_confirmed,
@@ -1529,8 +1609,8 @@ function renderCompactRow(item, showSupplier, crossMap = null) {
     const si = item.supplierIdx, ii = item.itemIdx;
     const isEditing = inlineEditItem && inlineEditItem.supplierIdx === si && inlineEditItem.itemIdx === ii;
     const leftLabel = item.pull_quantity != null
-        ? `<span class="pull-indicator ${pullConfirmedClass}" onclick="event.stopPropagation(); toggleInlineEdit(${si}, ${ii})">(${item.pull_quantity})</span>`
-        : `<span class="edit-trigger${isEditing ? ' active' : ''}" onclick="event.stopPropagation(); toggleInlineEdit(${si}, ${ii})">edit</span>`;
+        ? `<span class="pull-indicator ${pullConfirmedClass}">${item.pull_quantity}</span>`
+        : '';
 
     const supplierChip = showSupplier
         ? `<div class="compact-supplier" onclick="event.stopPropagation(); filterBySupplier(${item.supplierIdx})">${item.supplierAbbrev}</div>`
@@ -1549,10 +1629,11 @@ function renderCompactRow(item, showSupplier, crossMap = null) {
                     ? `<span class="pull-qty ${ePullConfirmedClass}" onclick="event.stopPropagation(); openPullPopup(event, ${e.supplierIdx}, ${e.itemIdx})">(${e.pull_quantity})</span> `
                     : `<span class="pull-qty pull-qty-empty" onclick="event.stopPropagation(); openPullPopup(event, ${e.supplierIdx}, ${e.itemIdx})" ></span> `;
                 const eIsPending = e.received_status === 'pending';
+                const eDoneQty = e.quantity_received ?? e.qty;
                 const eQtyCircle = eIsPending
                     ? `<div class="qty-circle pending${qtyDigitClass(e.qty)}" onclick="event.stopPropagation(); quickReceiveItem(${e.supplierIdx}, ${e.itemIdx})">${e.qty}</div>`
-                    : `<div class="qty-circle done" onclick="event.stopPropagation(); openCheckInModalFlat(${e.supplierIdx}, ${e.itemIdx})"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20,6 9,17 4,12"/></svg></div>`;
-                return `<div class="compact-row supplier-sub-row ${eStatus}" onclick="openCheckInModalFlat(${e.supplierIdx}, ${e.itemIdx})">
+                    : `<div class="qty-circle done${qtyDigitClass(eDoneQty)}" onclick="event.stopPropagation(); toggleInlineEdit(${e.supplierIdx}, ${e.itemIdx})">${eDoneQty}</div>`;
+                return `<div class="compact-row supplier-sub-row ${eStatus}" onclick="toggleInlineEdit(${e.supplierIdx}, ${e.itemIdx})">
                     <div class="compact-qty">${ePullQty}${eQtyCircle}</div>
                     <div class="compact-supplier sub-row-supplier" onclick="event.stopPropagation(); filterBySupplier(${e.supplierIdx})">${e.supplierName}</div>
                 </div>`;
@@ -1574,9 +1655,10 @@ function renderCompactRow(item, showSupplier, crossMap = null) {
         circleQty = item._ieRcvQty ?? item.quantity_expected;
     }
 
+    const doneQty = isEditing ? circleQty : (item.quantity_received ?? item.quantity_expected);
     const qtyCircle = isPending
         ? `<div class="qty-circle pending${qtyDigitClass(circleQty)}" onclick="event.stopPropagation(); quickReceiveItem(${si}, ${ii})">${circleQty}</div>`
-        : `<div class="qty-circle done" onclick="event.stopPropagation(); openCheckInModalFlat(${si}, ${ii})"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20,6 9,17 4,12"/></svg></div>`;
+        : `<div class="qty-circle done${qtyDigitClass(doneQty)}" onclick="event.stopPropagation(); toggleInlineEdit(${si}, ${ii})">${doneQty}</div>`;
 
     const noteKey = item.raw_description.toLowerCase().trim().replace(/\//g, '_');
     const hasNote = itemNotes[noteKey];
@@ -1586,7 +1668,7 @@ function renderCompactRow(item, showSupplier, crossMap = null) {
 
     return `
     <div class="compact-row ${statusClass} ${processingClass} ${floorClass}${showSupplier ? '' : ' accordion-item'}"
-         onclick="openCheckInModalFlat(${si}, ${ii})">
+         onclick="toggleInlineEdit(${si}, ${ii})">
         <div class="compact-qty"><div class="qty-left-stack">${leftLabel}</div>${qtyCircle}</div>
         <div class="compact-name">${item.raw_description}</div>
         ${supplierChip}
@@ -1625,12 +1707,13 @@ function renderMultiSupplierRow(items) {
         const pullQty = item.pull_quantity != null
             ? `<span class="pull-qty ${pullConfirmedClass}" onclick="event.stopPropagation(); openPullPopup(event, ${item.supplierIdx}, ${item.itemIdx})">(${item.pull_quantity})</span> `
             : `<span class="pull-qty pull-qty-empty" onclick="event.stopPropagation(); openPullPopup(event, ${item.supplierIdx}, ${item.itemIdx})">+</span> `;
+        const msDoneQty = item.quantity_received ?? item.quantity_expected;
         const msQtyCircle = isPending
             ? `<div class="qty-circle pending${qtyDigitClass(item.quantity_expected)}" onclick="event.stopPropagation(); quickReceiveItem(${item.supplierIdx}, ${item.itemIdx})">${item.quantity_expected}</div>`
-            : `<div class="qty-circle done" onclick="event.stopPropagation(); openCheckInModalFlat(${item.supplierIdx}, ${item.itemIdx})"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20,6 9,17 4,12"/></svg></div>`;
+            : `<div class="qty-circle done${qtyDigitClass(msDoneQty)}" onclick="event.stopPropagation(); toggleInlineEdit(${item.supplierIdx}, ${item.itemIdx})">${msDoneQty}</div>`;
         return `
         <div class="compact-row supplier-sub-row ${statusClass}"
-             onclick="openCheckInModalFlat(${item.supplierIdx}, ${item.itemIdx})">
+             onclick="toggleInlineEdit(${item.supplierIdx}, ${item.itemIdx})">
             <div class="compact-qty">${pullQty}${msQtyCircle}</div>
             <div class="compact-supplier sub-row-supplier" onclick="event.stopPropagation(); filterBySupplier(${item.supplierIdx})">${item.supplierName}</div>
         </div>`;
@@ -1861,6 +1944,9 @@ function renderLiveReport() {
         diff: e.status === 'short' ? Math.max(0, (e.expected || 0) - (e.received || 0))
             : e.status === 'over' ? Math.max(0, (e.received || 0) - (e.expected || 0))
             : (e.expected || 0),
+        notes: e.notes || '',
+        received: e.received,
+        expected: e.expected,
     }));
 
     html += '<div class="report-section-header">Returns and Adjustments</div>';
@@ -2743,11 +2829,16 @@ function buildAdjustmentStatsHtml(adjItems) {
     }
     return adjItems.map(item => {
         const diffLabel = `${item.diff} ${item.status}`;
+        const rcvLabel = item.received != null && item.expected != null && item.received !== item.expected
+            ? `<span class="report-item-rcv">Received ${item.received} of ${item.expected}</span>` : '';
+        const notesHtml = item.notes
+            ? `<span class="report-item-notes">${item.notes}</span>` : '';
         return `
         <div class="report-item-row">
             <div class="report-item-info">
                 <span class="report-item-name">${item.name}</span>
                 <span class="report-item-supplier">${item.supplier}</span>
+                ${rcvLabel}${notesHtml}
             </div>
             <span class="report-item-diff stat-${item.status}">${diffLabel}</span>
         </div>`;

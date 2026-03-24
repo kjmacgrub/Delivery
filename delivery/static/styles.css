@@ -1788,6 +1788,21 @@ textarea {
     color: var(--text-secondary);
 }
 
+.report-item-rcv {
+    display: block;
+    font-size: 11px;
+    color: var(--text-secondary);
+    font-weight: 600;
+}
+
+.report-item-notes {
+    display: block;
+    font-size: 11px;
+    color: var(--text-secondary);
+    font-style: italic;
+    margin-top: 1px;
+}
+
 .report-item-diff {
     font-size: 14px;
     font-weight: 700;
@@ -2564,17 +2579,12 @@ textarea {
 }
 
 .qty-circle.done {
-    background: var(--success);
-    color: white;
+    border: 2px solid var(--success);
+    color: var(--success);
 }
 
 .qty-circle.qty-3digit {
     font-size: 10px;
-}
-
-.qty-circle svg {
-    width: 14px;
-    height: 14px;
 }
 
 /* ---- Item Note Button (right side of item rows) ---- */
@@ -2590,8 +2600,8 @@ textarea {
     transform: translateY(-50%);
     -webkit-tap-highlight-color: transparent;
     cursor: pointer;
-    color: var(--border);
-    opacity: 0.4;
+    color: var(--text-secondary);
+    opacity: 0.5;
 }
 
 .item-note-btn.has-note {
@@ -2667,6 +2677,14 @@ textarea {
 
 .pull-indicator.pull-confirmed {
     color: var(--primary);
+    border: 2px solid var(--primary);
+    border-radius: 50%;
+    width: 22px;
+    height: 22px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
 }
 
 .edit-trigger {
@@ -2797,21 +2815,68 @@ textarea {
 }
 
 .ie-done {
-    padding: 6px 16px;
-    border-radius: 8px;
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
     border: none;
-    background: var(--primary);
+    background: var(--success);
     color: white;
-    font-size: 13px;
-    font-weight: 600;
     cursor: pointer;
     -webkit-tap-highlight-color: transparent;
     margin-left: 8px;
-    white-space: nowrap;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    padding: 0;
+}
+
+.ie-done svg {
+    width: 16px;
+    height: 16px;
 }
 
 .ie-done:active {
     opacity: 0.8;
+}
+
+.ie-undo {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    border: 2px solid var(--border);
+    background: none;
+    color: var(--text-secondary);
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+    margin-left: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    padding: 0;
+}
+
+.ie-undo svg {
+    width: 15px;
+    height: 15px;
+}
+
+.ie-undo:active {
+    opacity: 0.8;
+}
+
+.ie-cancel {
+    font-size: 12px;
+    color: var(--text-secondary);
+    opacity: 0.5;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+    margin-left: 8px;
+}
+
+.ie-cancel:active {
+    opacity: 0.3;
 }
 
 .ie-note-input {
@@ -2857,11 +2922,6 @@ textarea {
     font-size: 15px;
     font-weight: 700;
     color: #000;
-}
-
-
-.ie-done:active {
-    opacity: 0.8;
 }
 
 /* ---- Import Screen (grouped by date) ---- */
