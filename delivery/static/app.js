@@ -1125,7 +1125,7 @@ function renderInlineEditPanel(item) {
             </div>
         </div>
         <div class="ie-bottom-row">
-            <span class="ie-accept" onclick="ieCommitAll(${si}, ${ii})">Accept</span>
+            <span class="ie-accept" onclick="ieCommitAll(${si}, ${ii})">Accept all</span>
             <span class="ie-cancel" onclick="ieUndo(${si}, ${ii})">cancel all changes</span>
         </div>
     </div>`;
@@ -1271,6 +1271,8 @@ async function ieCommitAll(si, ii) {
         item.received_status = status;
         item.received_notes = notes;
         item._ieRcvConfirmed = true;
+        cleanupInlineEditState();
+        inlineEditItem = null;
         renderItemList();
 
         if (!completionShown && checkAllItemsReceived()) {
