@@ -376,7 +376,7 @@ html, body {
 
 .sort-search-wrapper input {
     width: 100%;
-    padding: 5px 26px 5px 26px;
+    padding: 10px 26px 10px 26px;
     border: 1.5px solid var(--border);
     border-radius: 100px;
     font-size: 13px;
@@ -2505,19 +2505,32 @@ textarea {
     opacity: 0.75;
 }
 
-.pull-sheet-qty {
-    font-size: 17px;
+.pull-qty-circle {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 15px;
     font-weight: 700;
-    color: var(--primary);
-    min-width: 28px;
-    text-align: right;
     flex-shrink: 0;
+}
+
+.pull-qty-circle.pending {
+    border: 2px solid var(--border);
+    color: var(--text);
+}
+
+.pull-qty-circle.done {
+    border: 2px solid var(--success);
+    color: var(--success);
 }
 
 .pull-sheet-of {
     font-size: 13px;
     font-weight: 400;
-    color: var(--text-muted);
+    color: var(--text);
 }
 
 .pull-sheet-name {
@@ -2707,26 +2720,60 @@ textarea {
 }
 
 /* ---- Inline Edit Panel ---- */
+.compact-row.editing {
+    background: #faf3ef;
+}
+
 .inline-edit-panel {
-    background: #f5f5f7;
+    background: #faf3ef;
     border-left: 3px solid var(--primary);
-    padding: 10px 14px 10px 50px;
+    padding: 10px 14px 10px 16px;
     display: flex;
     flex-direction: column;
     gap: 8px;
+    width: fit-content;
 }
 
-.ie-row {
+.ie-columns {
+    display: inline-flex;
+    gap: 12px;
+}
+
+.ie-col {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    padding-top: 9px;
+}
+
+.ie-col-return {
+    align-items: flex-start;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 8px 10px;
+}
+
+.ie-return-stepper-row {
     display: flex;
     align-items: center;
-    gap: 10px;
+    gap: 8px;
+}
+
+.ie-return-tags {
+    display: flex;
+    gap: 6px;
+}
+
+.ie-bottom-row {
+    display: flex;
+    justify-content: center;
 }
 
 .ie-label {
-    font-size: 12px;
+    font-size: 11px;
     font-weight: 600;
     color: var(--text-secondary);
-    min-width: 68px;
     text-transform: uppercase;
     letter-spacing: 0.5px;
     transition: color 0.15s;
@@ -2734,6 +2781,24 @@ textarea {
 
 .ie-label.ie-confirmed {
     color: var(--success);
+}
+
+.ie-label-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.ie-note-icon {
+    color: var(--text-secondary);
+    opacity: 0.5;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+}
+
+.ie-note-icon.active {
+    opacity: 1;
+    color: var(--primary);
 }
 
 .ie-checkbox {
@@ -2762,10 +2827,6 @@ textarea {
     border: solid white;
     border-width: 0 2px 2px 0;
     transform: rotate(45deg);
-}
-
-.ie-return-details {
-    gap: 8px;
 }
 
 .ie-tag {
@@ -2823,12 +2884,17 @@ textarea {
     color: white;
     cursor: pointer;
     -webkit-tap-highlight-color: transparent;
-    margin-left: 8px;
     display: flex;
     align-items: center;
     justify-content: center;
     flex-shrink: 0;
     padding: 0;
+}
+
+.ie-done.pending {
+    background: none;
+    border: 2px solid var(--border);
+    color: var(--text-secondary);
 }
 
 .ie-done svg {
@@ -2868,15 +2934,15 @@ textarea {
 
 .ie-cancel {
     font-size: 12px;
-    color: var(--text-secondary);
-    opacity: 0.5;
+    color: #d33;
+    opacity: 0.7;
     cursor: pointer;
     -webkit-tap-highlight-color: transparent;
-    margin-left: 8px;
+    flex-shrink: 0;
 }
 
 .ie-cancel:active {
-    opacity: 0.3;
+    opacity: 0.4;
 }
 
 .ie-note-input {

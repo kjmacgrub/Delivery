@@ -69,7 +69,7 @@ let inlineEditItem = null; // { supplierIdx, itemIdx } for inline edit panel
 let supplierFilter = null; // null = show all, or { idx, name } to filter to one supplier
 let itemSortMode = 'supplier'; // 'alpha', 'qty', or 'supplier'
 let multiFilter = false;   // show only items shared across 2+ suppliers
-let showReceived = false; // false = show pending items, true = show received items
+let showReceived = true; // true = show all items including received
 let collapsedPullSuppliers = new Set(); // supplier names collapsed in street view
 let pullChangeAlerts = new Set(); // "supplierIdx-itemIdx" keys for items changed since last ack
 let pullPopupOriginalQty = null; // qty when popup was opened, to detect changes
@@ -1052,6 +1052,7 @@ function cleanupInlineEditState() {
     delete item._ieReturnQuality;
     delete item._ieReturnMispick;
     delete item._ieReturnNote;
+    delete item._ieShowReturnNote;
     delete item._ieOriginal;
 }
 
@@ -1066,45 +1067,53 @@ function renderInlineEditPanel(item) {
 
     return `
     <div class="inline-edit-panel" onclick="event.stopPropagation()">
-        <div class="ie-row">
-            <span class="ie-label${pullConfirmed ? ' ie-confirmed' : ''}">${pullConfirmed ? 'Pulled' : 'Pull'}</span>
-            <div class="ie-stepper">
-                <button class="ie-btn" onclick="ieAdjustPull(${si}, ${ii}, -1)">−</button>
-                <span class="ie-value">${pullQty}</span>
-                <button class="ie-btn" onclick="ieAdjustPull(${si}, ${ii}, 1)">+</button>
+        <div class="ie-columns">
+            <div class="ie-col">
+                <span class="ie-label${pullConfirmed ? ' ie-confirmed' : ''}">${pullConfirmed ? 'Pulled' : 'Pull'}</span>
+                <div class="ie-stepper">
+                    <button class="ie-btn" onclick="ieAdjustPull(${si}, ${ii}, -1)">−</button>
+                    <span class="ie-value">${pullQty}</span>
+                    <button class="ie-btn" onclick="ieAdjustPull(${si}, ${ii}, 1)">+</button>
+                </div>
+                <span class="ie-checkbox${pullConfirmed ? ' checked' : ''}" onclick="ieConfirmPull(${si}, ${ii})"></span>
             </div>
-            <span class="ie-checkbox${pullConfirmed ? ' checked' : ''}" onclick="ieConfirmPull(${si}, ${ii})"></span>
-        </div>
-        <div class="ie-row">
-            <span class="ie-label">Receive</span>
-            <div class="ie-stepper">
-                <button class="ie-btn" onclick="ieAdjustReceived(${si}, ${ii}, -1)">−</button>
-                <span class="ie-value">${rcvQty}</span>
-                <button class="ie-btn" onclick="ieAdjustReceived(${si}, ${ii}, 1)">+</button>
+            <div class="ie-col">
+                <span class="ie-label">Receive</span>
+                <div class="ie-stepper">
+                    <button class="ie-btn" onclick="ieAdjustReceived(${si}, ${ii}, -1)">−</button>
+                    <span class="ie-value">${rcvQty}</span>
+                    <button class="ie-btn" onclick="ieAdjustReceived(${si}, ${ii}, 1)">+</button>
+                </div>
+                <span class="ie-checkbox${rcvConfirmed ? ' checked' : ''}" onclick="ieCommitAll(${si}, ${ii})"></span>
             </div>
-            <button class="ie-done" onclick="ieCommitAll(${si}, ${ii})"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20,6 9,17 4,12"/></svg></button>
-            <span class="ie-cancel" onclick="ieUndo(${si}, ${ii})">cancel</span>
-        </div>
-        <div class="ie-row">
-            <span class="ie-label">${retConfirmed ? 'Returned' : 'Return'}</span>
-            <div class="ie-stepper">
-                <button class="ie-btn" onclick="ieAdjustReturn(${si}, ${ii}, -1)">−</button>
-                <span class="ie-value">${retQty}</span>
-                <button class="ie-btn" onclick="ieAdjustReturn(${si}, ${ii}, 1)">+</button>
+            <div class="ie-col ie-col-return">
+                <div class="ie-label-row">
+                    <span class="ie-label">${retConfirmed ? 'Returned' : 'Return'}</span>
+                    <svg class="ie-note-icon${item._ieShowReturnNote ? ' active' : ''}" onclick="ieToggleReturnNote(${si}, ${ii})" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+                </div>
+                <div class="ie-return-stepper-row">
+                    <div class="ie-stepper">
+                        <button class="ie-btn" onclick="ieAdjustReturn(${si}, ${ii}, -1)">−</button>
+                        <span class="ie-value">${retQty}</span>
+                        <button class="ie-btn" onclick="ieAdjustReturn(${si}, ${ii}, 1)">+</button>
+                    </div>
+                    <label class="ie-tag${item._ieReturnAll ? ' checked' : ''}" onclick="ieToggleReturnAll(${si}, ${ii})">
+                        <span class="ie-tag-check"></span>All
+                    </label>
+                </div>
+                <div class="ie-return-tags">
+                    <label class="ie-tag${item._ieReturnQuality ? ' checked' : ''}" onclick="ieToggleReturnTag(${si}, ${ii}, 'quality')">
+                        <span class="ie-tag-check"></span>Quality
+                    </label>
+                    <label class="ie-tag${item._ieReturnMispick ? ' checked' : ''}" onclick="ieToggleReturnTag(${si}, ${ii}, 'mispick')">
+                        <span class="ie-tag-check"></span>Mispick
+                    </label>
+                </div>
+                ${item._ieShowReturnNote ? `<input type="text" class="ie-note-input" placeholder="Return note..." value="${escapeAttr(item._ieReturnNote || '')}" oninput="ieUpdateReturnNote(${si}, ${ii}, this.value)">` : ''}
             </div>
-            <label class="ie-tag${item._ieReturnAll ? ' checked' : ''}" onclick="ieToggleReturnAll(${si}, ${ii})">
-                <span class="ie-tag-check"></span>All
-            </label>
-            <label class="ie-tag${item._ieReturnQuality ? ' checked' : ''}" onclick="ieToggleReturnTag(${si}, ${ii}, 'quality')">
-                <span class="ie-tag-check"></span>Quality
-            </label>
-            <label class="ie-tag${item._ieReturnMispick ? ' checked' : ''}" onclick="ieToggleReturnTag(${si}, ${ii}, 'mispick')">
-                <span class="ie-tag-check"></span>Mispick
-            </label>
         </div>
-        <div class="ie-row ie-return-details">
-            <span class="ie-label"></span>
-            <input type="text" class="ie-note-input" placeholder="Return note..." value="${escapeAttr(item._ieReturnNote || '')}" oninput="ieUpdateReturnNote(${si}, ${ii}, this.value)">
+        <div class="ie-bottom-row">
+            <span class="ie-cancel" onclick="ieUndo(${si}, ${ii})">cancel all changes</span>
         </div>
     </div>`;
 }
@@ -1171,6 +1180,26 @@ function ieAdjustReturn(si, ii, delta) {
 // -- Done: commit all numbers --
 async function ieCommitAll(si, ii) {
     const item = currentDelivery.suppliers[si].items[ii];
+
+    // Toggle: if already received, revert to pending
+    if (item._ieRcvConfirmed) {
+        try {
+            await apiPatch(
+                `/deliveries/${currentDelivery.id}/suppliers/${si}/items/${ii}/checkin`,
+                { quantity_received: 0, received_status: 'pending', received_notes: null }
+            );
+            lastWriteTimestamp = Date.now();
+            item.quantity_received = null;
+            item.received_status = 'pending';
+            item.received_notes = null;
+            item._ieRcvConfirmed = false;
+            renderItemList();
+        } catch (e) {
+            showToast('Failed to revert', 'error');
+        }
+        return;
+    }
+
     const rcvQty = item._ieRcvQty ?? item.quantity_expected;
     const retQty = item._ieReturnQty ?? 0;
     const hasReturn = retQty > 0;
@@ -1207,11 +1236,8 @@ async function ieCommitAll(si, ii) {
         item.quantity_received = rcvQty;
         item.received_status = status;
         item.received_notes = notes;
-        cleanupInlineEditState();
-        inlineEditItem = null;
-
-        if (supplierFilter !== null) updateFilteredSupplierSummary();
-        renderDetail();
+        item._ieRcvConfirmed = true;
+        renderItemList();
 
         if (!completionShown && checkAllItemsReceived()) {
             completionShown = true;
@@ -1282,8 +1308,20 @@ function ieToggleReturnAll(si, ii) {
 
 function ieToggleReturnTag(si, ii, tag) {
     const item = currentDelivery.suppliers[si].items[ii];
-    if (tag === 'quality') item._ieReturnQuality = !item._ieReturnQuality;
-    if (tag === 'mispick') item._ieReturnMispick = !item._ieReturnMispick;
+    if (tag === 'quality') {
+        item._ieReturnQuality = !item._ieReturnQuality;
+        if (item._ieReturnQuality) item._ieReturnMispick = false;
+    }
+    if (tag === 'mispick') {
+        item._ieReturnMispick = !item._ieReturnMispick;
+        if (item._ieReturnMispick) item._ieReturnQuality = false;
+    }
+    renderItemList();
+}
+
+function ieToggleReturnNote(si, ii) {
+    const item = currentDelivery.suppliers[si].items[ii];
+    item._ieShowReturnNote = !item._ieShowReturnNote;
     renderItemList();
 }
 
@@ -1667,7 +1705,7 @@ function renderCompactRow(item, showSupplier, crossMap = null) {
     const editPanel = isEditing ? renderInlineEditPanel(item) : '';
 
     return `
-    <div class="compact-row ${statusClass} ${processingClass} ${floorClass}${showSupplier ? '' : ' accordion-item'}"
+    <div class="compact-row ${statusClass} ${processingClass} ${floorClass}${showSupplier ? '' : ' accordion-item'}${isEditing ? ' editing' : ''}"
          onclick="toggleInlineEdit(${si}, ${ii})">
         <div class="compact-qty"><div class="qty-left-stack">${leftLabel}</div>${qtyCircle}</div>
         <div class="compact-name">${item.raw_description}</div>
@@ -1962,7 +2000,11 @@ function renderLiveReport() {
     });
     pullItems.sort((a, b) => {
         const sup = a.supplierName.toLowerCase().localeCompare(b.supplierName.toLowerCase());
-        return sup !== 0 ? sup : a.raw_description.toLowerCase().localeCompare(b.raw_description.toLowerCase());
+        if (sup !== 0) return sup;
+        const aConfirmed = a.pull_confirmed ? 1 : 0;
+        const bConfirmed = b.pull_confirmed ? 1 : 0;
+        if (aConfirmed !== bConfirmed) return aConfirmed - bConfirmed;
+        return a.raw_description.toLowerCase().localeCompare(b.raw_description.toLowerCase());
     });
 
     html += `<div class="report-section-header">Pull</div>`;
@@ -1997,14 +2039,11 @@ function renderLiveReport() {
             itemsToShow.forEach(item => {
                 if (isCollapsed && item.pull_confirmed) return;
                 const confirmedClass = item.pull_confirmed ? 'pull-confirmed' : '';
-                const statusChip = item.pull_confirmed
-                    ? `<div class="pull-sheet-check done"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20,6 9,17 4,12"/></svg></div>`
-                    : `<div class="pull-sheet-check pending"></div>`;
                 html += `
                 <div class="pull-sheet-row ${confirmedClass}" onclick="togglePullFromReport(${item.supplierIdx}, ${item.itemIdx})">
-                    <span class="pull-sheet-qty">${item.pull_quantity} <span class="pull-sheet-of">(of ${item.quantity_expected})</span></span>
+                    <span class="pull-qty-circle ${item.pull_confirmed ? 'done' : 'pending'}">${item.pull_quantity}</span>
+                    <span class="pull-sheet-of">(of ${item.quantity_expected})</span>
                     <span class="pull-sheet-name">${item.raw_description}</span>
-                    ${statusChip}
                 </div>`;
             });
         });
