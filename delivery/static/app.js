@@ -1284,17 +1284,20 @@ async function ieCommitAll(si, ii) {
     }
 }
 
-// Accept all: save and close only if received toggle is already checked; otherwise just close
+// Accept all: commit changes if any meaningful edits were made, otherwise just close
 async function ieAcceptAll(si, ii) {
     const item = currentDelivery.suppliers[si].items[ii];
-    if (!item._ieRcvConfirmed) {
-        // Received not toggled — just close the edit box without changing received state
+    const hasOos = item._ieOosConfirmed;
+    const hasReturn = (item._ieReturnQty ?? 0) > 0;
+    const hasReceived = item._ieRcvConfirmed;
+    if (!hasReceived && !hasOos && !hasReturn) {
+        // No meaningful changes — just close the edit box
         cleanupInlineEditState();
         inlineEditItem = null;
         renderItemList();
         return;
     }
-    // Received is toggled — commit everything (same as ieCommitAll non-toggle path)
+    // Has changes — commit everything
     await ieCommitAll(si, ii);
 }
 
