@@ -41,9 +41,20 @@
                         <line x1="12" y1="19" x2="12" y2="21"/>
                     </svg>
                 </button>
-                <a href="https://produce-processor.netlify.app" class="icon-btn" aria-label="Produce Processor" data-tooltip="Produce Processor" style="text-decoration:none">
-                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-                        <text x="6" y="18" font-size="18" font-weight="700" fill="currentColor" stroke="none">P</text>
+                <a href="https://produce-processor.netlify.app" class="icon-btn" aria-label="Produce Processor" data-tooltip="Produce Processor" style="text-decoration:none; overflow:visible;">
+                    <svg width="24" height="24" viewBox="-5 -5 34 34" fill="none" style="overflow:visible;">
+                      <defs>
+                        <linearGradient id="pp-curl" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#e0e0e0"/><stop offset="50%" stop-color="#fafafa"/><stop offset="100%" stop-color="#d4d4d4"/></linearGradient>
+                        <clipPath id="pp-clip"><path d="M21,17 A11,11 0 1,0 12,23 C13.5,18.5 17,16.8 21,17 Z"/></clipPath>
+                        <filter id="pp-sha" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="1.8"/></filter>
+                        <filter id="pp-shb" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="0.7"/></filter>
+                      </defs>
+                      <circle cx="12" cy="12" r="11.5" fill="rgba(0,0,0,0.12)" filter="url(#pp-sha)" transform="translate(0.5,1.5)"/>
+                      <path d="M12,23 C13.5,18.5 17,16.8 21,17 A11,11 0 0,1 12,23 Z" fill="rgba(0,0,0,0.22)" filter="url(#pp-sha)" transform="translate(2,2.5)"/>
+                      <circle cx="12" cy="12" r="11" fill="white" clip-path="url(#pp-clip)"/>
+                      <circle cx="12" cy="12" r="11" fill="none" stroke="rgba(0,0,0,0.05)" stroke-width="3" clip-path="url(#pp-clip)"/>
+                      <text x="12" y="16" font-size="13" font-weight="700" fill="#cc2222" text-anchor="middle" font-family="system-ui">P</text>
+                      <path d="M12,23 C13.5,18.5 17,16.8 21,17 A11,11 0 0,1 12,23 Z" fill="url(#pp-curl)" filter="url(#pp-shb)" transform="rotate(-18,16.5,20) translate(0,-1.6)"/>
                     </svg>
                 </a>
                 <span id="header-brand-text" onclick="goHome()">Daily Delivery</span>
