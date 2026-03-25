@@ -1514,7 +1514,7 @@ function renderItemList() {
 
     // Filter by received status: off = pending only, on = show all items
     if (!showReceived) {
-        flatItems = flatItems.filter(item => item.received_status === 'pending');
+        flatItems = flatItems.filter(item => item.received_status === 'pending' || (item.received_notes && item.received_notes.includes('O/S')));
     }
 
     // Filter to one supplier if active
@@ -1845,9 +1845,10 @@ function renderSupplierAccordion(container, flatItems) {
         // Get items for this supplier from the flat list (already filtered by showReceived)
         let supplierItems = flatItems.filter(item => item.supplierIdx === sIdx);
 
-        // Hide fully-received suppliers when showReceived is off
+        // Hide fully-received suppliers when showReceived is off (keep if any O/S items)
         const allDone = supplier.items.every(i => i.received_status !== 'pending');
-        if (!showReceived && allDone) return;
+        const hasOosItems = supplier.items.some(i => i.received_notes && i.received_notes.includes('O/S'));
+        if (!showReceived && allDone && !hasOosItems) return;
 
         // Apply search filter
         if (searchQuery) {
