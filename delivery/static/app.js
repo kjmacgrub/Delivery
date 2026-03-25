@@ -1408,7 +1408,7 @@ async function openDelivery(id) {
         pullSessionOriginals = {};
         expandedSuppliers = new Set(); // reset accordion
         expandedLocations = new Set(); // reset location accordion
-        showReceived = false; // reset to pending view
+        showReceived = true; // reset to show-all view
         searchQuery = ''; // reset search
         // Reset supplier filter UI
         document.getElementById('item-receive-all-btn').innerHTML = '';
