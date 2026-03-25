@@ -1125,7 +1125,7 @@ function renderInlineEditPanel(item) {
             </div>
         </div>
         <div class="ie-bottom-row">
-            <span class="ie-accept" onclick="ieCommitAll(${si}, ${ii})">Accept all</span>
+            <span class="ie-accept" onclick="ieAcceptAll(${si}, ${ii})">Accept all</span>
             <span class="ie-cancel" onclick="ieUndo(${si}, ${ii})">cancel all changes</span>
         </div>
     </div>`;
@@ -1282,6 +1282,20 @@ async function ieCommitAll(si, ii) {
     } catch (e) {
         showToast('Failed to save', 'error');
     }
+}
+
+// Accept all: save and close only if received toggle is already checked; otherwise just close
+async function ieAcceptAll(si, ii) {
+    const item = currentDelivery.suppliers[si].items[ii];
+    if (!item._ieRcvConfirmed) {
+        // Received not toggled — just close the edit box without changing received state
+        cleanupInlineEditState();
+        inlineEditItem = null;
+        renderItemList();
+        return;
+    }
+    // Received is toggled — commit everything (same as ieCommitAll non-toggle path)
+    await ieCommitAll(si, ii);
 }
 
 async function ieUndo(si, ii) {
@@ -1704,13 +1718,18 @@ function renderCompactRow(item, showSupplier, crossMap = null) {
                     : `<span class="pull-qty pull-qty-empty" onclick="event.stopPropagation(); openPullPopup(event, ${e.supplierIdx}, ${e.itemIdx})" ></span> `;
                 const eIsPending = e.received_status === 'pending';
                 const eDoneQty = e.quantity_received ?? e.qty;
+                const eIsEditing = inlineEditItem && inlineEditItem.supplierIdx === e.supplierIdx && inlineEditItem.itemIdx === e.itemIdx;
+                const eItem = currentDelivery.suppliers[e.supplierIdx].items[e.itemIdx];
+                eItem.supplierIdx = e.supplierIdx;
+                eItem.itemIdx = e.itemIdx;
                 const eQtyCircle = eIsPending
                     ? `<div class="qty-circle pending${qtyDigitClass(e.qty)}" onclick="event.stopPropagation(); quickReceiveItem(${e.supplierIdx}, ${e.itemIdx})">${e.qty}</div>`
                     : `<div class="qty-circle done${qtyDigitClass(eDoneQty)}" onclick="event.stopPropagation(); toggleInlineEdit(${e.supplierIdx}, ${e.itemIdx})">${eDoneQty}</div>`;
-                return `<div class="compact-row supplier-sub-row ${eStatus}" onclick="toggleInlineEdit(${e.supplierIdx}, ${e.itemIdx})">
+                const eEditPanel = eIsEditing ? renderInlineEditPanel(eItem) : '';
+                return `<div class="compact-row supplier-sub-row ${eStatus}${eIsEditing ? ' editing' : ''}" onclick="toggleInlineEdit(${e.supplierIdx}, ${e.itemIdx})">
                     <div class="compact-qty">${ePullQty}${eQtyCircle}</div>
                     <div class="compact-supplier sub-row-supplier" onclick="event.stopPropagation(); filterBySupplier(${e.supplierIdx})">${e.supplierName}</div>
-                </div>`;
+                </div>${eEditPanel}`;
             }).join('');
         }
     }
@@ -1783,15 +1802,17 @@ function renderMultiSupplierRow(items) {
             ? `<span class="pull-qty ${pullConfirmedClass}" onclick="event.stopPropagation(); openPullPopup(event, ${item.supplierIdx}, ${item.itemIdx})">(${item.pull_quantity})</span> `
             : `<span class="pull-qty pull-qty-empty" onclick="event.stopPropagation(); openPullPopup(event, ${item.supplierIdx}, ${item.itemIdx})">+</span> `;
         const msDoneQty = item.quantity_received ?? item.quantity_expected;
+        const isEditing = inlineEditItem && inlineEditItem.supplierIdx === item.supplierIdx && inlineEditItem.itemIdx === item.itemIdx;
         const msQtyCircle = isPending
             ? `<div class="qty-circle pending${qtyDigitClass(item.quantity_expected)}" onclick="event.stopPropagation(); quickReceiveItem(${item.supplierIdx}, ${item.itemIdx})">${item.quantity_expected}</div>`
             : `<div class="qty-circle done${qtyDigitClass(msDoneQty)}" onclick="event.stopPropagation(); toggleInlineEdit(${item.supplierIdx}, ${item.itemIdx})">${msDoneQty}</div>`;
+        const editPanel = isEditing ? renderInlineEditPanel(item) : '';
         return `
-        <div class="compact-row supplier-sub-row ${statusClass}"
+        <div class="compact-row supplier-sub-row ${statusClass}${isEditing ? ' editing' : ''}"
              onclick="toggleInlineEdit(${item.supplierIdx}, ${item.itemIdx})">
             <div class="compact-qty">${pullQty}${msQtyCircle}</div>
             <div class="compact-supplier sub-row-supplier" onclick="event.stopPropagation(); filterBySupplier(${item.supplierIdx})">${item.supplierName}</div>
-        </div>`;
+        </div>${editPanel}`;
     }).join('');
 
     return mainRow + subRows;
