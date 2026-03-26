@@ -2495,7 +2495,6 @@ textarea {
     gap: 10px;
     padding: 10px 12px;
     background: var(--surface);
-    cursor: pointer;
     -webkit-tap-highlight-color: transparent;
     border-left: 3px solid var(--border);
     min-height: 44px;
@@ -2520,6 +2519,7 @@ textarea {
     font-size: 15px;
     font-weight: 700;
     flex-shrink: 0;
+    cursor: pointer;
 }
 
 .pull-qty-circle.pending {
@@ -2570,6 +2570,25 @@ textarea {
 .pull-sheet-check svg {
     width: 14px;
     height: 14px;
+}
+
+/* ---- Street View Edit Panel ---- */
+.pull-sheet-row.se-editing {
+    background: #faf3ef;
+}
+
+.pull-sheet-name {
+    cursor: pointer;
+}
+
+.se-panel {
+    background: #faf3ef;
+    border-left: 3px solid var(--primary);
+    padding: 10px 14px 10px 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    width: fit-content;
 }
 
 /* ---- Qty Receive Circle (left side of item rows) ---- */

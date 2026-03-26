@@ -71,6 +71,7 @@ let itemSortMode = 'supplier'; // 'alpha', 'qty', or 'supplier'
 let multiFilter = false;   // show only items shared across 2+ suppliers
 let showReceived = true; // true = show all items including received
 let collapsedPullSuppliers = new Set(); // supplier names collapsed in street view
+let streetEditItem = null; // { supplierIdx, itemIdx } for street view edit panel
 let pullChangeAlerts = new Set(); // "supplierIdx-itemIdx" keys for items changed since last ack
 let pullPopupOriginalQty = null; // qty when popup was opened, to detect changes
 let pullSessionOriginals = {}; // qty before any popup edits this session, keyed by "sIdx-iIdx"
@@ -101,6 +102,7 @@ function showView(name) {
     const badge = document.getElementById('status-badge');
     const brandText = document.getElementById('header-brand-text');
     document.getElementById('app-header').classList.remove('street-view-active');
+    streetEditItem = null;
 
     // Show delivery date in the secondary header (page-title)
     title.textContent = currentDelivery
@@ -2099,14 +2101,19 @@ function renderLiveReport() {
                 : '';
             html += `<div class="pull-sheet-supplier">${group.name}${countBadge}</div>`;
             itemsToShow.forEach(item => {
-                if (isCollapsed && item.pull_confirmed) return;
+                const itemIsOos = item.received_notes && item.received_notes.includes('O/S');
+                if (isCollapsed && item.pull_confirmed && !itemIsOos) return;
+                const si = item.supplierIdx, ii = item.itemIdx;
                 const confirmedClass = item.pull_confirmed ? 'pull-confirmed' : '';
+                const isOos = item.received_notes && item.received_notes.includes('O/S');
+                const isEditing = streetEditItem && streetEditItem.supplierIdx === si && streetEditItem.itemIdx === ii;
                 html += `
-                <div class="pull-sheet-row ${confirmedClass}" onclick="togglePullFromReport(${item.supplierIdx}, ${item.itemIdx})">
-                    <span class="pull-qty-circle ${item.pull_confirmed ? 'done' : 'pending'}">${item.pull_quantity}</span>
+                <div class="pull-sheet-row ${confirmedClass}${isEditing ? ' se-editing' : ''}">
+                    <span class="pull-qty-circle ${item.pull_confirmed ? 'done' : 'pending'}" onclick="togglePullFromReport(${si}, ${ii})">${item.pull_quantity}</span>
                     <span class="pull-sheet-of">(of ${item.quantity_expected})</span>
-                    <span class="pull-sheet-name${(item.received_notes && item.received_notes.includes('O/S')) ? ' oos' : ''}">${item.raw_description}</span>
+                    <span class="pull-sheet-name${isOos ? ' oos' : ''}" onclick="toggleStreetEdit(${si}, ${ii})">${item.raw_description}</span>
                 </div>`;
+                if (isEditing) html += renderStreetEditPanel(item, si, ii);
             });
         });
     }
@@ -2138,6 +2145,111 @@ function toggleCollapsePullSupplier(event, supplierName) {
         collapsedPullSuppliers.add(supplierName);
     }
     renderLiveReport();
+}
+
+// ---- Street View Edit Panel ----
+
+function toggleStreetEdit(supplierIdx, itemIdx) {
+    if (streetEditItem && streetEditItem.supplierIdx === supplierIdx && streetEditItem.itemIdx === itemIdx) {
+        streetEditItem = null;
+    } else {
+        streetEditItem = { supplierIdx, itemIdx };
+    }
+    renderLiveReport();
+}
+
+function renderStreetEditPanel(item, si, ii) {
+    const pullQty = item.pull_quantity ?? 0;
+    const pullConfirmed = item.pull_confirmed || false;
+    const isOos = item.received_notes && item.received_notes.includes('O/S');
+    return `
+    <div class="se-panel" onclick="event.stopPropagation()">
+        <div class="ie-columns">
+            <div class="ie-col">
+                <span class="ie-label${pullConfirmed ? ' ie-confirmed' : ''}">${pullConfirmed ? 'Pulled' : 'Pull'}</span>
+                <div class="ie-stepper">
+                    <button class="ie-btn" onclick="seAdjustPull(${si}, ${ii}, -1)">−</button>
+                    <span class="ie-value">${pullQty}</span>
+                    <button class="ie-btn" onclick="seAdjustPull(${si}, ${ii}, 1)">+</button>
+                </div>
+                <span class="ie-checkbox${pullConfirmed ? ' checked' : ''}" onclick="seConfirmPull(${si}, ${ii})"></span>
+            </div>
+            <div class="ie-col">
+                <span class="ie-label" title="Out of Stock">O/S</span>
+                <span class="ie-oos-qty">${item.quantity_expected}</span>
+                <span class="ie-checkbox${isOos ? ' checked' : ''}" onclick="seConfirmOos(${si}, ${ii})"></span>
+            </div>
+        </div>
+    </div>`;
+}
+
+async function seAdjustPull(si, ii, delta) {
+    const item = currentDelivery.suppliers[si].items[ii];
+    const newQty = Math.max(0, (item.pull_quantity ?? 0) + delta);
+    try {
+        await apiPatch(
+            `/deliveries/${currentDelivery.id}/suppliers/${si}/items/${ii}/set-pull`,
+            { quantity: newQty }
+        );
+        lastWriteTimestamp = Date.now();
+        item.pull_quantity = newQty > 0 ? newQty : null;
+        item.pull_for_floor = newQty > 0;
+    } catch (e) {
+        showToast('Failed to update pull', 'error');
+    }
+    renderLiveReport();
+}
+
+async function seConfirmPull(si, ii) {
+    const item = currentDelivery.suppliers[si].items[ii];
+    const newState = !item.pull_confirmed;
+    try {
+        if (newState && !item.pull_submitted) {
+            await apiPatch(`/deliveries/${currentDelivery.id}/suppliers/${si}/items/${ii}/pull-submit`, {});
+            item.pull_submitted = true;
+        }
+        await apiPatch(`/deliveries/${currentDelivery.id}/suppliers/${si}/items/${ii}/pull-confirm`, {});
+        lastWriteTimestamp = Date.now();
+        item.pull_confirmed = newState;
+    } catch (e) {
+        showToast('Failed to update pull', 'error');
+    }
+    renderLiveReport();
+    renderItemList();
+}
+
+async function seConfirmOos(si, ii) {
+    const item = currentDelivery.suppliers[si].items[ii];
+    const isOos = item.received_notes && item.received_notes.includes('O/S');
+    try {
+        if (isOos) {
+            // Un-mark O/S: revert to pending
+            await apiPatch(
+                `/deliveries/${currentDelivery.id}/suppliers/${si}/items/${ii}/checkin`,
+                { quantity_received: 0, received_status: 'pending', received_notes: null }
+            );
+            lastWriteTimestamp = Date.now();
+            item.quantity_received = null;
+            item.received_status = 'pending';
+            item.received_notes = null;
+        } else {
+            // Mark O/S
+            const oosQty = item.quantity_expected;
+            await apiPatch(
+                `/deliveries/${currentDelivery.id}/suppliers/${si}/items/${ii}/checkin`,
+                { quantity_received: 0, received_status: 'short', received_notes: `O/S ${oosQty}` }
+            );
+            lastWriteTimestamp = Date.now();
+            item.quantity_received = 0;
+            item.received_status = 'short';
+            item.received_notes = `O/S ${oosQty}`;
+        }
+    } catch (e) {
+        showToast('Failed to update O/S status', 'error');
+    }
+    streetEditItem = null;
+    renderLiveReport();
+    renderItemList();
 }
 
 function onSearchInput() {
