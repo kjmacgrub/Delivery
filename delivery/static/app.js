@@ -1189,6 +1189,8 @@ function ieConfirmOos(si, ii) {
     if (newState) {
         item._ieOosQty = item.quantity_expected;
         item._ieRcvQty = 0;
+        item._iePullQty = 0;
+        item._iePullConfirmed = false;
     } else {
         item._ieOosQty = 0;
         item._ieRcvQty = item.quantity_expected;
@@ -1268,6 +1270,16 @@ async function ieCommitAll(si, ii) {
             `/deliveries/${currentDelivery.id}/suppliers/${si}/items/${ii}/checkin`,
             { quantity_received: rcvQty, received_status: status, received_notes: notes }
         );
+        // If O/S, clear pull — nothing to pull
+        if (hasOos) {
+            await apiPatch(
+                `/deliveries/${currentDelivery.id}/suppliers/${si}/items/${ii}/set-pull`,
+                { quantity: 0 }
+            );
+            item.pull_quantity = null;
+            item.pull_for_floor = false;
+            item.pull_confirmed = false;
+        }
         lastWriteTimestamp = Date.now();
         item.quantity_received = rcvQty;
         item.received_status = status;
@@ -2239,10 +2251,18 @@ async function seConfirmOos(si, ii) {
                 `/deliveries/${currentDelivery.id}/suppliers/${si}/items/${ii}/checkin`,
                 { quantity_received: 0, received_status: 'short', received_notes: `O/S ${oosQty}` }
             );
+            // Clear pull — nothing to pull if O/S
+            await apiPatch(
+                `/deliveries/${currentDelivery.id}/suppliers/${si}/items/${ii}/set-pull`,
+                { quantity: 0 }
+            );
             lastWriteTimestamp = Date.now();
             item.quantity_received = 0;
             item.received_status = 'short';
             item.received_notes = `O/S ${oosQty}`;
+            item.pull_quantity = null;
+            item.pull_for_floor = false;
+            item.pull_confirmed = false;
         }
     } catch (e) {
         showToast('Failed to update O/S status', 'error');
