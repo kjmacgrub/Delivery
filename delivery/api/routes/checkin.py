@@ -220,6 +220,16 @@ async def complete_delivery(delivery_id: str, request: Request):
         except Exception:
             pass  # Non-fatal: Firestore is the primary store
 
+    # Auto-snapshot delivery data to daily log
+    log_service = getattr(request.app.state, 'daily_log_service', None)
+    if log_service:
+        try:
+            delivery = service.get_delivery(delivery_id)
+            if delivery:
+                log_service.snapshot_delivery(delivery)
+        except Exception:
+            pass  # Non-fatal: daily log is supplementary
+
     return CompleteDeliveryResponse(
         message="Delivery completed successfully",
         report_id=report.id,

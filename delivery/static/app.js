@@ -89,7 +89,7 @@ let pendingDeliveryUpdate = null;  // snapshot data waiting for modal to close
 let lastWriteTimestamp = 0;        // to debounce our own writes
 
 // ---- Navigation ----
-const views = ['deliveries', 'storage', 'detail', 'complete', 'reports', 'pullsheet'];
+const views = ['deliveries', 'storage', 'detail', 'complete', 'reports', 'pullsheet', 'dailylogs'];
 
 function showView(name) {
     views.forEach(v => {
@@ -142,6 +142,12 @@ function showView(name) {
             badge.className = 'badge';
             document.getElementById('app-header').classList.add('street-view-active');
             break;
+        case 'dailylogs':
+            brandText.textContent = 'Daily Log';
+            title.textContent = 'History';
+            badge.textContent = '';
+            badge.className = 'badge';
+            break;
     }
 }
 
@@ -170,6 +176,7 @@ function goBack() {
         case 'storage':
         case 'deliveries':
         case 'reports':
+        case 'dailylogs':
             if (currentDelivery && currentDelivery.status !== 'completed') {
                 showView('detail');
             } else {
@@ -693,6 +700,340 @@ function renderDeliveryReport(delivery) {
                 <div class="report-section-header" style="margin-top:12px">Pulls</div>
                 ${buildPullStatsHtml(pullItems)}
             </div>
+        </div>`;
+}
+
+// ---- Daily Logs ----
+
+let dailyLogDetail = null; // currently viewed log detail
+let dlSearchTimeout = null; // debounce timer for daily log search
+
+async function showDailyLogs() {
+    showView('dailylogs');
+    dailyLogDetail = null;
+    const container = document.getElementById('dailylogs-content');
+    container.innerHTML = '<div class="loading">Loading daily logs...</div>';
+
+    try {
+        const data = await apiGet('/daily-logs');
+        const logs = data.logs || [];
+        if (!logs.length) {
+            container.innerHTML = `<div class="empty-state"><p>No daily logs yet</p><p class="subtitle">Logs are created when deliveries are completed</p></div>`;
+            return;
+        }
+        renderDailyLogList(logs);
+    } catch (e) {
+        container.innerHTML = `<div class="empty-state"><p>Failed to load daily logs</p></div>`;
+        showToast('Failed to load daily logs', 'error');
+    }
+}
+
+function renderDailyLogList(logs) {
+    const container = document.getElementById('dailylogs-content');
+    const rows = logs.map(log => {
+        const dateLabel = log.date ? formatDate(log.date) : 'Unknown';
+        const dow = log.dayOfWeek || '';
+        const statusColor = log.status === 'complete' ? 'var(--success)' : 'var(--warning)';
+        const excBadge = log.exceptionCount > 0 ? `<span class="dl-badge dl-badge-exc">${log.exceptionCount} exc</span>` : '';
+        const pullBadge = log.pullCount > 0 ? `<span class="dl-badge dl-badge-pull">${log.pullCount} pulls</span>` : '';
+        const procBadge = log.processingCount > 0 ? `<span class="dl-badge dl-badge-proc">${log.processingCount} processed</span>` : '';
+        const noteBadge = log.noteCount > 0 ? `<span class="dl-badge dl-badge-note">${log.noteCount} notes</span>` : '';
+
+        return `<div class="card dl-card" onclick="loadDailyLogDetail('${log.date}')">
+            <div class="dl-card-header">
+                <div>
+                    <div class="dl-card-date">${dow} ${dateLabel}</div>
+                    <div class="dl-card-meta">${log.totalItemsExpected || 0} items expected · ${log.totalCasesExpected || 0} cases</div>
+                </div>
+                <span class="dl-status-dot" style="background:${statusColor}"></span>
+            </div>
+            <div class="dl-badges">${excBadge}${pullBadge}${procBadge}${noteBadge}</div>
+        </div>`;
+    }).join('');
+
+    container.innerHTML = `
+        <div class="dl-search-bar">
+            <svg class="search-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/>
+            </svg>
+            <input type="text" id="dl-search-input" placeholder="Search items across all days..." oninput="onDlSearchInput()" autocomplete="off" autocorrect="off" spellcheck="false">
+            <button id="dl-search-clear" class="search-clear hidden" onclick="clearDlSearch()">&times;</button>
+        </div>
+        <div class="dl-header-bar">
+            <span class="dl-header-title">Last 7 Days</span>
+            ${currentDelivery ? `<button class="btn btn-sm btn-primary" onclick="saveDailyLogNow()">Save Today's Log</button>` : ''}
+        </div>
+        <div id="dl-search-results" class="hidden"></div>
+        <div id="dl-date-list">${rows}</div>`;
+}
+
+async function saveDailyLogNow() {
+    if (!currentDelivery || !currentDelivery.delivery_date) {
+        showToast('No active delivery to snapshot', 'error');
+        return;
+    }
+    try {
+        await apiPost(`/daily-logs/${currentDelivery.delivery_date}/snapshot-delivery`);
+        showToast('Daily log saved', 'success');
+        showDailyLogs(); // refresh list
+    } catch (e) {
+        showToast('Failed to save daily log', 'error');
+    }
+}
+
+function onDlSearchInput() {
+    const input = document.getElementById('dl-search-input');
+    const clearBtn = document.getElementById('dl-search-clear');
+    const q = (input.value || '').trim();
+    clearBtn.classList.toggle('hidden', !q);
+
+    if (dlSearchTimeout) clearTimeout(dlSearchTimeout);
+
+    if (!q) {
+        clearDlSearch();
+        return;
+    }
+
+    dlSearchTimeout = setTimeout(() => executeDlSearch(q), 300);
+}
+
+function clearDlSearch() {
+    const input = document.getElementById('dl-search-input');
+    if (input) input.value = '';
+    const clearBtn = document.getElementById('dl-search-clear');
+    if (clearBtn) clearBtn.classList.add('hidden');
+    const results = document.getElementById('dl-search-results');
+    const dateList = document.getElementById('dl-date-list');
+    if (results) { results.classList.add('hidden'); results.innerHTML = ''; }
+    if (dateList) dateList.classList.remove('hidden');
+}
+
+async function executeDlSearch(query) {
+    const results = document.getElementById('dl-search-results');
+    const dateList = document.getElementById('dl-date-list');
+    if (!results) return;
+
+    results.classList.remove('hidden');
+    dateList.classList.add('hidden');
+    results.innerHTML = '<div class="loading">Searching...</div>';
+
+    try {
+        const data = await apiGet(`/daily-logs/search?q=${encodeURIComponent(query)}`);
+        renderDlSearchResults(data, query);
+    } catch (e) {
+        results.innerHTML = '<div class="dl-section-empty">Search failed</div>';
+    }
+}
+
+function renderDlSearchResults(data, query) {
+    const container = document.getElementById('dl-search-results');
+    const hits = data.totalHits || 0;
+    const results = data.results || [];
+
+    if (!hits) {
+        container.innerHTML = `<div class="dl-section-empty" style="padding:16px">No results for "${query}"</div>`;
+        return;
+    }
+
+    const sectionLabels = {
+        exceptions: 'Exception',
+        pulls: 'Pull',
+        processing: 'Processing',
+        outOfStock: 'Out of Stock',
+        notes: 'Note',
+    };
+
+    const sectionColors = {
+        exceptions: 'dl-exc-short',
+        pulls: 'dl-badge-pull',
+        processing: 'dl-badge-proc',
+        outOfStock: 'dl-exc-return',
+        notes: 'dl-badge-note',
+    };
+
+    const html = results.map(dayResult => {
+        const dateLabel = dayResult.date ? formatDate(dayResult.date) : '';
+        const dow = dayResult.dayOfWeek || '';
+
+        const hitRows = dayResult.hits.map(hit => {
+            const section = hit.section;
+            const label = sectionLabels[section] || section;
+            const colorClass = sectionColors[section] || '';
+
+            // Build detail based on section type
+            let name = '';
+            let detail = '';
+
+            if (section === 'exceptions') {
+                name = hit.rawDescription || '';
+                const status = hit.receivedStatus || '';
+                detail = `${status} · ${hit.quantityReceived ?? '?'}/${hit.quantityExpected ?? '?'}`;
+                if (hit.receivedNotes) detail += ` · ${hit.receivedNotes}`;
+            } else if (section === 'pulls') {
+                name = hit.rawDescription || '';
+                detail = `${hit.pullQuantity || 0} cases${hit.pullConfirmed ? ' ✓' : ''}`;
+            } else if (section === 'processing') {
+                name = hit.itemName || '';
+                const timeStr = hit.totalTime ? `${Math.round(hit.totalTime / 60)}m` : '';
+                detail = `${hit.cases || 0} cases${timeStr ? ' · ' + timeStr : ''}`;
+            } else if (section === 'outOfStock') {
+                name = hit.rawDescription || '';
+                detail = `${hit.quantityExpected || 0} expected`;
+            } else if (section === 'notes') {
+                name = hit.itemName || 'Freeform note';
+                detail = hit.text || '';
+            }
+
+            const supplier = hit.supplierName ? `<span class="dl-exc-supplier">${hit.supplierName}</span>` : '';
+
+            return `<div class="dl-search-hit">
+                <span class="dl-search-tag ${colorClass}">${label}</span>
+                <div class="dl-search-hit-body">
+                    <span class="dl-search-hit-name">${highlightMatch(name, query)}</span>
+                    <span class="dl-search-hit-detail">${detail}</span>
+                    ${supplier}
+                </div>
+            </div>`;
+        }).join('');
+
+        return `<div class="dl-section" style="margin-top:0">
+            <div class="dl-section-title">${dow} ${dateLabel} <span class="dl-section-count">${dayResult.hits.length}</span></div>
+            ${hitRows}
+        </div>`;
+    }).join('');
+
+    container.innerHTML = `
+        <div class="dl-header-bar">
+            <span class="dl-header-title">${hits} result${hits !== 1 ? 's' : ''} for "${query}"</span>
+        </div>
+        ${html}`;
+}
+
+function highlightMatch(text, query) {
+    if (!query) return text;
+    const escaped = query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const re = new RegExp(`(${escaped})`, 'gi');
+    return text.replace(re, '<mark>$1</mark>');
+}
+
+async function loadDailyLogDetail(dateKey) {
+    const container = document.getElementById('dailylogs-content');
+    container.innerHTML = '<div class="loading">Loading log...</div>';
+
+    try {
+        const log = await apiGet(`/daily-logs/${dateKey}`);
+        dailyLogDetail = log;
+        renderDailyLogDetail(log, dateKey);
+    } catch (e) {
+        container.innerHTML = `<div class="empty-state"><p>Failed to load log</p></div>`;
+    }
+}
+
+function renderDailyLogDetail(log, dateKey) {
+    const container = document.getElementById('dailylogs-content');
+    const dateLabel = log.date ? formatDate(log.date) : dateKey;
+    const dow = log.dayOfWeek || '';
+
+    // Exceptions section
+    const exceptions = log.exceptions || [];
+    const excHtml = exceptions.length ? exceptions.map(e => {
+        const statusLabel = e.receivedStatus || '';
+        const statusClass = statusLabel === 'SHORT' ? 'dl-exc-short' : statusLabel === 'OVER' ? 'dl-exc-over' : 'dl-exc-return';
+        return `<div class="dl-exc-row">
+            <span class="dl-exc-status ${statusClass}">${statusLabel}</span>
+            <span class="dl-exc-name">${e.rawDescription || ''}</span>
+            <span class="dl-exc-qty">${e.quantityReceived ?? '?'} / ${e.quantityExpected ?? '?'}</span>
+            <span class="dl-exc-supplier">${e.supplierName || ''}</span>
+            ${e.receivedNotes ? `<span class="dl-exc-notes">${e.receivedNotes}</span>` : ''}
+        </div>`;
+    }).join('') : '<div class="dl-section-empty">No exceptions</div>';
+
+    // Pulls section
+    const pulls = log.pulls || [];
+    const pullHtml = pulls.length ? pulls.map(p => {
+        const confIcon = p.pullConfirmed ? '✓' : '○';
+        return `<div class="dl-pull-row">
+            <span class="dl-pull-qty">${p.pullQuantity}</span>
+            <span class="dl-pull-name">${p.rawDescription || ''}</span>
+            <span class="dl-pull-conf">${confIcon}</span>
+            <span class="dl-exc-supplier">${p.supplierName || ''}</span>
+        </div>`;
+    }).join('') : '<div class="dl-section-empty">No pulls</div>';
+
+    // Processing section
+    const processing = log.processing || [];
+    const procHtml = processing.length ? processing.map(p => {
+        const timeStr = p.totalTime ? `${Math.round(p.totalTime / 60)}m` : '';
+        const perCase = p.timePerCase ? `(${Math.round(p.timePerCase)}s/case)` : '';
+        return `<div class="dl-proc-row">
+            <span class="dl-proc-name">${p.itemName || ''}</span>
+            <span class="dl-proc-cases">${p.cases || 0} cs</span>
+            <span class="dl-proc-time">${timeStr} ${perCase}</span>
+            ${p.photoUrl ? `<a href="${p.photoUrl}" target="_blank" class="dl-proc-photo">📷</a>` : ''}
+        </div>`;
+    }).join('') : '<div class="dl-section-empty">No processing data</div>';
+
+    // Out of stock section
+    const oos = log.outOfStock || [];
+    const oosHtml = oos.length ? oos.map(o => {
+        return `<div class="dl-oos-row">
+            <span class="dl-oos-name">${o.rawDescription || ''}</span>
+            <span class="dl-exc-supplier">${o.supplierName || ''}</span>
+            <span class="dl-oos-qty">${o.quantityExpected || 0} expected</span>
+        </div>`;
+    }).join('') : '<div class="dl-section-empty">None</div>';
+
+    // Notes section
+    const notes = log.notes || [];
+    const noteHtml = notes.length ? notes.map(n => {
+        const srcLabel = n.source === 'produce-processor' ? 'PP' : 'DLV';
+        const typeIcon = n.type === 'item' ? '📦' : n.type === 'delivery' ? '🚚' : '📝';
+        return `<div class="dl-note-row">
+            <span class="dl-note-icon">${typeIcon}</span>
+            <div class="dl-note-body">
+                ${n.itemName ? `<span class="dl-note-item">${n.itemName}</span>` : ''}
+                <span class="dl-note-text">${n.text || ''}</span>
+            </div>
+            <span class="dl-note-src">${srcLabel}</span>
+        </div>`;
+    }).join('') : '<div class="dl-section-empty">No notes</div>';
+
+    // Metadata summary
+    const metaHtml = `<div class="dl-meta-row">
+        <span>${log.totalItemsExpected || 0} items expected</span>
+        <span>${log.totalCasesExpected || 0} cases expected</span>
+        <span>${log.totalItemsReceived || 0} received</span>
+        <span>${log.totalCasesReceived || 0} cases received</span>
+        ${log.totalItemsProcessed ? `<span>${log.totalItemsProcessed} processed</span>` : ''}
+        ${log.totalCasesProcessed ? `<span>${log.totalCasesProcessed} cases processed</span>` : ''}
+    </div>`;
+
+    container.innerHTML = `
+        <div class="dl-detail-header">
+            <button class="btn btn-sm btn-secondary" onclick="showDailyLogs()">← Back</button>
+            <span class="dl-detail-date">${dow} ${dateLabel}</span>
+            <span class="dl-status-chip dl-status-${log.status || 'partial'}">${log.status || 'partial'}</span>
+        </div>
+        ${metaHtml}
+        <div class="dl-section">
+            <div class="dl-section-title">Exceptions <span class="dl-section-count">${exceptions.length}</span></div>
+            ${excHtml}
+        </div>
+        <div class="dl-section">
+            <div class="dl-section-title">Pulls <span class="dl-section-count">${pulls.length}</span></div>
+            ${pullHtml}
+        </div>
+        <div class="dl-section">
+            <div class="dl-section-title">Processing <span class="dl-section-count">${processing.length}</span></div>
+            ${procHtml}
+        </div>
+        <div class="dl-section">
+            <div class="dl-section-title">Out of Stock <span class="dl-section-count">${oos.length}</span></div>
+            ${oosHtml}
+        </div>
+        <div class="dl-section">
+            <div class="dl-section-title">Notes <span class="dl-section-count">${notes.length}</span></div>
+            ${noteHtml}
         </div>`;
 }
 
@@ -2119,11 +2460,14 @@ function renderLiveReport() {
                 const confirmedClass = item.pull_confirmed ? 'pull-confirmed' : '';
                 const isOos = item.received_notes && item.received_notes.includes('O/S');
                 const isEditing = streetEditItem && streetEditItem.supplierIdx === si && streetEditItem.itemIdx === ii;
+                const checkSvg = item.pull_confirmed ? '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="4,12 10,18 20,6"/></svg>' : '';
                 html += `
                 <div class="pull-sheet-row ${confirmedClass}${isEditing ? ' se-editing' : ''}">
                     <span class="pull-qty-circle ${item.pull_confirmed ? 'done' : 'pending'}" onclick="togglePullFromReport(${si}, ${ii})">${item.pull_quantity}</span>
                     <span class="pull-sheet-of">(of ${item.quantity_expected})</span>
                     <span class="pull-sheet-name${isOos ? ' oos' : ''}" onclick="toggleStreetEdit(${si}, ${ii})">${item.raw_description}</span>
+                    <span class="pull-sheet-toggle" onclick="togglePullFromReport(${si}, ${ii})"></span>
+                    <span class="pull-sheet-check ${item.pull_confirmed ? 'done' : 'pending'}" onclick="togglePullFromReport(${si}, ${ii})">${checkSvg}</span>
                 </div>`;
                 if (isEditing) html += renderStreetEditPanel(item, si, ii);
             });

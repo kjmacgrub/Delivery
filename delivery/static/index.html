@@ -267,6 +267,13 @@
             </div>
         </div>
 
+        <!-- View: Daily Logs -->
+        <div id="view-dailylogs" class="view">
+            <div id="dailylogs-content" class="card-list">
+                <div class="loading">Loading daily logs...</div>
+            </div>
+        </div>
+
         <!-- View: Delivery Complete (post-confirmation) -->
         <div id="view-complete" class="view">
             <div class="complete-screen">
@@ -318,6 +325,10 @@
                     <button class="admin-menu-btn" onclick="closeAdminModal(); showReports()">
                         <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14,2 14,8 20,8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10,9 9,9 8,9"/></svg>
                         Delivery Report
+                    </button>
+                    <button class="admin-menu-btn" onclick="closeAdminModal(); showDailyLogs()">
+                        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+                        Daily Log History
                     </button>
 
                     <div id="nuclear-section" style="display:none;margin-top:16px;padding-top:16px;border-top:1px solid #fee2e2">

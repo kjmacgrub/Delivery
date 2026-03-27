@@ -13,7 +13,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, HTMLResponse
 
-from delivery.api.routes import deliveries, items, checkin, storage, notes
+from delivery.api.routes import deliveries, items, checkin, storage, notes, daily_logs
 
 logger = logging.getLogger(__name__)
 
@@ -42,18 +42,27 @@ def create_app(use_firebase: bool = True) -> FastAPI:
                 db = get_firestore_client()
                 bucket = get_storage_bucket()
 
+                from delivery.services.daily_log_service import DailyLogService
+
                 app.state.delivery_service = DeliveryService(firestore_client=db)
                 app.state.storage_service = FirebaseStorageService(bucket)
+                app.state.daily_log_service = DailyLogService(
+                    firestore_client=db, storage_bucket=bucket
+                )
                 logger.info("Firebase services initialized successfully")
             except Exception as e:
                 logger.warning(f"Firebase init failed, using in-memory: {e}")
                 from delivery.services.delivery_service import DeliveryService
+                from delivery.services.daily_log_service import DailyLogService
                 app.state.delivery_service = DeliveryService()
                 app.state.storage_service = None
+                app.state.daily_log_service = DailyLogService()
         else:
             from delivery.services.delivery_service import DeliveryService
+            from delivery.services.daily_log_service import DailyLogService
             app.state.delivery_service = DeliveryService()
             app.state.storage_service = None
+            app.state.daily_log_service = DailyLogService()
 
         yield
 
@@ -82,6 +91,7 @@ def create_app(use_firebase: bool = True) -> FastAPI:
     app.include_router(checkin.router, prefix="/api/v1", tags=["checkin"])
     app.include_router(storage.router, prefix="/api/v1", tags=["storage"])
     app.include_router(notes.router, prefix="/api/v1", tags=["notes"])
+    app.include_router(daily_logs.router, prefix="/api/v1", tags=["daily-logs"])
 
     # Resolve commit hash once at startup
     def _get_commit_hash() -> str:
