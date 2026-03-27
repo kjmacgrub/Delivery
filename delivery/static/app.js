@@ -1013,6 +1013,7 @@ function renderDailyLogDetail(log, dateKey) {
             <button class="btn btn-sm btn-secondary" onclick="showDailyLogs()">← Back</button>
             <span class="dl-detail-date">${dow} ${dateLabel}</span>
             <span class="dl-status-chip dl-status-${log.status || 'partial'}">${log.status || 'partial'}</span>
+            <a href="${API}/daily-logs/${dateKey}/report" target="_blank" class="btn btn-sm btn-outline" style="margin-left:auto;text-decoration:none">Report ↗</a>
         </div>
         ${metaHtml}
         <div class="dl-section">
