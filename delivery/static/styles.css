@@ -184,6 +184,16 @@ html, body {
     background: rgba(0,122,255,0.1);
 }
 
+.header-badge {
+    position: absolute;
+    top: 6px;
+    right: 4px;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #f59e0b;
+}
+
 #live-status-btn {
     position: relative;
 }
@@ -3528,10 +3538,47 @@ textarea {
     font-size: 15px;
     font-weight: 700;
     color: var(--text);
-    margin-bottom: 8px;
+    margin-bottom: 0;
     display: flex;
     align-items: center;
     gap: 6px;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+}
+
+.dl-chevron {
+    display: inline-block;
+    font-size: 16px;
+    font-weight: 700;
+    color: var(--text-secondary);
+    transition: transform 0.2s ease;
+}
+
+.dl-expanded .dl-chevron {
+    transform: rotate(90deg);
+}
+
+.dl-section-summary {
+    font-size: 13px;
+    font-weight: 400;
+    color: var(--text-secondary);
+    margin-left: auto;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.dl-expanded .dl-section-summary {
+    display: none;
+}
+
+.dl-section-body {
+    display: none;
+    margin-top: 8px;
+}
+
+.dl-expanded .dl-section-body {
+    display: block;
 }
 
 .dl-section-count {
@@ -3549,6 +3596,20 @@ textarea {
     font-style: italic;
     padding: 4px 0;
 }
+
+/* Supplier rows */
+.dl-supplier-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 5px 0;
+    border-bottom: 1px solid var(--bg);
+    font-size: 14px;
+}
+
+.dl-supplier-row:last-child { border-bottom: none; }
+.dl-supplier-name { font-weight: 600; }
+.dl-supplier-cases { font-weight: 700; white-space: nowrap; }
 
 /* Exception rows */
 .dl-exc-row {
@@ -3584,7 +3645,7 @@ textarea {
 .dl-pull-row {
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: 6px;
     padding: 6px 0;
     border-bottom: 1px solid var(--bg);
     font-size: 14px;
@@ -3594,15 +3655,29 @@ textarea {
 
 .dl-pull-qty {
     font-weight: 700;
-    width: 28px;
+    min-width: 24px;
     text-align: center;
     background: var(--bg);
     border-radius: 6px;
-    padding: 2px 0;
+    padding: 2px 4px;
+    flex-shrink: 0;
 }
 
-.dl-pull-name { font-weight: 500; flex: 1; min-width: 0; }
-.dl-pull-conf { font-size: 16px; }
+.dl-pull-name {
+    font-weight: 500;
+    flex: 1;
+    min-width: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.dl-pull-conf {
+    font-size: 13px;
+    flex-shrink: 0;
+    color: var(--success-dark);
+    font-weight: 700;
+}
 
 /* Processing rows */
 .dl-proc-row {

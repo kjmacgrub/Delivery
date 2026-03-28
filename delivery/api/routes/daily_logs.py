@@ -221,7 +221,7 @@ def _render_report_html(log: dict, date_key: str) -> str:
     note_rows = ""
     for n in notes:
         icon = {"item": "&#128230;", "delivery": "&#128666;", "freeform": "&#128221;"}.get(n.get("type"), "&#128221;")
-        src = "PP" if n.get("source") == "produce-processor" else "DLV"
+        src = "Processing" if n.get("source") == "produce-processor" else "Delivery"
         item_label = f'<strong>{esc(n.get("itemName", ""))}</strong> ' if n.get("itemName") else ""
         note_rows += f"""<tr>
             <td>{icon}</td>
@@ -238,8 +238,8 @@ def _render_report_html(log: dict, date_key: str) -> str:
     status_bg = "#dcfce7" if status == "complete" else "#fef9c3"
 
     proc_meta = ""
-    if items_proc:
-        proc_meta = f" &middot; {items_proc} items / {cases_proc} cases processed"
+    if cases_proc:
+        proc_meta = f" &middot; {cases_proc} cases processed ({items_proc} items)"
 
     html = f"""<!DOCTYPE html>
 <html lang="en">
@@ -300,15 +300,15 @@ def _render_report_html(log: dict, date_key: str) -> str:
   <div class="header">
     <h1>{dow} {esc(date_key)} <span class="status">{status}</span></h1>
     <div class="meta">
-      {items_exp} items / {cases_exp} cases expected &middot;
-      {items_rcv} items / {cases_rcv} cases received{proc_meta}
+      {cases_exp} cases expected ({items_exp} items) &middot;
+      {cases_rcv} cases received ({items_rcv} items){proc_meta}
     </div>
   </div>
+  {section("Notes", len(notes), note_rows, "No notes")}
+  {section("Out of Stock", len(oos), oos_rows, "None")}
+  {section("Processing", len(processing), proc_rows, "No processing data")}
   {section("Exceptions", len(exceptions), exc_rows, "No exceptions")}
   {section("Pulls", len(pulls), pull_rows, "No pulls")}
-  {section("Processing", len(processing), proc_rows, "No processing data")}
-  {section("Out of Stock", len(oos), oos_rows, "None")}
-  {section("Notes", len(notes), note_rows, "No notes")}
 </div>
 </body>
 </html>"""

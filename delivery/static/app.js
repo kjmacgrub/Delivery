@@ -89,7 +89,7 @@ let pendingDeliveryUpdate = null;  // snapshot data waiting for modal to close
 let lastWriteTimestamp = 0;        // to debounce our own writes
 
 // ---- Navigation ----
-const views = ['deliveries', 'storage', 'detail', 'complete', 'reports', 'pullsheet', 'dailylogs'];
+const views = ['deliveries', 'storage', 'detail', 'complete', 'pullsheet', 'dailylogs'];
 
 function showView(name) {
     views.forEach(v => {
@@ -131,11 +131,6 @@ function showView(name) {
             badge.textContent = 'completed';
             badge.className = 'badge badge-completed';
             break;
-        case 'reports':
-            brandText.textContent = 'Delivery View';
-            badge.textContent = '';
-            badge.className = 'badge';
-            break;
         case 'pullsheet':
             brandText.textContent = 'Street View';
             badge.textContent = '';
@@ -143,8 +138,8 @@ function showView(name) {
             document.getElementById('app-header').classList.add('street-view-active');
             break;
         case 'dailylogs':
-            brandText.textContent = 'Daily Log';
-            title.textContent = 'History';
+            brandText.textContent = 'Reports';
+            title.textContent = '';
             badge.textContent = '';
             badge.className = 'badge';
             break;
@@ -175,7 +170,6 @@ function goBack() {
             break;
         case 'storage':
         case 'deliveries':
-        case 'reports':
         case 'dailylogs':
             if (currentDelivery && currentDelivery.status !== 'completed') {
                 showView('detail');
@@ -196,6 +190,7 @@ function showNoDeliveryScreen() {
     completionShown = false;
     supplierFilter = null;
     updateLiveStatusBtn();
+    updateReportsBadge();
     showStorageFiles();
 }
 
@@ -206,6 +201,29 @@ function updateLiveStatusBtn() {
     if (liveBtn) liveBtn.classList.toggle('hidden', !active);
     const continueBtn = document.getElementById('header-continue-btn');
     if (continueBtn) continueBtn.classList.toggle('hidden', !active);
+}
+
+function updateReportsBadge() {
+    const badge = document.getElementById('reports-badge');
+    if (!badge) return;
+    if (!currentDelivery || !currentDelivery.suppliers) {
+        badge.classList.add('hidden');
+        return;
+    }
+    // Check for notes or O/S items in today's delivery
+    let hasNotes = false;
+    let hasOos = false;
+    for (const s of currentDelivery.suppliers) {
+        for (const item of (s.items || [])) {
+            if (item.received_notes && item.received_notes.trim()) hasNotes = true;
+            if (item.received_notes && item.received_notes.includes('O/S')) hasOos = true;
+            if (hasNotes && hasOos) break;
+        }
+        if (hasNotes && hasOos) break;
+    }
+    // Also check item_notes
+    if (Object.keys(itemNotes).length > 0) hasNotes = true;
+    badge.classList.toggle('hidden', !(hasNotes || hasOos));
 }
 
 function updateAlertBadge() {
@@ -435,6 +453,7 @@ function applyDeliveryUpdate(data) {
     currentDelivery = data;
     applyWeekColor(data.delivery_date);
     updateLiveStatusBtn();
+    updateReportsBadge();
 
     // Re-render whichever view is active
     if (currentView === 'pullsheet') {
@@ -743,7 +762,7 @@ function renderDailyLogList(logs) {
             <div class="dl-card-header">
                 <div>
                     <div class="dl-card-date">${dow} ${dateLabel}</div>
-                    <div class="dl-card-meta">${log.totalItemsExpected || 0} items expected · ${log.totalCasesExpected || 0} cases</div>
+                    <div class="dl-card-meta">${log.totalCasesExpected || 0} cases expected (${log.totalItemsExpected || 0} items)</div>
                 </div>
                 <span class="dl-status-dot" style="background:${statusColor}"></span>
             </div>
@@ -923,19 +942,118 @@ async function loadDailyLogDetail(dateKey) {
     try {
         const log = await apiGet(`/daily-logs/${dateKey}`);
         dailyLogDetail = log;
-        renderDailyLogDetail(log, dateKey);
+
+        // Also fetch the delivery for supplier totals if available
+        let delivery = null;
+        if (log.deliveryId) {
+            try {
+                delivery = await apiGet(`/deliveries/${log.deliveryId}`);
+            } catch (e) { /* delivery may have been deleted */ }
+        }
+        renderDailyLogDetail(log, dateKey, delivery);
     } catch (e) {
         container.innerHTML = `<div class="empty-state"><p>Failed to load log</p></div>`;
     }
 }
 
-function renderDailyLogDetail(log, dateKey) {
+function toggleDlSection(el) {
+    const section = el.closest('.dl-section');
+    section.classList.toggle('dl-expanded');
+}
+
+function dlCollapsible(title, count, summary, contentHtml) {
+    return `<div class="dl-section">
+        <div class="dl-section-title" onclick="toggleDlSection(this)">
+            <span class="dl-chevron">›</span>
+            ${title} <span class="dl-section-count">${count}</span>
+            <span class="dl-section-summary">${summary}</span>
+        </div>
+        <div class="dl-section-body">${contentHtml}</div>
+    </div>`;
+}
+
+function renderDailyLogDetail(log, dateKey, delivery) {
     const container = document.getElementById('dailylogs-content');
     const dateLabel = log.date ? formatDate(log.date) : dateKey;
     const dow = log.dayOfWeek || '';
 
+    // Notes section (first)
+    const notes = log.notes || [];
+    const noteSummary = notes.length
+        ? notes.slice(0, 2).map(n => n.itemName || n.text?.slice(0, 30) || '').join(', ') + (notes.length > 2 ? '…' : '')
+        : 'None';
+    const noteHtml = notes.length ? notes.map(n => {
+        const srcLabel = n.source === 'produce-processor' ? 'Processing' : 'Delivery';
+        const typeIcon = n.type === 'item' ? '📦' : n.type === 'delivery' ? '🚚' : '📝';
+        return `<div class="dl-note-row">
+            <span class="dl-note-icon">${typeIcon}</span>
+            <div class="dl-note-body">
+                ${n.itemName ? `<span class="dl-note-item">${n.itemName}</span>` : ''}
+                <span class="dl-note-text">${n.text || ''}</span>
+            </div>
+            <span class="dl-note-src">${srcLabel}</span>
+        </div>`;
+    }).join('') : '<div class="dl-section-empty">No notes</div>';
+
+    // Out of stock section
+    const oos = log.outOfStock || [];
+    const oosSummary = oos.length
+        ? oos.slice(0, 2).map(o => o.rawDescription || '').join(', ') + (oos.length > 2 ? '…' : '')
+        : 'None';
+    const oosHtml = oos.length ? oos.map(o => {
+        return `<div class="dl-oos-row">
+            <span class="dl-oos-name">${o.rawDescription || ''}</span>
+            <span class="dl-exc-supplier">${o.supplierName || ''}</span>
+            <span class="dl-oos-qty">${o.quantityExpected || 0} expected</span>
+        </div>`;
+    }).join('') : '<div class="dl-section-empty">None</div>';
+
+    // Processing section
+    const processing = log.processing || [];
+    const totalProcCases = processing.reduce((s, p) => s + (p.cases || 0), 0);
+    const procSummary = processing.length
+        ? `${processing.length} items, ${totalProcCases} cases`
+        : 'None';
+    const procHtml = processing.length ? processing.map(p => {
+        const timeStr = p.totalTime ? `${Math.round(p.totalTime / 60)}m` : '';
+        const perCase = p.timePerCase ? `(${Math.round(p.timePerCase)}s/case)` : '';
+        return `<div class="dl-proc-row">
+            <span class="dl-proc-name">${p.itemName || ''}</span>
+            <span class="dl-proc-cases">${p.cases || 0} cs</span>
+            <span class="dl-proc-time">${timeStr} ${perCase}</span>
+            ${p.photoUrl ? `<a href="${p.photoUrl}" target="_blank" class="dl-proc-photo">📷</a>` : ''}
+        </div>`;
+    }).join('') : '<div class="dl-section-empty">No processing data</div>';
+
+    // Supplier totals (from delivery data if available)
+    let supplierSection = '';
+    if (delivery && delivery.suppliers) {
+        const supplierRows = delivery.suppliers.map(s => {
+            const rcv = casesReceived(s.items || []);
+            const exp = casesExpected(s.items || []);
+            const color = rcv >= exp ? 'var(--success-dark)' : rcv > 0 ? '#f59e0b' : 'var(--text-secondary)';
+            return `<div class="dl-supplier-row">
+                <span class="dl-supplier-name">${s.supplier_name}</span>
+                <span class="dl-supplier-cases" style="color:${color}">${fmtNum(rcv)} / ${fmtNum(exp)}</span>
+            </div>`;
+        }).join('');
+        const totalRcv = delivery.suppliers.reduce((s, sup) => s + casesReceived(sup.items || []), 0);
+        const totalExp = delivery.suppliers.reduce((s, sup) => s + casesExpected(sup.items || []), 0);
+        const supplierSummary = `${delivery.suppliers.length} suppliers, ${fmtNum(totalRcv)}/${fmtNum(totalExp)} cases`;
+        const supplierBody = `<div style="font-size:11px;color:var(--text-secondary);text-align:right;margin-bottom:4px">received / expected</div>${supplierRows}`;
+        supplierSection = dlCollapsible('Received by Supplier', delivery.suppliers.length, supplierSummary, supplierBody);
+    }
+
     // Exceptions section
     const exceptions = log.exceptions || [];
+    const shortCount = exceptions.filter(e => e.receivedStatus === 'SHORT').length;
+    const overCount = exceptions.filter(e => e.receivedStatus === 'OVER').length;
+    const retCount = exceptions.filter(e => e.receivedStatus === 'RETURN').length;
+    const excParts = [];
+    if (shortCount) excParts.push(`${shortCount} short`);
+    if (overCount) excParts.push(`${overCount} over`);
+    if (retCount) excParts.push(`${retCount} return`);
+    const excSummary = excParts.length ? excParts.join(', ') : 'None';
     const excHtml = exceptions.length ? exceptions.map(e => {
         const statusLabel = e.receivedStatus || '';
         const statusClass = statusLabel === 'SHORT' ? 'dl-exc-short' : statusLabel === 'OVER' ? 'dl-exc-over' : 'dl-exc-return';
@@ -950,8 +1068,13 @@ function renderDailyLogDetail(log, dateKey) {
 
     // Pulls section
     const pulls = log.pulls || [];
+    const totalPullCases = pulls.reduce((s, p) => s + (p.pullQuantity || 0), 0);
+    const confirmedCount = pulls.filter(p => p.pullConfirmed).length;
+    const pullSummary = pulls.length
+        ? `${totalPullCases} cases, ${confirmedCount}/${pulls.length} confirmed`
+        : 'None';
     const pullHtml = pulls.length ? pulls.map(p => {
-        const confIcon = p.pullConfirmed ? '✓' : '○';
+        const confIcon = p.pullConfirmed ? '✓' : '';
         return `<div class="dl-pull-row">
             <span class="dl-pull-qty">${p.pullQuantity}</span>
             <span class="dl-pull-name">${p.rawDescription || ''}</span>
@@ -960,52 +1083,11 @@ function renderDailyLogDetail(log, dateKey) {
         </div>`;
     }).join('') : '<div class="dl-section-empty">No pulls</div>';
 
-    // Processing section
-    const processing = log.processing || [];
-    const procHtml = processing.length ? processing.map(p => {
-        const timeStr = p.totalTime ? `${Math.round(p.totalTime / 60)}m` : '';
-        const perCase = p.timePerCase ? `(${Math.round(p.timePerCase)}s/case)` : '';
-        return `<div class="dl-proc-row">
-            <span class="dl-proc-name">${p.itemName || ''}</span>
-            <span class="dl-proc-cases">${p.cases || 0} cs</span>
-            <span class="dl-proc-time">${timeStr} ${perCase}</span>
-            ${p.photoUrl ? `<a href="${p.photoUrl}" target="_blank" class="dl-proc-photo">📷</a>` : ''}
-        </div>`;
-    }).join('') : '<div class="dl-section-empty">No processing data</div>';
-
-    // Out of stock section
-    const oos = log.outOfStock || [];
-    const oosHtml = oos.length ? oos.map(o => {
-        return `<div class="dl-oos-row">
-            <span class="dl-oos-name">${o.rawDescription || ''}</span>
-            <span class="dl-exc-supplier">${o.supplierName || ''}</span>
-            <span class="dl-oos-qty">${o.quantityExpected || 0} expected</span>
-        </div>`;
-    }).join('') : '<div class="dl-section-empty">None</div>';
-
-    // Notes section
-    const notes = log.notes || [];
-    const noteHtml = notes.length ? notes.map(n => {
-        const srcLabel = n.source === 'produce-processor' ? 'PP' : 'DLV';
-        const typeIcon = n.type === 'item' ? '📦' : n.type === 'delivery' ? '🚚' : '📝';
-        return `<div class="dl-note-row">
-            <span class="dl-note-icon">${typeIcon}</span>
-            <div class="dl-note-body">
-                ${n.itemName ? `<span class="dl-note-item">${n.itemName}</span>` : ''}
-                <span class="dl-note-text">${n.text || ''}</span>
-            </div>
-            <span class="dl-note-src">${srcLabel}</span>
-        </div>`;
-    }).join('') : '<div class="dl-section-empty">No notes</div>';
-
     // Metadata summary
     const metaHtml = `<div class="dl-meta-row">
-        <span>${log.totalItemsExpected || 0} items expected</span>
-        <span>${log.totalCasesExpected || 0} cases expected</span>
-        <span>${log.totalItemsReceived || 0} received</span>
-        <span>${log.totalCasesReceived || 0} cases received</span>
-        ${log.totalItemsProcessed ? `<span>${log.totalItemsProcessed} processed</span>` : ''}
-        ${log.totalCasesProcessed ? `<span>${log.totalCasesProcessed} cases processed</span>` : ''}
+        <span>${log.totalCasesExpected || 0} cases expected (${log.totalItemsExpected || 0} items)</span>
+        <span>${log.totalCasesReceived || 0} cases received (${log.totalItemsReceived || 0} items)</span>
+        ${log.totalCasesProcessed ? `<span>${log.totalCasesProcessed} cases processed (${log.totalItemsProcessed || 0} items)</span>` : ''}
     </div>`;
 
     container.innerHTML = `
@@ -1013,29 +1095,15 @@ function renderDailyLogDetail(log, dateKey) {
             <button class="btn btn-sm btn-secondary" onclick="showDailyLogs()">← Back</button>
             <span class="dl-detail-date">${dow} ${dateLabel}</span>
             <span class="dl-status-chip dl-status-${log.status || 'partial'}">${log.status || 'partial'}</span>
-            <a href="${API}/daily-logs/${dateKey}/report" target="_blank" class="btn btn-sm btn-outline" style="margin-left:auto;text-decoration:none">Report ↗</a>
+            <a href="${API}/daily-logs/${dateKey}/report" target="_blank" class="btn btn-sm btn-outline" style="margin-left:auto;text-decoration:none">Print ↗</a>
         </div>
         ${metaHtml}
-        <div class="dl-section">
-            <div class="dl-section-title">Exceptions <span class="dl-section-count">${exceptions.length}</span></div>
-            ${excHtml}
-        </div>
-        <div class="dl-section">
-            <div class="dl-section-title">Pulls <span class="dl-section-count">${pulls.length}</span></div>
-            ${pullHtml}
-        </div>
-        <div class="dl-section">
-            <div class="dl-section-title">Processing <span class="dl-section-count">${processing.length}</span></div>
-            ${procHtml}
-        </div>
-        <div class="dl-section">
-            <div class="dl-section-title">Out of Stock <span class="dl-section-count">${oos.length}</span></div>
-            ${oosHtml}
-        </div>
-        <div class="dl-section">
-            <div class="dl-section-title">Notes <span class="dl-section-count">${notes.length}</span></div>
-            ${noteHtml}
-        </div>`;
+        ${dlCollapsible('Notes', notes.length, noteSummary, noteHtml)}
+        ${dlCollapsible('Out of Stock', oos.length, oosSummary, oosHtml)}
+        ${dlCollapsible('Processing', processing.length, procSummary, procHtml)}
+        ${supplierSection}
+        ${dlCollapsible('Exceptions', exceptions.length, excSummary, excHtml)}
+        ${dlCollapsible('Pulls', pulls.length, pullSummary, pullHtml)}`;
 }
 
 // ---- Import Screen ----
@@ -1285,6 +1353,7 @@ async function loadItemNotes() {
     } catch (e) {
         itemNotes = {};
     }
+    updateReportsBadge();
 }
 
 function escapeAttr(str) {
