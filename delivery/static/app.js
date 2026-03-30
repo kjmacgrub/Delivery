@@ -2606,7 +2606,15 @@ function renderStreetEditPanel(item, si, ii) {
                 <span class="ie-checkbox${isOos ? ' checked' : ''}" onclick="seConfirmOos(${si}, ${ii})"></span>
             </div>
         </div>
+        <div class="se-bottom-row">
+            <span class="ie-cancel" onclick="seCancel()">cancel</span>
+        </div>
     </div>`;
+}
+
+function seCancel() {
+    streetEditItem = null;
+    renderLiveReport();
 }
 
 async function seAdjustPull(si, ii, delta) {

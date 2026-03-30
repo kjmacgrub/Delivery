@@ -2606,6 +2606,11 @@ textarea {
     width: fit-content;
 }
 
+.se-bottom-row {
+    text-align: right;
+    padding-top: 2px;
+}
+
 /* ---- Qty Receive Circle (left side of item rows) ---- */
 .compact-row {
     padding-right: 40px;

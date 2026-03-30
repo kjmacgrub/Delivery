@@ -7,8 +7,12 @@
 - Cache busters in `index.html` use `?v=__COMMIT__` — injected server-side at serve time, no manual updates needed
 - Format: v1.XX (minor increments)
 
+## Python Environment
+- Virtual env: `.venv/` — use `.venv/bin/python` and `.venv/bin/pip` for all commands
+- If `.venv/` doesn't exist: `python3 -m venv .venv && .venv/bin/pip install fastapi uvicorn pdfplumber pymupdf firebase-admin pydantic python-multipart`
+
 ## Dev Server
-- `python3 -m uvicorn delivery.api.app:create_app --factory --host 0.0.0.0 --port 8001 --reload`
+- `.venv/bin/python -m uvicorn delivery.api.app:create_app --factory --host 0.0.0.0 --port 8001 --reload`
 - Use port **8001** — port 8000 is reserved for the CEF investments app (Budget Planner investments tab links there)
 - Check for stale processes on port 8001 before starting
 
