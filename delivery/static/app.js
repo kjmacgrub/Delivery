@@ -3480,7 +3480,7 @@ function getExceptionItems() {
 
 function buildAdjustmentStatsHtml(adjItems) {
     if (adjItems.length === 0) {
-        return '<div class="report-section-empty">No adjustments — everything matched!</div>';
+        return '<div class="report-section-empty">No returns or adjustments</div>';
     }
     return adjItems.map(item => {
         const diffLabel = `${item.diff} ${item.status}`;
