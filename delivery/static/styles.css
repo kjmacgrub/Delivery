@@ -2472,7 +2472,7 @@ textarea {
     justify-content: space-between;
     padding: 6px 10px;
     background: var(--bg);
-    font-size: 15px;
+    font-size: 18px;
     font-weight: 700;
     color: var(--text);
 }
