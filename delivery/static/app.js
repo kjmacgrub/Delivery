@@ -144,6 +144,15 @@ function showView(name) {
             badge.className = 'badge';
             break;
     }
+
+    // Show not-today banner only on delivery-specific views
+    const deliveryViews = ['detail', 'pullsheet', 'complete'];
+    if (deliveryViews.includes(name)) {
+        updateNotTodayBanner();
+    } else {
+        const banner = document.getElementById('not-today-banner');
+        if (banner) banner.classList.add('hidden');
+    }
 }
 
 function goHome() {
@@ -452,6 +461,7 @@ function applyDeliveryUpdate(data) {
     // Replace delivery data (client-side state like sort/filter/expanded is preserved)
     currentDelivery = data;
     applyWeekColor(data.delivery_date);
+    updateNotTodayBanner();
     updateLiveStatusBtn();
     updateReportsBadge();
 
@@ -1814,6 +1824,7 @@ async function openDelivery(id) {
         const delivery = await apiGet(`/deliveries/${id}`);
         currentDelivery = delivery;
         applyWeekColor(delivery.delivery_date);
+        updateNotTodayBanner();
         completionShown = false;
         updateLiveStatusBtn();
         await Promise.all([
@@ -3703,6 +3714,21 @@ function showVersionHistory() {
 
 function closeVersionModal() {
     document.getElementById('version-modal').classList.add('hidden');
+}
+
+// ---- Not-today banner ----
+function updateNotTodayBanner() {
+    const banner = document.getElementById('not-today-banner');
+    if (!banner) return;
+    if (!currentDelivery || !currentDelivery.delivery_date) {
+        banner.classList.add('hidden');
+        return;
+    }
+    const today = new Date();
+    const todayStr = today.getFullYear() + '-' +
+        String(today.getMonth() + 1).padStart(2, '0') + '-' +
+        String(today.getDate()).padStart(2, '0');
+    banner.classList.toggle('hidden', currentDelivery.delivery_date === todayStr);
 }
 
 // ---- Week color ----

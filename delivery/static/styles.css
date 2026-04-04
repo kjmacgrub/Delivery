@@ -1,3 +1,33 @@
+/* ---- Not-Today Banner ---- */
+.not-today-banner {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    z-index: 99999;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+}
+.not-today-banner::after {
+    content: attr(data-text);
+    content: 'NOT TODAY\'S DATA';
+    position: absolute;
+    font-size: 5vw;
+    font-weight: 900;
+    letter-spacing: 0.15em;
+    color: rgba(255, 0, 0, 0.18);
+    white-space: nowrap;
+    transform: rotate(-35deg);
+    pointer-events: none;
+}
+.not-today-banner.hidden {
+    display: none;
+}
+
 /* ---- Reset & Base ---- */
 *, *::before, *::after {
     box-sizing: border-box;
