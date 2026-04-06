@@ -1,3 +1,6 @@
+/* ---- Disable iPad zoom ---- */
+* { touch-action: manipulation; }
+
 /* ---- Not-Today Banner ---- */
 .not-today-banner {
     position: fixed;

@@ -5,6 +5,10 @@
 
 const API = '/api/v1';
 
+// ---- Disable pinch-to-zoom on iPad ----
+document.addEventListener('gesturestart', e => e.preventDefault());
+document.addEventListener('gesturechange', e => e.preventDefault());
+
 // ---- Version History ----
 const VERSION_HISTORY = [
     { version: 'v1.43', description: 'Street button in header, supplier name in modal, UX polish and label updates' },
