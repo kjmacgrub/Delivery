@@ -2548,9 +2548,9 @@ function renderLiveReport() {
                 const checkSvg = item.pull_confirmed ? '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="4,12 10,18 20,6"/></svg>' : '';
                 html += `
                 <div class="pull-sheet-row ${confirmedClass}${isEditing ? ' se-editing' : ''}">
-                    <span class="pull-qty-circle ${item.pull_confirmed ? 'done' : 'pending'}" onclick="togglePullFromReport(${si}, ${ii})">${item.pull_quantity}</span>
-                    <span class="pull-sheet-of">(of ${item.quantity_expected})</span>
-                    <span class="pull-sheet-name${isOos ? ' oos' : ''}" onclick="toggleStreetEdit(${si}, ${ii})">${item.raw_description}</span>
+                    <span class="pull-qty-circle ${item.pull_confirmed ? 'done' : 'pending'}" onclick="toggleStreetEdit(${si}, ${ii})">${item.pull_quantity}</span>
+                    <span class="pull-sheet-of" onclick="toggleStreetEdit(${si}, ${ii})">(of ${item.quantity_expected})</span>
+                    <span class="pull-sheet-name${isOos ? ' oos' : ''}" onclick="togglePullFromReport(${si}, ${ii})">${item.raw_description}</span>
                     <span class="pull-sheet-toggle" onclick="togglePullFromReport(${si}, ${ii})"></span>
                     <span class="pull-sheet-check ${item.pull_confirmed ? 'done' : 'pending'}" onclick="togglePullFromReport(${si}, ${ii})">${checkSvg}</span>
                 </div>`;
