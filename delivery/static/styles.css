@@ -969,7 +969,6 @@ html, body {
     gap: 8px;
     padding: 7px 10px 7px 50px;
     background: var(--surface);
-    cursor: pointer;
     -webkit-tap-highlight-color: transparent;
     border-left: 3px solid var(--pending);
     min-height: 38px;
@@ -1019,6 +1018,26 @@ html, body {
     flex-shrink: 0;
     white-space: nowrap;
     position: relative;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+    border-radius: 6px;
+    padding: 2px 4px;
+    margin: -2px -4px;
+}
+
+.compact-qty::after {
+    content: '';
+    position: absolute;
+    top: -2px;
+    bottom: -2px;
+    right: -4px;
+    left: -42px;
+    border-radius: 6px;
+    pointer-events: none;
+}
+
+.compact-qty:hover::after {
+    outline: 1px solid rgba(0, 0, 0, 0.1);
 }
 
 .compact-qty .pull-qty {
@@ -2677,31 +2696,76 @@ textarea {
     font-size: 10px;
 }
 
-/* ---- Item Note Button (right side of item rows) ---- */
-.item-note-btn {
-    display: flex;
+/* ---- Inline Note Icon (inside item name) ---- */
+.inline-note-icon {
+    width: 12px;
+    height: 12px;
+    vertical-align: super;
+    margin-left: 3px;
+    color: #d32f2f;
+    flex-shrink: 0;
+}
+
+.compact-name {
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+    border-radius: 6px;
+    padding: 2px 4px;
+    margin: -2px -4px;
+}
+
+.compact-name:hover {
+    outline: 1px solid rgba(0, 0, 0, 0.1);
+}
+
+.compact-name.has-note .inline-note-icon {
+    color: #d32f2f;
+}
+
+/* ---- Express Receive Circle (right side of item rows) ---- */
+.express-circle {
+    display: inline-flex;
     align-items: center;
     justify-content: center;
-    width: 28px;
-    height: 28px;
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
     position: absolute;
-    right: 8px;
+    right: 10px;
     top: 50%;
     transform: translateY(-50%);
     -webkit-tap-highlight-color: transparent;
     cursor: pointer;
-    color: var(--text-secondary);
-    opacity: 0.5;
+    flex-shrink: 0;
+    z-index: 2;
 }
 
-.item-note-btn.has-note {
-    color: var(--primary);
-    opacity: 1;
+.express-circle.pending {
+    border: 2px solid var(--border);
 }
 
-.item-note-btn svg {
-    width: 18px;
-    height: 18px;
+.express-circle.done {
+    background: var(--success);
+    color: white;
+}
+
+.express-circle::before {
+    content: '';
+    position: absolute;
+    top: -8px;
+    bottom: -8px;
+    right: -10px;
+    left: -48px;
+    border-radius: 6px;
+}
+
+.express-circle:hover::before {
+    outline: 1px solid rgba(0, 0, 0, 0.1);
+}
+
+.express-circle svg {
+    width: 14px;
+    height: 14px;
 }
 
 /* ---- Note Popup ---- */
@@ -2746,7 +2810,7 @@ textarea {
 /* ---- Edit Trigger & Pull Indicator (left margin) ---- */
 .qty-left-stack {
     position: absolute;
-    right: calc(100% + 4px);
+    right: calc(100% + 10px);
     top: 50%;
     transform: translateY(-50%);
     display: flex;

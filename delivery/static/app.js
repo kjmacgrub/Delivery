@@ -116,22 +116,22 @@ function showView(name) {
     switch (name) {
 
         case 'deliveries':
-            brandText.textContent = 'Delivery View';
+            brandText.textContent = 'Delivery';
             badge.textContent = '';
             badge.className = 'badge';
             break;
         case 'storage':
-            brandText.textContent = 'Delivery View';
+            brandText.textContent = 'Delivery';
             badge.textContent = '';
             badge.className = 'badge';
             break;
         case 'detail':
-            brandText.textContent = 'Delivery View';
+            brandText.textContent = 'Delivery';
             badge.textContent = '';
             badge.className = 'badge';
             break;
         case 'complete':
-            brandText.textContent = 'Delivery View';
+            brandText.textContent = 'Delivery';
             badge.textContent = 'completed';
             badge.className = 'badge badge-completed';
             break;
@@ -210,8 +210,6 @@ function showNoDeliveryScreen() {
 // ---- Live Status Button ----
 function updateLiveStatusBtn() {
     const active = currentDelivery && currentDelivery.status !== 'completed';
-    const liveBtn = document.getElementById('live-status-btn');
-    if (liveBtn) liveBtn.classList.toggle('hidden', !active);
     const continueBtn = document.getElementById('header-continue-btn');
     if (continueBtn) continueBtn.classList.toggle('hidden', !active);
 }
@@ -240,14 +238,14 @@ function updateReportsBadge() {
 }
 
 function updateAlertBadge() {
-    const liveBtn = document.getElementById('live-status-btn');
-    if (!liveBtn) return;
-    let badge = liveBtn.querySelector('.alert-badge');
+    const btn = document.getElementById('header-continue-btn');
+    if (!btn) return;
+    let badge = btn.querySelector('.alert-badge');
     if (pullChangeAlerts.size > 0) {
         if (!badge) {
             badge = document.createElement('span');
             badge.className = 'alert-badge';
-            liveBtn.appendChild(badge);
+            btn.appendChild(badge);
         }
         badge.textContent = pullChangeAlerts.size;
     } else {
@@ -1445,7 +1443,7 @@ function toggleInlineEdit(supplierIdx, itemIdx) {
         item._iePullQty = item.pull_quantity ?? 0;
         item._iePullConfirmed = item.pull_confirmed || false;
         item._ieRcvQty = item.quantity_received ?? item.quantity_expected;
-        item._ieRcvConfirmed = item.received_status !== 'pending';
+        item._ieRcvConfirmed = false;
         item._ieOosQty = 0;
         item._ieOosConfirmed = false;
         item._ieReturnQty = 0;
@@ -1638,7 +1636,7 @@ function ieAdjustReturn(si, ii, delta) {
 async function ieCommitAll(si, ii) {
     const item = currentDelivery.suppliers[si].items[ii];
 
-    // Toggle: if already received, revert to pending
+    // Toggle: if already received, revert to pending (used by receive checkbox)
     if (item._ieRcvConfirmed) {
         try {
             await apiPatch(
@@ -1726,11 +1724,27 @@ async function ieCommitAll(si, ii) {
 // Accept all: commit changes if any meaningful edits were made, otherwise just close
 async function ieAcceptAll(si, ii) {
     const item = currentDelivery.suppliers[si].items[ii];
+    const orig = item._ieOriginal;
     const hasOos = item._ieOosConfirmed;
     const hasReturn = (item._ieReturnQty ?? 0) > 0;
-    const hasReceived = item._ieRcvConfirmed;
-    if (!hasReceived && !hasOos && !hasReturn) {
-        // No meaningful changes — just close the edit box
+
+    // Check if anything actually changed from the original state
+    const rcvQty = item._ieRcvQty ?? item.quantity_expected;
+    const origRcvQty = orig.quantity_received ?? orig.quantity_expected;
+    const wasAlreadyReceived = orig.received_status !== 'pending';
+    const rcvQtyChanged = rcvQty !== origRcvQty;
+    const pullQtyChanged = (item._iePullQty ?? 0) !== (orig.pull_quantity ?? 0);
+
+    if (wasAlreadyReceived && !rcvQtyChanged && !pullQtyChanged && !hasOos && !hasReturn) {
+        // Already received, no edits made — just close
+        cleanupInlineEditState();
+        inlineEditItem = null;
+        renderItemList();
+        return;
+    }
+
+    if (!item._ieRcvConfirmed && !hasOos && !hasReturn) {
+        // Not received and no meaningful input — just close
         cleanupInlineEditState();
         inlineEditItem = null;
         renderItemList();
@@ -1846,7 +1860,7 @@ async function openDelivery(id) {
         supplierFilter = null; // reset filter
         pullChangeAlerts = new Set();
         pullSessionOriginals = {};
-        expandedSuppliers = new Set(); // reset accordion
+        expandedSuppliers = new Set(currentDelivery.suppliers.map((_, idx) => idx)); // default all expanded
         expandedLocations = new Set(); // reset location accordion
         showReceived = true; // reset to show-all view
         searchQuery = ''; // reset search
@@ -2166,12 +2180,16 @@ function renderCompactRow(item, showSupplier, crossMap = null) {
                 eItem.supplierIdx = e.supplierIdx;
                 eItem.itemIdx = e.itemIdx;
                 const eQtyCircle = eIsPending
-                    ? `<div class="qty-circle pending${qtyDigitClass(e.qty)}" onclick="event.stopPropagation(); quickReceiveItem(${e.supplierIdx}, ${e.itemIdx})">${e.qty}</div>`
+                    ? `<div class="qty-circle pending${qtyDigitClass(e.qty)}" onclick="event.stopPropagation(); toggleInlineEdit(${e.supplierIdx}, ${e.itemIdx})">${e.qty}</div>`
                     : `<div class="qty-circle done${qtyDigitClass(eDoneQty)}" onclick="event.stopPropagation(); toggleInlineEdit(${e.supplierIdx}, ${e.itemIdx})">${eDoneQty}</div>`;
+                const eIsFullyConfirmed = e.received_status !== 'pending' && e.pull_confirmed;
+                const eExpressCheckSvg = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="4,12 10,18 20,6"/></svg>';
+                const eExpressCircle = `<div class="express-circle ${eIsFullyConfirmed ? 'done' : 'pending'}" onclick="event.stopPropagation(); expressConfirmItem(${e.supplierIdx}, ${e.itemIdx})">${eIsFullyConfirmed ? eExpressCheckSvg : ''}</div>`;
                 const eEditPanel = eIsEditing ? renderInlineEditPanel(eItem) : '';
-                return `<div class="compact-row supplier-sub-row ${eStatus}${eIsEditing ? ' editing' : ''}" onclick="toggleInlineEdit(${e.supplierIdx}, ${e.itemIdx})">
-                    <div class="compact-qty">${ePullQty}${eQtyCircle}</div>
+                return `<div class="compact-row supplier-sub-row ${eStatus}${eIsEditing ? ' editing' : ''}">
+                    <div class="compact-qty" onclick="event.stopPropagation(); toggleInlineEdit(${e.supplierIdx}, ${e.itemIdx})">${ePullQty}${eQtyCircle}</div>
                     <div class="compact-supplier sub-row-supplier" onclick="event.stopPropagation(); filterBySupplier(${e.supplierIdx})">${e.supplierName}</div>
+                    ${eExpressCircle}
                 </div>${eEditPanel}`;
             }).join('');
         }
@@ -2193,24 +2211,27 @@ function renderCompactRow(item, showSupplier, crossMap = null) {
 
     const doneQty = isEditing ? circleQty : (item.quantity_received ?? item.quantity_expected);
     const qtyCircle = isPending
-        ? `<div class="qty-circle pending${qtyDigitClass(circleQty)}" onclick="event.stopPropagation(); quickReceiveItem(${si}, ${ii})">${circleQty}</div>`
+        ? `<div class="qty-circle pending${qtyDigitClass(circleQty)}" onclick="event.stopPropagation(); toggleInlineEdit(${si}, ${ii})">${circleQty}</div>`
         : `<div class="qty-circle done${qtyDigitClass(doneQty)}" onclick="event.stopPropagation(); toggleInlineEdit(${si}, ${ii})">${doneQty}</div>`;
 
     const noteKey = item.raw_description.toLowerCase().trim().replace(/\//g, '_');
     const hasNote = itemNotes[noteKey];
-    const noteBtn = `<div class="item-note-btn${hasNote ? ' has-note' : ''}" onclick="event.stopPropagation(); openNotePopup('${escapeAttr(item.raw_description)}')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg></div>`;
+    const noteIcon = hasNote ? '<svg class="inline-note-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>' : '';
+
+    const isFullyConfirmed = item.received_status !== 'pending' && item.pull_confirmed;
+    const expressCheckSvg = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="4,12 10,18 20,6"/></svg>';
+    const expressCircle = `<div class="express-circle ${isFullyConfirmed ? 'done' : 'pending'}" onclick="event.stopPropagation(); expressConfirmItem(${si}, ${ii})">${isFullyConfirmed ? expressCheckSvg : ''}</div>`;
 
     const editPanel = isEditing ? renderInlineEditPanel(item) : '';
     const isOos = item._ieOosConfirmed || (item.received_notes && item.received_notes.includes('O/S'));
 
     return `
-    <div class="compact-row ${statusClass} ${processingClass} ${floorClass}${showSupplier ? '' : ' accordion-item'}${isEditing ? ' editing' : ''}"
-         onclick="toggleInlineEdit(${si}, ${ii})">
-        <div class="compact-qty"><div class="qty-left-stack">${leftLabel}</div>${qtyCircle}</div>
-        <div class="compact-name${isOos ? ' oos' : ''}">${item.raw_description}</div>
+    <div class="compact-row ${statusClass} ${processingClass} ${floorClass}${showSupplier ? '' : ' accordion-item'}${isEditing ? ' editing' : ''}">
+        <div class="compact-qty" onclick="event.stopPropagation(); toggleInlineEdit(${si}, ${ii})"><div class="qty-left-stack">${leftLabel}</div>${qtyCircle}</div>
+        <div class="compact-name${isOos ? ' oos' : ''}${hasNote ? ' has-note' : ''}" onclick="event.stopPropagation(); openNotePopup('${escapeAttr(item.raw_description)}')">${item.raw_description}${noteIcon}</div>
         ${supplierChip}
         ${hcStrip}
-        ${noteBtn}
+        ${expressCircle}
     </div>${editPanel}${alsoRow}`;
 }
 
@@ -2227,14 +2248,13 @@ function renderMultiSupplierRow(items) {
 
     const msNoteKey = firstName.toLowerCase().trim().replace(/\//g, '_');
     const msHasNote = itemNotes[msNoteKey];
-    const msNoteBtn = `<div class="item-note-btn${msHasNote ? ' has-note' : ''}" onclick="event.stopPropagation(); openNotePopup('${escapeAttr(firstName)}')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg></div>`;
+    const msNoteIcon = msHasNote ? '<svg class="inline-note-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>' : '';
 
     const mainRow = `
     <div class="compact-row multi-supplier-header">
         <div class="compact-qty">${totalQty}</div>
-        <div class="compact-name">${firstName}</div>
+        <div class="compact-name${msHasNote ? ' has-note' : ''}" onclick="event.stopPropagation(); openNotePopup('${escapeAttr(firstName)}')">${firstName}${msNoteIcon}</div>
         ${hcStrip}
-        ${msNoteBtn}
     </div>`;
 
     const subRows = items.map(item => {
@@ -2247,14 +2267,17 @@ function renderMultiSupplierRow(items) {
         const msDoneQty = item.quantity_received ?? item.quantity_expected;
         const isEditing = inlineEditItem && inlineEditItem.supplierIdx === item.supplierIdx && inlineEditItem.itemIdx === item.itemIdx;
         const msQtyCircle = isPending
-            ? `<div class="qty-circle pending${qtyDigitClass(item.quantity_expected)}" onclick="event.stopPropagation(); quickReceiveItem(${item.supplierIdx}, ${item.itemIdx})">${item.quantity_expected}</div>`
+            ? `<div class="qty-circle pending${qtyDigitClass(item.quantity_expected)}" onclick="event.stopPropagation(); toggleInlineEdit(${item.supplierIdx}, ${item.itemIdx})">${item.quantity_expected}</div>`
             : `<div class="qty-circle done${qtyDigitClass(msDoneQty)}" onclick="event.stopPropagation(); toggleInlineEdit(${item.supplierIdx}, ${item.itemIdx})">${msDoneQty}</div>`;
+        const msIsFullyConfirmed = item.received_status !== 'pending' && item.pull_confirmed;
+        const msExpressCheckSvg = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="4,12 10,18 20,6"/></svg>';
+        const msExpressCircle = `<div class="express-circle ${msIsFullyConfirmed ? 'done' : 'pending'}" onclick="event.stopPropagation(); expressConfirmItem(${item.supplierIdx}, ${item.itemIdx})">${msIsFullyConfirmed ? msExpressCheckSvg : ''}</div>`;
         const editPanel = isEditing ? renderInlineEditPanel(item) : '';
         return `
-        <div class="compact-row supplier-sub-row ${statusClass}${isEditing ? ' editing' : ''}"
-             onclick="toggleInlineEdit(${item.supplierIdx}, ${item.itemIdx})">
-            <div class="compact-qty">${pullQty}${msQtyCircle}</div>
+        <div class="compact-row supplier-sub-row ${statusClass}${isEditing ? ' editing' : ''}">
+            <div class="compact-qty" onclick="event.stopPropagation(); toggleInlineEdit(${item.supplierIdx}, ${item.itemIdx})">${pullQty}${msQtyCircle}</div>
             <div class="compact-supplier sub-row-supplier" onclick="event.stopPropagation(); filterBySupplier(${item.supplierIdx})">${item.supplierName}</div>
+            ${msExpressCircle}
         </div>${editPanel}`;
     }).join('');
 
@@ -3221,6 +3244,57 @@ async function quickReceiveItem(supplierIdx, itemIdx) {
         }
     } catch (e) {
         showToast('Failed to receive item', 'error');
+    }
+}
+
+async function expressConfirmItem(supplierIdx, itemIdx) {
+    const item = currentDelivery.suppliers[supplierIdx].items[itemIdx];
+    const isFullyConfirmed = item.received_status !== 'pending' && item.pull_confirmed;
+
+    // Optimistically update local state and re-render immediately
+    if (isFullyConfirmed) {
+        item.quantity_received = null;
+        item.received_status = 'pending';
+        item.received_notes = null;
+        item.pull_confirmed = false;
+    } else {
+        item.quantity_received = item.quantity_expected;
+        item.received_status = 'ok';
+        item.received_notes = null;
+        item.pull_confirmed = true;
+    }
+    lastWriteTimestamp = Date.now();
+    if (supplierFilter !== null) updateFilteredSupplierSummary();
+    renderDetail();
+
+    try {
+        if (isFullyConfirmed) {
+            await apiPatch(
+                `/deliveries/${currentDelivery.id}/suppliers/${supplierIdx}/items/${itemIdx}/unreceive`,
+                {}
+            );
+        } else {
+            const calls = [];
+            if (!item.pull_submitted) {
+                calls.push(
+                    apiPatch(`/deliveries/${currentDelivery.id}/suppliers/${supplierIdx}/items/${itemIdx}/pull-submit`, {})
+                        .then(() => { item.pull_submitted = true; })
+                );
+            }
+            calls.push(
+                apiPatch(`/deliveries/${currentDelivery.id}/suppliers/${supplierIdx}/items/${itemIdx}/checkin`,
+                    { quantity_received: item.quantity_expected, received_status: 'ok', received_notes: null, pull_confirmed: true })
+            );
+            await Promise.all(calls);
+        }
+        lastWriteTimestamp = Date.now();
+
+        if (!completionShown && checkAllItemsReceived()) {
+            completionShown = true;
+            showCompletionModal();
+        }
+    } catch (e) {
+        showToast('Failed to update item', 'error');
     }
 }
 
