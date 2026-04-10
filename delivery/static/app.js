@@ -2346,6 +2346,7 @@ function renderSupplierAccordion(container, flatItems) {
         <div class="supplier-accordion-header ${statusClass}" onclick="toggleSupplierAccordion(${sIdx})">
             <span class="${chevronClass}">&#9654;</span>
             <span class="accordion-supplier-name">${supplier.supplier_name} <span class="accordion-case-count"><span class="count-green">${fmtNum(rcvCases)}</span>/${fmtNum(expCases)}</span></span>
+            ${isExpanded ? '<span class="accept-column-header">Accept <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--success)" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><polyline points="19,12 12,19 5,12"/></svg></span>' : ''}
         </div>`;
 
         if (isExpanded && supplierItems.length > 0) {

@@ -2728,6 +2728,20 @@ textarea {
     color: #d32f2f;
 }
 
+/* ---- Accept Column Header ---- */
+.accept-column-header {
+    margin-left: auto;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    padding-right: 4px;
+    display: flex;
+    align-items: center;
+    gap: 2px;
+}
+
 /* ---- Express Receive Circle (right side of item rows) ---- */
 .express-circle {
     display: inline-flex;
