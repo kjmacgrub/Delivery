@@ -1686,7 +1686,7 @@ async function ieCommitAll(si, ii) {
         const returnNote = [tags.join(', '), noteText].filter(Boolean).join(' — ');
         noteParts.push(returnNote ? `Return ${retQty}: ${returnNote}` : `Return ${retQty}`);
     }
-    let notes = noteParts.length > 0 ? noteParts.join('; ') : (item.received_notes || null);
+    let notes = noteParts.length > 0 ? noteParts.join('; ') : null;
 
     try {
         await apiPatch(
