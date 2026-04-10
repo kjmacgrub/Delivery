@@ -1380,13 +1380,33 @@ function noteKey(description) {
     return description.toLowerCase().trim().replace(/\//g, '_');
 }
 
-function openNotePopup(description) {
+function openNotePopup(description, event) {
     const key = noteKey(description);
     const existing = itemNotes[key];
     document.getElementById('note-popup-name').textContent = description;
     document.getElementById('note-popup-text').value = existing ? existing.note : '';
-    document.getElementById('note-popup').dataset.description = description;
-    document.getElementById('note-popup').classList.remove('hidden');
+    const popup = document.getElementById('note-popup');
+    popup.dataset.description = description;
+
+    // Position to the right of the item name, flipping vertically based on screen position
+    if (event && event.currentTarget) {
+        const rect = event.currentTarget.getBoundingClientRect();
+        const popupHeight = 220; // approximate height
+        const midScreen = window.innerHeight / 2;
+
+        popup.style.position = 'absolute';
+        popup.style.left = rect.right + 'px';
+
+        if (rect.top > midScreen) {
+            // Item is in bottom half — popup above
+            popup.style.top = (rect.top + window.scrollY - popupHeight) + 'px';
+        } else {
+            // Item is in top half — popup below
+            popup.style.top = (rect.top + window.scrollY) + 'px';
+        }
+    }
+
+    popup.classList.remove('hidden');
     document.getElementById('note-popup-backdrop').classList.remove('hidden');
     document.getElementById('note-popup-text').focus();
 }
@@ -1498,7 +1518,7 @@ function renderInlineEditPanel(item) {
     const retConfirmed = item._ieReturnConfirmed || false;
 
     return `
-    <div class="inline-edit-panel" onclick="event.stopPropagation()">
+    <div class="inline-edit-wrapper"><div class="inline-edit-panel" onclick="event.stopPropagation()">
         <div class="ie-columns">
             <div class="ie-col">
                 <span class="ie-label${pullConfirmed ? ' ie-confirmed' : ''}">${pullConfirmed ? 'Pulled' : 'Pull'}</span>
@@ -1553,7 +1573,7 @@ function renderInlineEditPanel(item) {
             <span class="ie-accept" onclick="ieAcceptAll(${si}, ${ii})">Accept all</span>
             <span class="ie-cancel" onclick="ieUndo(${si}, ${ii})">cancel all changes</span>
         </div>
-    </div>`;
+    </div></div>`;
 }
 
 // -- Pull: adjust qty (auto-saves, resets confirmed) --
@@ -2228,7 +2248,7 @@ function renderCompactRow(item, showSupplier, crossMap = null) {
     return `
     <div class="compact-row ${statusClass} ${processingClass} ${floorClass}${showSupplier ? '' : ' accordion-item'}${isEditing ? ' editing' : ''}">
         <div class="compact-qty" onclick="event.stopPropagation(); toggleInlineEdit(${si}, ${ii})"><div class="qty-left-stack">${leftLabel}</div>${qtyCircle}</div>
-        <div class="compact-name${isOos ? ' oos' : ''}${hasNote ? ' has-note' : ''}" onclick="event.stopPropagation(); openNotePopup('${escapeAttr(item.raw_description)}')">${item.raw_description}${noteIcon}</div>
+        <div class="compact-name${isOos ? ' oos' : ''}${hasNote ? ' has-note' : ''}" onclick="event.stopPropagation(); openNotePopup('${escapeAttr(item.raw_description)}', event)">${item.raw_description}${noteIcon}</div>
         ${supplierChip}
         ${hcStrip}
         ${expressCircle}
@@ -2253,7 +2273,7 @@ function renderMultiSupplierRow(items) {
     const mainRow = `
     <div class="compact-row multi-supplier-header">
         <div class="compact-qty">${totalQty}</div>
-        <div class="compact-name${msHasNote ? ' has-note' : ''}" onclick="event.stopPropagation(); openNotePopup('${escapeAttr(firstName)}')">${firstName}${msNoteIcon}</div>
+        <div class="compact-name${msHasNote ? ' has-note' : ''}" onclick="event.stopPropagation(); openNotePopup('${escapeAttr(firstName)}', event)">${firstName}${msNoteIcon}</div>
         ${hcStrip}
     </div>`;
 

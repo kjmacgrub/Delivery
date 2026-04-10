@@ -229,10 +229,10 @@
         <!-- Pop-up: Item Note -->
         <div id="note-popup-backdrop" class="pull-popup-backdrop hidden" onclick="closeNotePopup()"></div>
         <div id="note-popup" class="note-popup hidden">
-            <div class="pull-popup-title">Item Note<button class="pull-popup-close" onclick="closeNotePopup()">✕</button></div>
             <div id="note-popup-name" class="pull-popup-name"></div>
             <textarea id="note-popup-text" rows="4" placeholder="Add a note about this item..."></textarea>
             <div class="note-popup-actions">
+                <button class="btn btn-sm" style="background:#d32f2f;color:#fff;border:none" onclick="closeNotePopup()">Cancel</button>
                 <button class="btn btn-secondary btn-sm" onclick="deleteItemNote()">Clear</button>
                 <button class="btn btn-success btn-sm" onclick="saveItemNote()">Save</button>
             </div>

@@ -2790,10 +2790,7 @@ textarea {
 
 /* ---- Note Popup ---- */
 .note-popup {
-    position: fixed;
-    left: 50%;
-    top: 40%;
-    transform: translate(-50%, -50%);
+    position: absolute;
     z-index: 1100;
     background: var(--surface);
     border-radius: var(--radius);
@@ -2882,12 +2879,16 @@ textarea {
 
 /* ---- Inline Edit Panel ---- */
 .compact-row.editing {
-    background: #faf3ef;
+    background: var(--surface);
+}
+
+.inline-edit-wrapper {
+    background: var(--surface);
+    border-left: 3px solid var(--primary);
 }
 
 .inline-edit-panel {
     background: #faf3ef;
-    border-left: 3px solid var(--primary);
     padding: 10px 14px 10px 16px;
     display: flex;
     flex-direction: column;
@@ -3387,8 +3388,8 @@ textarea {
     font-size: 15px;
     font-weight: 700;
     letter-spacing: 0.01em;
-    color: #fff;
-    background: var(--primary);
+    color: var(--text);
+    background: #faf3ef;
     align-self: stretch;
     text-align: center;
     padding: 10px 20px;
@@ -3404,7 +3405,7 @@ textarea {
     transform: translateY(-50%);
     background: none;
     border: none;
-    color: rgba(255,255,255,0.8);
+    color: var(--text-secondary);
     font-size: 14px;
     line-height: 1;
     cursor: pointer;
