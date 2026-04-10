@@ -83,7 +83,7 @@ html, body {
 #app-header {
     position: sticky;
     top: 0;
-    z-index: 100;
+    z-index: 110;
     background: rgba(255,255,255,0.85);
     backdrop-filter: blur(20px);
     -webkit-backdrop-filter: blur(20px);
@@ -588,7 +588,7 @@ html, body {
     gap: 16px;
     position: sticky;
     top: 0;
-    z-index: 100;
+    z-index: 98;
 }
 
 #delivery-summary,
