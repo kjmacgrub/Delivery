@@ -1743,8 +1743,8 @@ async function ieAcceptAll(si, ii) {
         return;
     }
 
-    if (!item._ieRcvConfirmed && !hasOos && !hasReturn) {
-        // Not received and no meaningful input — just close
+    if (!item._ieRcvConfirmed && !hasOos && !hasReturn && !rcvQtyChanged && !pullQtyChanged) {
+        // No meaningful input or changes — just close
         cleanupInlineEditState();
         inlineEditItem = null;
         renderItemList();
