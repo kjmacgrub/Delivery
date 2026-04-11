@@ -2060,6 +2060,7 @@ textarea {
 .supplier-accordion-header {
     display: flex;
     align-items: center;
+    justify-content: center;
     gap: 8px;
     padding: 10px 12px;
     background: var(--highlight);
@@ -2067,6 +2068,7 @@ textarea {
     -webkit-tap-highlight-color: transparent;
     border-left: 4px solid var(--pending);
     min-height: 44px;
+    position: relative;
 }
 
 .supplier-accordion-header:active {
@@ -2080,12 +2082,14 @@ textarea {
 }
 
 .accordion-chevron {
+    display: inline-block;
     font-size: 12px;
     color: var(--text-secondary);
     transition: transform 0.2s;
-    flex-shrink: 0;
     width: 16px;
     text-align: center;
+    margin-right: 6px;
+    vertical-align: middle;
 }
 
 .accordion-chevron.expanded {
@@ -2095,11 +2099,12 @@ textarea {
 .accordion-supplier-name {
     font-size: 18px;
     font-weight: 600;
-    flex: 1;
     min-width: 0;
+    max-width: calc(100% - 200px);
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+    text-align: center;
 }
 
 .accordion-case-count {
@@ -2728,18 +2733,31 @@ textarea {
     color: #d32f2f;
 }
 
-/* ---- Accept Column Header ---- */
+/* ---- Edit / Accept Column Headers ---- */
+.edit-column-header,
 .accept-column-header {
-    margin-left: auto;
+    position: absolute;
     font-size: 11px;
     font-weight: 600;
     color: var(--text-secondary);
     text-transform: uppercase;
     letter-spacing: 0.5px;
-    padding-right: 4px;
     display: flex;
     align-items: center;
     gap: 2px;
+}
+
+.edit-column-header {
+    left: 20px;
+}
+
+.accept-column-header {
+    right: 16px;
+}
+
+.edit-column-header svg,
+.accept-column-header svg {
+    stroke: var(--success);
 }
 
 /* ---- Express Receive Circle (right side of item rows) ---- */

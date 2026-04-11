@@ -73,6 +73,7 @@ let inlineEditItem = null; // { supplierIdx, itemIdx } for inline edit panel
 let supplierFilter = null; // null = show all, or { idx, name } to filter to one supplier
 let itemSortMode = 'supplier'; // 'alpha', 'qty', or 'supplier'
 let multiFilter = false;   // show only items shared across 2+ suppliers
+let pullsOnlyFilter = false; // show only items that have a pull quantity specified
 let showReceived = true; // true = show all items including received
 let collapsedPullSuppliers = new Set(); // supplier names collapsed in street view
 let streetEditItem = null; // { supplierIdx, itemIdx } for street view edit panel
@@ -1996,6 +1997,11 @@ function renderItemList() {
         flatItems = flatItems.filter(item => item.supplierIdx === supplierFilter.idx);
     }
 
+    // Pulls-only filter: items that have a pull quantity specified
+    if (pullsOnlyFilter) {
+        flatItems = flatItems.filter(item => (item.pull_quantity || 0) > 0);
+    }
+
     // Multi filter: items appearing in 2+ supplier blocks
     if (multiFilter && itemSortMode === 'alpha') {
         const descSuppliers = new Map();
@@ -2034,6 +2040,9 @@ function renderItemList() {
     multiBtn.classList.toggle('hidden', itemSortMode !== 'alpha' || supplierFilter !== null);
     multiBtn.classList.toggle('active', multiFilter);
 
+    const pullsBtn = document.getElementById('sort-pulls');
+    pullsBtn.classList.toggle('active', pullsOnlyFilter);
+
 
 
     const container = document.getElementById('flat-item-list');
@@ -2055,7 +2064,9 @@ function renderItemList() {
 
     if (!flatItems.length) {
         let emptyMsg;
-        if (multiFilter) {
+        if (pullsOnlyFilter) {
+            emptyMsg = 'No items have a pull quantity specified';
+        } else if (multiFilter) {
             emptyMsg = 'No items are shared across multiple suppliers';
         } else if (searchQuery) {
             emptyMsg = 'No items match your search';
@@ -2344,6 +2355,9 @@ function renderSupplierAccordion(container, flatItems) {
         // Skip suppliers with no matching items when searching
         if (searchQuery && supplierItems.length === 0) return;
 
+        // Skip suppliers with no pull items when Pulls Only is active
+        if (pullsOnlyFilter && supplierItems.length === 0) return;
+
         anyVisible = true;
 
         // Sort items within supplier alphabetically
@@ -2362,11 +2376,14 @@ function renderSupplierAccordion(container, flatItems) {
         const statusClass = allDone ? 'supplier-complete' : '';
         const chevronClass = isExpanded ? 'accordion-chevron expanded' : 'accordion-chevron';
 
+        const arrowSvg = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><polyline points="19,12 12,19 5,12"/></svg>';
+        const editHeader = isExpanded ? `<span class="edit-column-header">Edit ${arrowSvg}</span>` : '';
+        const acceptHeader = isExpanded ? `<span class="accept-column-header">Accept ${arrowSvg}</span>` : '';
         html += `
         <div class="supplier-accordion-header ${statusClass}" onclick="toggleSupplierAccordion(${sIdx})">
-            <span class="${chevronClass}">&#9654;</span>
-            <span class="accordion-supplier-name">${supplier.supplier_name} <span class="accordion-case-count"><span class="count-green">${fmtNum(rcvCases)}</span>/${fmtNum(expCases)}</span></span>
-            ${isExpanded ? '<span class="accept-column-header">Accept <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--success)" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><polyline points="19,12 12,19 5,12"/></svg></span>' : ''}
+            ${editHeader}
+            <span class="accordion-supplier-name"><span class="${chevronClass}">&#9654;</span>${supplier.supplier_name} <span class="accordion-case-count"><span class="count-green">${fmtNum(rcvCases)}</span>/${fmtNum(expCases)}</span></span>
+            ${acceptHeader}
         </div>`;
 
         if (isExpanded && supplierItems.length > 0) {
@@ -2375,7 +2392,11 @@ function renderSupplierAccordion(container, flatItems) {
     });
 
     if (!anyVisible) {
-        container.innerHTML = `<div class="empty-state"><p>${searchQuery ? 'No items match your search' : 'All items received!'}</p></div>`;
+        let emptyMsg;
+        if (pullsOnlyFilter) emptyMsg = 'No items have a pull quantity specified';
+        else if (searchQuery) emptyMsg = 'No items match your search';
+        else emptyMsg = 'All items received!';
+        container.innerHTML = `<div class="empty-state"><p>${emptyMsg}</p></div>`;
     } else {
         container.innerHTML = html;
     }
@@ -2778,6 +2799,11 @@ async function setItemSort(mode) {
 
 function toggleMultiFilter() {
     multiFilter = !multiFilter;
+    renderItemList();
+}
+
+function togglePullsOnly() {
+    pullsOnlyFilter = !pullsOnlyFilter;
     renderItemList();
 }
 
@@ -3464,16 +3490,12 @@ function casesExpected(items) {
 function progressBar(done, total) {
     const pct = total > 0 ? Math.round((done / total) * 100) : 0;
     const countClickable = done > 0;
-    const toggleBtn = `<button onclick="setShowReceived(${!showReceived})" style="padding:5px 12px;font-size:13px;font-weight:600;border:1px solid var(--border);border-radius:8px;background:${showReceived ? 'var(--success)' : 'var(--surface)'};color:${showReceived ? '#fff' : 'var(--text-secondary)'};cursor:pointer;white-space:nowrap">${showReceived ? 'Hide received' : 'Show received'}</button>`;
     return `
     <div class="progress-bar-summary">
-        <div style="display:flex;align-items:center;justify-content:center;gap:12px;margin-bottom:4px">
-            <div class="progress-bar-count${countClickable ? ' progress-bar-count-toggle' : ''}" style="margin-bottom:0"${countClickable ? ` onclick="setShowReceived(${!showReceived})"` : ''}><span class="${done > 0 ? 'count-green' : ''}">${fmtNum(done)}</span> / ${fmtNum(total)}</div>
-            ${toggleBtn}
-        </div>
+        <div class="progress-bar-count${countClickable ? ' progress-bar-count-toggle' : ''}"${countClickable ? ` onclick="setShowReceived(${!showReceived})"` : ''}><span class="${done > 0 ? 'count-green' : ''}">${fmtNum(done)}</span> / ${fmtNum(total)}</div>
         <div class="progress-bar-label">
-            <span class="progress-bar-title ${showReceived ? 'progress-title-received' : ''}" onclick="setShowReceived(${!showReceived})">Received</span>
-            <span class="progress-bar-title ${showReceived ? '' : 'progress-title-expected'}" onclick="setShowReceived(${!showReceived})">Expected</span>
+            <span class="progress-bar-title ${showReceived ? 'progress-title-received' : ''}" onclick="setShowReceived(${!showReceived})">Show Received</span>
+            <span class="progress-bar-title ${showReceived ? '' : 'progress-title-expected'}" onclick="setShowReceived(${!showReceived})">Show Expected Only</span>
         </div>
         <div class="progress-bar-track">
             <div class="progress-bar-fill" style="width: ${pct}%; transition: width 0.4s ease"></div>
