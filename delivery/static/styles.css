@@ -723,7 +723,7 @@ html, body {
 }
 
 .progress-title-expected {
-    color: var(--text);
+    color: var(--success);
 }
 
 .progress-bar-track {

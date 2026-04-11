@@ -3495,7 +3495,7 @@ function progressBar(done, total) {
         <div class="progress-bar-count${countClickable ? ' progress-bar-count-toggle' : ''}"${countClickable ? ` onclick="setShowReceived(${!showReceived})"` : ''}><span class="${done > 0 ? 'count-green' : ''}">${fmtNum(done)}</span> / ${fmtNum(total)}</div>
         <div class="progress-bar-label">
             <span class="progress-bar-title ${showReceived ? 'progress-title-received' : ''}" onclick="setShowReceived(${!showReceived})">Show Received</span>
-            <span class="progress-bar-title ${showReceived ? '' : 'progress-title-expected'}" onclick="setShowReceived(${!showReceived})">Show Expected Only</span>
+            <span class="progress-bar-title ${showReceived ? '' : 'progress-title-expected'}" onclick="setShowReceived(${!showReceived})">Hide Received</span>
         </div>
         <div class="progress-bar-track">
             <div class="progress-bar-fill" style="width: ${pct}%; transition: width 0.4s ease"></div>
