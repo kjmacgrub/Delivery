@@ -88,6 +88,10 @@ let highCountData = null; // { lowercase_item_name: { sat, sun, mon } } or null
 let itemNotes = {}; // { note_key: { description, note } } — persists across deliveries
 let inventoryData = null; // { lowercase_item_name: { name, basement_location, floor_location } } or null
 
+// ---- History / Date Selector State ----
+let availableDeliveries = [];  // delivery summaries for date dropdown
+let isViewingHistory = false;  // true when viewing a past completed delivery
+
 // ---- Real-time Listener State ----
 let activeUnsubscribes = [];       // functions to call to tear down listeners
 let pendingDeliveryUpdate = null;  // snapshot data waiting for modal to close
@@ -109,10 +113,13 @@ function showView(name) {
     document.getElementById('app-header').classList.remove('street-view-active');
     streetEditItem = null;
 
-    // Show delivery date in the secondary header (page-title)
-    title.textContent = currentDelivery
-        ? `${currentDelivery.day_of_week} ${formatDate(currentDelivery.delivery_date)}`
-        : '';
+    // Show delivery date in the secondary header (page-title text span)
+    const titleTextEl = document.getElementById('page-title-text');
+    if (titleTextEl) {
+        titleTextEl.textContent = currentDelivery
+            ? `${currentDelivery.day_of_week} ${formatDate(currentDelivery.delivery_date)}`
+            : '';
+    }
 
     switch (name) {
 
@@ -144,7 +151,7 @@ function showView(name) {
             break;
         case 'dailylogs':
             brandText.textContent = 'Reports';
-            title.textContent = '';
+            if (titleTextEl) titleTextEl.textContent = '';
             badge.textContent = '';
             badge.className = 'badge';
             break;
@@ -161,8 +168,8 @@ function showView(name) {
 }
 
 function goHome() {
-    if (currentDelivery && currentDelivery.status !== 'completed') {
-        // Active delivery exists — go (back) to it
+    if (currentDelivery && (currentDelivery.status !== 'completed' || isViewingHistory)) {
+        // Active delivery or history view — go (back) to detail
         if (currentView !== 'detail') {
             showView('detail');
         }
@@ -185,7 +192,7 @@ function goBack() {
         case 'storage':
         case 'deliveries':
         case 'dailylogs':
-            if (currentDelivery && currentDelivery.status !== 'completed') {
+            if (currentDelivery && (currentDelivery.status !== 'completed' || isViewingHistory)) {
                 showView('detail');
             } else {
                 showNoDeliveryScreen();
@@ -1161,7 +1168,7 @@ async function showStorageFiles() {
             const lname = f.name.toLowerCase();
             const dateMatch = f.name.match(/(\d{4}-\d{2}-\d{2})/);
             const dateStr = dateMatch ? dateMatch[1] : null;
-            if (lname.includes('inventory')) {
+            if (lname.includes('inventory') && !inventoryFile) {
                 inventoryFile = f;
             } else if (dateStr) {
                 if (!dateGroups.has(dateStr)) dateGroups.set(dateStr, { delivery: null, highCount: null });
@@ -1282,6 +1289,11 @@ async function importDelivery(fileName) {
         }
         const data = await res.json();
         showToast(`Imported: ${data.supplier_count} suppliers, ${data.item_count} items`, 'success');
+        // Refresh available deliveries for the date dropdown
+        try {
+            const listData = await apiGet('/deliveries');
+            availableDeliveries = listData.deliveries || [];
+        } catch (_) {}
         openDelivery(data.delivery_id);
     } catch (e) {
         showToast('Import failed', 'error');
@@ -1453,6 +1465,7 @@ async function deleteItemNote() {
 // ---- Inline Edit Panel ----
 
 function toggleInlineEdit(supplierIdx, itemIdx) {
+    if (isViewingHistory) return;
     if (inlineEditItem && inlineEditItem.supplierIdx === supplierIdx && inlineEditItem.itemIdx === itemIdx) {
         cleanupInlineEditState();
         inlineEditItem = null;
@@ -1863,7 +1876,6 @@ async function openDelivery(id) {
         const delivery = await apiGet(`/deliveries/${id}`);
         currentDelivery = delivery;
         applyWeekColor(delivery.delivery_date);
-        updateNotTodayBanner();
         completionShown = false;
         updateLiveStatusBtn();
         await Promise.all([
@@ -1872,8 +1884,15 @@ async function openDelivery(id) {
             loadItemNotes(),
         ]);
 
-        // If already completed, show the delivery-over screen
-        if (delivery.status === 'completed') {
+        // Determine if this is a historical (read-only) view
+        const todayStr = getTodayStr();
+        isViewingHistory = delivery.status === 'completed' && delivery.delivery_date !== todayStr;
+        document.body.classList.toggle('viewing-history', isViewingHistory);
+        updateNotTodayBanner();
+        updateDateDropdownState();
+
+        // If today's delivery is completed, show the delivery-over screen
+        if (delivery.status === 'completed' && !isViewingHistory) {
             showDeliveryOverScreen();
             return;
         }
@@ -2656,6 +2675,7 @@ function toggleCollapsePullSupplier(event, supplierName) {
 // ---- Street View Edit Panel ----
 
 function toggleStreetEdit(supplierIdx, itemIdx) {
+    if (isViewingHistory) return;
     if (streetEditItem && streetEditItem.supplierIdx === supplierIdx && streetEditItem.itemIdx === itemIdx) {
         streetEditItem = null;
     } else {
@@ -2815,6 +2835,7 @@ let selectedReason = null; // 'short', 'over', or 'return'
 
 // Called from flat item list (Items tab)
 function openCheckInModalFlat(supplierIdx, itemIdx) {
+    if (isViewingHistory) return;
     currentSupplierIdx = supplierIdx;
     openCheckInModal(itemIdx);
 }
@@ -2958,6 +2979,7 @@ async function togglePullConfirmed() {
 
 // ---- Pull Popup ----
 function openPullPopup(event, supplierIdx, itemIdx) {
+    if (isViewingHistory) return;
     const item = currentDelivery.suppliers[supplierIdx].items[itemIdx];
     pullPopupItem = { supplierIdx, itemIdx };
 
@@ -3268,6 +3290,7 @@ async function submitCheckIn() {
 // ---- Quick Receive (target circle in main view) ----
 
 async function quickReceiveItem(supplierIdx, itemIdx) {
+    if (isViewingHistory) return;
     const item = currentDelivery.suppliers[supplierIdx].items[itemIdx];
     if (item.received_status !== 'pending') return;
 
@@ -3295,6 +3318,7 @@ async function quickReceiveItem(supplierIdx, itemIdx) {
 }
 
 async function expressConfirmItem(supplierIdx, itemIdx) {
+    if (isViewingHistory) return;
     const item = currentDelivery.suppliers[supplierIdx].items[itemIdx];
     const isFullyConfirmed = item.received_status !== 'pending' && item.pull_confirmed;
 
@@ -3397,6 +3421,7 @@ async function unreceiveItem() {
 }
 
 async function receiveAllSupplier(supplierIdx) {
+    if (isViewingHistory) return;
     const supplier = currentDelivery.suppliers[supplierIdx];
     const pendingItems = supplier.items.filter(i => i.received_status === 'pending');
     if (!pendingItems.length) return;
@@ -3437,6 +3462,7 @@ async function receiveAllSupplier(supplierIdx) {
 }
 
 async function unreceiveAllSupplier(supplierIdx) {
+    if (isViewingHistory) return;
     const supplier = currentDelivery.suppliers[supplierIdx];
     const receivedItems = supplier.items.filter(i => i.received_status !== 'pending');
     if (!receivedItems.length) return;
@@ -3837,6 +3863,14 @@ function closeVersionModal() {
     document.getElementById('version-modal').classList.add('hidden');
 }
 
+// ---- Helpers ----
+function getTodayStr() {
+    const today = new Date();
+    return today.getFullYear() + '-' +
+        String(today.getMonth() + 1).padStart(2, '0') + '-' +
+        String(today.getDate()).padStart(2, '0');
+}
+
 // ---- Not-today banner ----
 function updateNotTodayBanner() {
     const banner = document.getElementById('not-today-banner');
@@ -3845,12 +3879,85 @@ function updateNotTodayBanner() {
         banner.classList.add('hidden');
         return;
     }
-    const today = new Date();
-    const todayStr = today.getFullYear() + '-' +
-        String(today.getMonth() + 1).padStart(2, '0') + '-' +
-        String(today.getDate()).padStart(2, '0');
-    banner.classList.toggle('hidden', currentDelivery.delivery_date === todayStr);
+    const todayStr = getTodayStr();
+    const isToday = currentDelivery.delivery_date === todayStr;
+    banner.classList.toggle('hidden', isToday);
+    if (!isToday && isViewingHistory) {
+        banner.setAttribute('data-text', `VIEWING ${currentDelivery.day_of_week.toUpperCase()} ${formatDate(currentDelivery.delivery_date).toUpperCase()} (READ ONLY)`);
+    } else if (!isToday) {
+        banner.setAttribute('data-text', "NOT TODAY'S DATA");
+    }
 }
+
+// ---- Date Dropdown ----
+function toggleDateDropdown(event) {
+    if (!availableDeliveries.length) return;
+    event.stopPropagation();
+    const dd = document.getElementById('date-dropdown');
+    const caret = document.getElementById('date-caret');
+    const isHidden = dd.classList.contains('hidden');
+    if (isHidden) {
+        renderDateDropdown();
+        dd.classList.remove('hidden');
+        caret.classList.add('open');
+    } else {
+        closeDateDropdown();
+    }
+}
+
+function closeDateDropdown() {
+    document.getElementById('date-dropdown').classList.add('hidden');
+    const caret = document.getElementById('date-caret');
+    if (caret) caret.classList.remove('open');
+}
+
+function renderDateDropdown() {
+    const dd = document.getElementById('date-dropdown');
+    // Sort by delivery_date descending
+    const sorted = [...availableDeliveries]
+        .filter(d => d.delivery_date)
+        .sort((a, b) => (b.delivery_date || '').localeCompare(a.delivery_date || ''));
+
+    dd.innerHTML = sorted.map(d => {
+        const isActive = currentDelivery && currentDelivery.id === d.id;
+        const isCompleted = d.status === 'completed';
+        const statusClass = isCompleted ? 'completed' : 'active';
+        const statusLabel = isCompleted ? 'Done' : 'Active';
+        return `<div class="date-dropdown-item${isActive ? ' active' : ''}"
+                     onclick="selectDateDelivery('${d.id}')">
+            <span>${d.day_of_week} ${formatDate(d.delivery_date)}</span>
+            <span class="dd-status ${statusClass}">${statusLabel}</span>
+        </div>`;
+    }).join('');
+}
+
+function selectDateDelivery(id) {
+    closeDateDropdown();
+    if (currentDelivery && currentDelivery.id === id) return;
+    openDelivery(id);
+}
+
+function updateDateDropdownState() {
+    const caret = document.getElementById('date-caret');
+    const title = document.getElementById('page-title');
+    if (availableDeliveries.length > 1) {
+        caret.classList.remove('hidden');
+        title.classList.add('has-dropdown');
+    } else {
+        caret.classList.add('hidden');
+        title.classList.remove('has-dropdown');
+    }
+}
+
+// Close dropdown when clicking outside
+document.addEventListener('click', (e) => {
+    const dd = document.getElementById('date-dropdown');
+    if (dd && !dd.classList.contains('hidden')) {
+        if (!e.target.closest('#page-title') && !e.target.closest('#date-dropdown')) {
+            closeDateDropdown();
+        }
+    }
+});
 
 // ---- Week color ----
 function applyWeekColor(dateStr) {
@@ -3889,18 +3996,24 @@ document.addEventListener('DOMContentLoaded', async () => {
 async function initApp() {
     try {
         const data = await apiGet('/deliveries');
-        const deliveries = data.deliveries || [];
+        availableDeliveries = data.deliveries || [];
 
         // Find the most recent non-completed delivery
-        const active = deliveries
+        const active = availableDeliveries
             .filter(d => d.status !== 'completed')
             .sort((a, b) => (b.parsed_at || '').localeCompare(a.parsed_at || ''))[0];
 
         if (active) {
             await openDelivery(active.id);
+        } else if (availableDeliveries.length > 0) {
+            // All completed — open the most recent one (read-only history)
+            const mostRecent = [...availableDeliveries]
+                .sort((a, b) => (b.delivery_date || '').localeCompare(a.delivery_date || ''))[0];
+            await openDelivery(mostRecent.id);
         } else {
             showNoDeliveryScreen();
         }
+        updateDateDropdownState();
     } catch (e) {
         showToast('Failed to load deliveries', 'error');
         showNoDeliveryScreen();

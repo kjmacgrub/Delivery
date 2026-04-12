@@ -94,6 +94,12 @@ async def parse_storage_file(file_name: str, request: Request):
     # except Exception:
     #     pass
 
+    # Clean up deliveries older than 7 days
+    try:
+        delivery_service.cleanup_old_deliveries()
+    except Exception:
+        pass  # Don't fail the import if cleanup has issues
+
     total_items = sum(len(s.items) for s in delivery.suppliers)
     return ParseResponse(
         delivery_id=delivery.id,

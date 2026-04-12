@@ -17,7 +17,6 @@
 }
 .not-today-banner::after {
     content: attr(data-text);
-    content: 'NOT TODAY\'S DATA';
     position: absolute;
     font-size: 5vw;
     font-weight: 900;
@@ -29,6 +28,83 @@
 }
 .not-today-banner.hidden {
     display: none;
+}
+
+/* ---- Date Dropdown Selector ---- */
+.date-caret {
+    display: inline-block;
+    vertical-align: middle;
+    margin-left: 4px;
+    transition: transform 0.2s;
+    opacity: 0.5;
+}
+.date-caret.open {
+    transform: rotate(180deg);
+}
+#page-title.has-dropdown {
+    cursor: pointer;
+}
+.date-dropdown {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    z-index: 10000;
+    background: #fff;
+    border-radius: 10px;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.18);
+    min-width: 240px;
+    padding: 6px 0;
+    margin-top: 4px;
+}
+.date-dropdown.hidden {
+    display: none;
+}
+.date-dropdown-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 16px;
+    font-size: 15px;
+    font-weight: 500;
+    cursor: pointer;
+    border-bottom: 1px solid #f0f0f0;
+    color: #333;
+}
+.date-dropdown-item:last-child {
+    border-bottom: none;
+}
+.date-dropdown-item:active {
+    background: #f0f0f0;
+}
+.date-dropdown-item.active {
+    background: #e8f5e9;
+    font-weight: 700;
+}
+.date-dropdown-item .dd-status {
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    padding: 2px 8px;
+    border-radius: 8px;
+}
+.dd-status.active {
+    background: #c8e6c9;
+    color: #2e7d32;
+}
+.dd-status.completed {
+    background: #e0e0e0;
+    color: #666;
+}
+
+/* ---- Read-only mode for history ---- */
+.viewing-history .qty-circle.pending,
+.viewing-history .express-circle.pending {
+    opacity: 0.7;
+}
+.viewing-history .receive-all-slot,
+.viewing-history .supplier-accept-btn,
+.viewing-history .unreceive-all-btn {
+    display: none !important;
 }
 
 /* ---- Reset & Base ---- */

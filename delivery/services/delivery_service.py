@@ -528,6 +528,28 @@ class DeliveryService:
         self._db.collection(self.REPORTS_COLLECTION).document(report_id).delete()
         return True
 
+    def cleanup_old_deliveries(self, max_age_days: int = 7) -> int:
+        """Delete deliveries older than max_age_days. Returns count deleted."""
+        from datetime import date, timedelta
+        cutoff = date.today() - timedelta(days=max_age_days)
+        count = 0
+        if self._use_firestore:
+            cutoff_str = cutoff.isoformat()
+            docs = self._db.collection(self.COLLECTION).where(
+                "delivery_date", "<", cutoff_str
+            ).stream()
+            for doc in docs:
+                self.delete_delivery(doc.id)
+                count += 1
+        # Clean cache too
+        to_remove = [
+            k for k, v in self._cache.items()
+            if v.delivery_date and v.delivery_date < cutoff
+        ]
+        for k in to_remove:
+            self._cache.pop(k, None)
+        return count
+
     def wipe_all(self) -> dict:
         """Delete ALL deliveries and reports. Nuclear option — no recovery."""
         delivery_count = 0

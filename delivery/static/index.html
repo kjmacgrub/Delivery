@@ -17,7 +17,7 @@
     <link rel="stylesheet" href="/static/styles.css?v=__COMMIT__">
 </head>
 <body>
-    <div id="not-today-banner" class="not-today-banner hidden">NOT TODAY'S DATA</div>
+    <div id="not-today-banner" class="not-today-banner hidden" data-text="NOT TODAY'S DATA"></div>
     <div id="app">
         <!-- Header -->
         <header id="app-header">
@@ -56,8 +56,11 @@
                 <span id="julian-day" class="julian-day"></span>
             </div>
             <div class="header-row">
-                <div class="header-left">
-                    <h1 id="page-title">Deliveries</h1>
+                <div class="header-left" style="position:relative;">
+                    <h1 id="page-title" onclick="toggleDateDropdown(event)"><span id="page-title-text">Deliveries</span>
+                        <svg id="date-caret" class="date-caret hidden" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>
+                    </h1>
+                    <div id="date-dropdown" class="date-dropdown hidden"></div>
                 </div>
                 <div class="header-right">
                     <span id="status-badge" class="badge"></span>
