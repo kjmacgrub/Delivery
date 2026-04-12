@@ -591,6 +591,7 @@ class DeliveryService:
                     needs_processing=it.get('needs_processing', False),
                     pull_for_floor=it.get('pull_for_floor', False),
                     pull_quantity=it.get('pull_quantity'),
+                    original_pull_quantity=it.get('pull_quantity'),
                     line_sequence=it.get('line_sequence', 0),
                 ))
 

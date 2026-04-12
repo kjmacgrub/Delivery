@@ -74,6 +74,7 @@ let supplierFilter = null; // null = show all, or { idx, name } to filter to one
 let itemSortMode = 'supplier'; // 'alpha', 'qty', or 'supplier'
 let multiFilter = false;   // show only items shared across 2+ suppliers
 let pullsOnlyFilter = false; // show only items that have a pull quantity specified
+let notesChangesFilter = false; // show only items with notes or changed quantities
 let showReceived = true; // true = show all items including received
 let collapsedPullSuppliers = new Set(); // supplier names collapsed in street view
 let streetEditItem = null; // { supplierIdx, itemIdx } for street view edit panel
@@ -2021,6 +2022,20 @@ function renderItemList() {
         flatItems = flatItems.filter(item => (item.pull_quantity || 0) > 0);
     }
 
+    // Notes & Changes filter: items with notes, received qty changed, or pull qty changed from original
+    if (notesChangesFilter) {
+        flatItems = flatItems.filter(item => {
+            const nk = item.raw_description.toLowerCase().trim().replace(/\//g, '_');
+            const hasNote = !!itemNotes[nk];
+            const hasReceivedNote = !!item.received_notes;
+            const qtyChanged = item.received_status === 'short' || item.received_status === 'over' || item.received_status === 'return';
+            const origPull = item.original_pull_quantity !== undefined && item.original_pull_quantity !== null
+                ? item.original_pull_quantity : item.pull_quantity;
+            const pullChanged = (item.pull_quantity || 0) !== (origPull || 0);
+            return hasNote || hasReceivedNote || qtyChanged || pullChanged;
+        });
+    }
+
     // Multi filter: items appearing in 2+ supplier blocks
     if (multiFilter && itemSortMode === 'alpha') {
         const descSuppliers = new Map();
@@ -2062,7 +2077,8 @@ function renderItemList() {
     const pullsBtn = document.getElementById('sort-pulls');
     pullsBtn.classList.toggle('active', pullsOnlyFilter);
 
-
+    const notesBtn = document.getElementById('sort-notes-changes');
+    notesBtn.classList.toggle('active', notesChangesFilter);
 
     const container = document.getElementById('flat-item-list');
     container.classList.toggle('show-received', showReceived);
@@ -2083,7 +2099,9 @@ function renderItemList() {
 
     if (!flatItems.length) {
         let emptyMsg;
-        if (pullsOnlyFilter) {
+        if (notesChangesFilter) {
+            emptyMsg = 'No items have notes or changes';
+        } else if (pullsOnlyFilter) {
             emptyMsg = 'No items have a pull quantity specified';
         } else if (multiFilter) {
             emptyMsg = 'No items are shared across multiple suppliers';
@@ -2203,8 +2221,12 @@ function renderCompactRow(item, showSupplier, crossMap = null) {
     const pullConfirmedClass = item.pull_confirmed ? 'pull-confirmed' : '';
     const si = item.supplierIdx, ii = item.itemIdx;
     const isEditing = inlineEditItem && inlineEditItem.supplierIdx === si && inlineEditItem.itemIdx === ii;
+    const origPull = item.original_pull_quantity !== undefined && item.original_pull_quantity !== null
+        ? item.original_pull_quantity : item.pull_quantity;
+    const pullChangedTip = item.pull_quantity != null && (item.pull_quantity || 0) !== (origPull || 0)
+        ? ` title="Original: ${origPull || 0}"` : '';
     const leftLabel = item.pull_quantity != null
-        ? `<span class="pull-indicator ${pullConfirmedClass}">${item.pull_quantity}</span>`
+        ? `<span class="pull-indicator ${pullConfirmedClass}"${pullChangedTip}>${item.pull_quantity}</span>`
         : '';
 
     const supplierChip = showSupplier
@@ -2220,8 +2242,12 @@ function renderCompactRow(item, showSupplier, crossMap = null) {
             alsoRow = others.map(e => {
                 const eStatus = e.received_status === 'pending' ? '' : `checked-${e.received_status}`;
                 const ePullConfirmedClass = e.pull_confirmed ? 'pull-confirmed' : '';
+                const eOrigPull = e.original_pull_quantity !== undefined && e.original_pull_quantity !== null
+                    ? e.original_pull_quantity : e.pull_quantity;
+                const ePullTip = e.pull_quantity != null && (e.pull_quantity || 0) !== (eOrigPull || 0)
+                    ? ` title="Original: ${eOrigPull || 0}"` : '';
                 const ePullQty = e.pull_quantity != null
-                    ? `<span class="pull-qty ${ePullConfirmedClass}" onclick="event.stopPropagation(); openPullPopup(event, ${e.supplierIdx}, ${e.itemIdx})">(${e.pull_quantity})</span> `
+                    ? `<span class="pull-qty ${ePullConfirmedClass}"${ePullTip} onclick="event.stopPropagation(); openPullPopup(event, ${e.supplierIdx}, ${e.itemIdx})">(${e.pull_quantity})</span> `
                     : `<span class="pull-qty pull-qty-empty" onclick="event.stopPropagation(); openPullPopup(event, ${e.supplierIdx}, ${e.itemIdx})" ></span> `;
                 const eIsPending = e.received_status === 'pending';
                 const eDoneQty = e.quantity_received ?? e.qty;
@@ -2229,9 +2255,11 @@ function renderCompactRow(item, showSupplier, crossMap = null) {
                 const eItem = currentDelivery.suppliers[e.supplierIdx].items[e.itemIdx];
                 eItem.supplierIdx = e.supplierIdx;
                 eItem.itemIdx = e.itemIdx;
+                const eRcvChanged = !eIsPending && e.quantity_received != null && e.quantity_received !== e.qty;
+                const eRcvTip = eRcvChanged ? ` title="Expected: ${e.qty}"` : '';
                 const eQtyCircle = eIsPending
                     ? `<div class="qty-circle pending${qtyDigitClass(e.qty)}" onclick="event.stopPropagation(); toggleInlineEdit(${e.supplierIdx}, ${e.itemIdx})">${e.qty}</div>`
-                    : `<div class="qty-circle done${qtyDigitClass(eDoneQty)}" onclick="event.stopPropagation(); toggleInlineEdit(${e.supplierIdx}, ${e.itemIdx})">${eDoneQty}</div>`;
+                    : `<div class="qty-circle done${qtyDigitClass(eDoneQty)}"${eRcvTip} onclick="event.stopPropagation(); toggleInlineEdit(${e.supplierIdx}, ${e.itemIdx})">${eDoneQty}</div>`;
                 const eIsFullyConfirmed = e.received_status !== 'pending' && e.pull_confirmed;
                 const eExpressCheckSvg = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="4,12 10,18 20,6"/></svg>';
                 const eExpressCircle = `<div class="express-circle ${eIsFullyConfirmed ? 'done' : 'pending'}" onclick="event.stopPropagation(); expressConfirmItem(${e.supplierIdx}, ${e.itemIdx})">${eIsFullyConfirmed ? eExpressCheckSvg : ''}</div>`;
@@ -2260,9 +2288,11 @@ function renderCompactRow(item, showSupplier, crossMap = null) {
     }
 
     const doneQty = isEditing ? circleQty : (item.quantity_received ?? item.quantity_expected);
+    const rcvChanged = !isPending && item.quantity_received != null && item.quantity_received !== item.quantity_expected;
+    const rcvTip = rcvChanged ? ` title="Expected: ${item.quantity_expected}"` : '';
     const qtyCircle = isPending
         ? `<div class="qty-circle pending${qtyDigitClass(circleQty)}" onclick="event.stopPropagation(); toggleInlineEdit(${si}, ${ii})">${circleQty}</div>`
-        : `<div class="qty-circle done${qtyDigitClass(doneQty)}" onclick="event.stopPropagation(); toggleInlineEdit(${si}, ${ii})">${doneQty}</div>`;
+        : `<div class="qty-circle done${qtyDigitClass(doneQty)}"${rcvTip} onclick="event.stopPropagation(); toggleInlineEdit(${si}, ${ii})">${doneQty}</div>`;
 
     const noteKey = item.raw_description.toLowerCase().trim().replace(/\//g, '_');
     const hasNote = itemNotes[noteKey];
@@ -2374,8 +2404,9 @@ function renderSupplierAccordion(container, flatItems) {
         // Skip suppliers with no matching items when searching
         if (searchQuery && supplierItems.length === 0) return;
 
-        // Skip suppliers with no pull items when Pulls Only is active
+        // Skip suppliers with no matching items when filter is active
         if (pullsOnlyFilter && supplierItems.length === 0) return;
+        if (notesChangesFilter && supplierItems.length === 0) return;
 
         anyVisible = true;
 
@@ -2412,7 +2443,8 @@ function renderSupplierAccordion(container, flatItems) {
 
     if (!anyVisible) {
         let emptyMsg;
-        if (pullsOnlyFilter) emptyMsg = 'No items have a pull quantity specified';
+        if (notesChangesFilter) emptyMsg = 'No items have notes or changes';
+        else if (pullsOnlyFilter) emptyMsg = 'No items have a pull quantity specified';
         else if (searchQuery) emptyMsg = 'No items match your search';
         else emptyMsg = 'All items received!';
         container.innerHTML = `<div class="empty-state"><p>${emptyMsg}</p></div>`;
@@ -2630,9 +2662,13 @@ function renderLiveReport() {
                 const isOos = item.received_notes && item.received_notes.includes('O/S');
                 const isEditing = streetEditItem && streetEditItem.supplierIdx === si && streetEditItem.itemIdx === ii;
                 const checkSvg = item.pull_confirmed ? '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="4,12 10,18 20,6"/></svg>' : '';
+                const stOrigPull = item.original_pull_quantity !== undefined && item.original_pull_quantity !== null
+                    ? item.original_pull_quantity : item.pull_quantity;
+                const stPullTip = (item.pull_quantity || 0) !== (stOrigPull || 0)
+                    ? ` title="Original: ${stOrigPull || 0}"` : '';
                 html += `
                 <div class="pull-sheet-row ${confirmedClass}${isEditing ? ' se-editing' : ''}">
-                    <span class="pull-qty-circle ${item.pull_confirmed ? 'done' : 'pending'}" onclick="toggleStreetEdit(${si}, ${ii})">${item.pull_quantity}</span>
+                    <span class="pull-qty-circle ${item.pull_confirmed ? 'done' : 'pending'}"${stPullTip} onclick="toggleStreetEdit(${si}, ${ii})">${item.pull_quantity}</span>
                     <span class="pull-sheet-of" onclick="toggleStreetEdit(${si}, ${ii})">(of ${item.quantity_expected})</span>
                     <span class="pull-sheet-name${isOos ? ' oos' : ''}" onclick="togglePullFromReport(${si}, ${ii})">${item.raw_description}</span>
                     <span class="pull-sheet-toggle" onclick="togglePullFromReport(${si}, ${ii})"></span>
@@ -2824,6 +2860,11 @@ function toggleMultiFilter() {
 
 function togglePullsOnly() {
     pullsOnlyFilter = !pullsOnlyFilter;
+    renderItemList();
+}
+
+function toggleNotesChanges() {
+    notesChangesFilter = !notesChangesFilter;
     renderItemList();
 }
 
