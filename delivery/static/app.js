@@ -3924,7 +3924,7 @@ function updateNotTodayBanner() {
     const isToday = currentDelivery.delivery_date === todayStr;
     banner.classList.toggle('hidden', isToday);
     if (!isToday && isViewingHistory) {
-        banner.setAttribute('data-text', `VIEWING ${currentDelivery.day_of_week.toUpperCase()} ${formatDate(currentDelivery.delivery_date).toUpperCase()} (READ ONLY)`);
+        banner.setAttribute('data-text', "NOT TODAY'S DATA\nCOMPLETED DELIVERY");
     } else if (!isToday) {
         banner.setAttribute('data-text', "NOT TODAY'S DATA");
     }
@@ -3952,18 +3952,27 @@ function closeDateDropdown() {
     if (caret) caret.classList.remove('open');
 }
 
-function renderDateDropdown() {
+async function renderDateDropdown() {
     const dd = document.getElementById('date-dropdown');
+    // Refresh delivery list to get current statuses
+    try {
+        const data = await apiGet('/deliveries');
+        availableDeliveries = data.deliveries || [];
+    } catch (_) {}
+
     // Sort by delivery_date descending
     const sorted = [...availableDeliveries]
         .filter(d => d.delivery_date)
         .sort((a, b) => (b.delivery_date || '').localeCompare(a.delivery_date || ''));
 
+    const allReceived = d => d.checked_in_count > 0 && d.checked_in_count >= d.item_count;
+
     dd.innerHTML = sorted.map(d => {
         const isActive = currentDelivery && currentDelivery.id === d.id;
         const isCompleted = d.status === 'completed';
-        const statusClass = isCompleted ? 'completed' : 'active';
-        const statusLabel = isCompleted ? 'Done' : 'Active';
+        const isReceived = allReceived(d);
+        const statusClass = (isCompleted || isReceived) ? 'completed' : 'active';
+        const statusLabel = (isCompleted || isReceived) ? 'Received' : 'Active';
         return `<div class="date-dropdown-item${isActive ? ' active' : ''}"
                      onclick="selectDateDelivery('${d.id}')">
             <span>${d.day_of_week} ${formatDate(d.delivery_date)}</span>
