@@ -169,8 +169,22 @@ function showView(name) {
 }
 
 function goHome() {
+    // Find the best "home" delivery: today's active, or most recent active
+    if (availableDeliveries.length > 0) {
+        const todayStr = getTodayStr();
+        const todayActive = availableDeliveries.find(d => d.delivery_date === todayStr && d.status !== 'completed');
+        const mostRecentActive = availableDeliveries
+            .filter(d => d.status !== 'completed')
+            .sort((a, b) => (b.delivery_date || '').localeCompare(a.delivery_date || ''))[0];
+        const homeDelivery = todayActive || mostRecentActive;
+
+        // If we're viewing a different delivery, switch to home
+        if (homeDelivery && (!currentDelivery || currentDelivery.id !== homeDelivery.id)) {
+            openDelivery(homeDelivery.id);
+            return;
+        }
+    }
     if (currentDelivery && (currentDelivery.status !== 'completed' || isViewingHistory)) {
-        // Active delivery or history view — go (back) to detail
         if (currentView !== 'detail') {
             showView('detail');
         }
@@ -2388,10 +2402,8 @@ function renderSupplierAccordion(container, flatItems) {
         // Get items for this supplier from the flat list (already filtered by showReceived)
         let supplierItems = flatItems.filter(item => item.supplierIdx === sIdx);
 
-        // Hide fully-received suppliers when showReceived is off (keep if any O/S items)
         const allDone = supplier.items.every(i => i.received_status !== 'pending');
         const hasOosItems = supplier.items.some(i => i.received_notes && i.received_notes.includes('O/S'));
-        if (!showReceived && allDone && !hasOosItems) return;
 
         // Apply search filter
         if (searchQuery) {
@@ -2427,8 +2439,8 @@ function renderSupplierAccordion(container, flatItems) {
         const chevronClass = isExpanded ? 'accordion-chevron expanded' : 'accordion-chevron';
 
         const arrowSvg = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><polyline points="19,12 12,19 5,12"/></svg>';
-        const editHeader = isExpanded ? `<span class="edit-column-header">Edit ${arrowSvg}</span>` : '';
-        const acceptHeader = isExpanded ? `<span class="accept-column-header">Accept ${arrowSvg}</span>` : '';
+        const editHeader = (isExpanded && !isViewingHistory) ? `<span class="edit-column-header">Edit ${arrowSvg}</span>` : '';
+        const acceptHeader = (isExpanded && !isViewingHistory) ? `<span class="accept-column-header" title="Double-click to accept/unaccept all items" onclick="event.stopPropagation(); event.preventDefault(); shiftAcceptAll(event, ${sIdx})">Accept ${arrowSvg}</span>` : '';
         html += `
         <div class="supplier-accordion-header ${statusClass}" onclick="toggleSupplierAccordion(${sIdx})">
             ${editHeader}
@@ -3458,6 +3470,21 @@ async function unreceiveItem() {
         showToast('Item unreceived', 'success');
     } catch (e) {
         showToast('Failed to unreceive item', 'error');
+    }
+}
+
+function shiftAcceptAll(event, supplierIdx) {
+    if (isViewingHistory) return;
+    if (event.detail < 2) return; // require double-click
+    const supplier = currentDelivery.suppliers[supplierIdx];
+    const pendingCount = supplier.items.filter(i => i.received_status === 'pending').length;
+    const receivedCount = supplier.items.filter(i => i.received_status !== 'pending').length;
+    if (pendingCount > 0) {
+        if (!confirm(`Accept all ${pendingCount} pending items for ${supplier.supplier_name}?`)) return;
+        receiveAllSupplier(supplierIdx);
+    } else if (receivedCount > 0) {
+        if (!confirm(`Unaccept all ${receivedCount} items for ${supplier.supplier_name}?`)) return;
+        unreceiveAllSupplier(supplierIdx);
     }
 }
 

@@ -2155,8 +2155,6 @@ textarea {
 
 .supplier-accordion-header.supplier-complete {
     border-left-color: var(--success);
-    background: #e8f5e9;
-    opacity: 0.75;
 }
 
 .accordion-chevron {
