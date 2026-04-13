@@ -68,7 +68,6 @@ let currentView = 'storage';
 let currentDelivery = null;
 let currentSupplierIdx = null;
 let checkInItem = null; // { supplierIdx, itemIdx }
-let pullPopupItem = null; // { supplierIdx, itemIdx }
 let inlineEditItem = null; // { supplierIdx, itemIdx } for inline edit panel
 let supplierFilter = null; // null = show all, or { idx, name } to filter to one supplier
 let itemSortMode = 'supplier'; // 'alpha', 'qty', or 'supplier'
@@ -79,8 +78,6 @@ let showReceived = true; // true = show all items including received
 let collapsedPullSuppliers = new Set(); // supplier names collapsed in street view
 let streetEditItem = null; // { supplierIdx, itemIdx } for street view edit panel
 let pullChangeAlerts = new Set(); // "supplierIdx-itemIdx" keys for items changed since last ack
-let pullPopupOriginalQty = null; // qty when popup was opened, to detect changes
-let pullSessionOriginals = {}; // qty before any popup edits this session, keyed by "sIdx-iIdx"
 let searchQuery = ''; // search filter for item list
 let completionShown = false; // prevent duplicate completion modal
 let expandedSuppliers = new Set(); // supplier indices expanded in accordion view
@@ -158,13 +155,15 @@ function showView(name) {
             break;
     }
 
-    // Show not-today banner only on delivery-specific views
+    // Show not-today banner and title tooltip only on delivery-specific views
     const deliveryViews = ['detail', 'pullsheet', 'complete'];
     if (deliveryViews.includes(name)) {
         updateNotTodayBanner();
+        updateTitleTooltip();
     } else {
         const banner = document.getElementById('not-today-banner');
         if (banner) banner.classList.add('hidden');
+        if (title) title.title = '';
     }
 }
 
@@ -472,10 +471,8 @@ function cleanupListeners() {
 function isModalOpen() {
     const checkinModal = document.getElementById('checkin-modal');
     const completeModal = document.getElementById('complete-modal');
-    const pullPopup = document.getElementById('pull-popup');
     return (checkinModal && !checkinModal.classList.contains('hidden')) ||
            (completeModal && !completeModal.classList.contains('hidden')) ||
-           (pullPopup && !pullPopup.classList.contains('hidden')) ||
            inlineEditItem != null;
 }
 
@@ -489,6 +486,7 @@ function applyDeliveryUpdate(data) {
     updateNotTodayBanner();
     updateLiveStatusBtn();
     updateReportsBadge();
+    updateTitleTooltip();
 
     // Re-render whichever view is active
     if (currentView === 'pullsheet') {
@@ -1408,111 +1406,76 @@ function noteKey(description) {
     return description.toLowerCase().trim().replace(/\//g, '_');
 }
 
-function openNotePopup(description, event) {
-    const key = noteKey(description);
-    const existing = itemNotes[key];
-    document.getElementById('note-popup-name').textContent = description;
-    document.getElementById('note-popup-text').value = existing ? existing.note : '';
-    const popup = document.getElementById('note-popup');
-    popup.dataset.description = description;
-
-    // Position to the right of the item name, flipping vertically based on screen position
-    if (event && event.currentTarget) {
-        const rect = event.currentTarget.getBoundingClientRect();
-        const popupHeight = 220; // approximate height
-        const midScreen = window.innerHeight / 2;
-
-        popup.style.position = 'absolute';
-        popup.style.left = rect.right + 'px';
-
-        if (rect.top > midScreen) {
-            // Item is in bottom half — popup above
-            popup.style.top = (rect.top + window.scrollY - popupHeight) + 'px';
-        } else {
-            // Item is in top half — popup below
-            popup.style.top = (rect.top + window.scrollY) + 'px';
-        }
-    }
-
-    popup.classList.remove('hidden');
-    document.getElementById('note-popup-backdrop').classList.remove('hidden');
-    document.getElementById('note-popup-text').focus();
-}
-
-function closeNotePopup() {
-    document.getElementById('note-popup').classList.add('hidden');
-    document.getElementById('note-popup-backdrop').classList.add('hidden');
-}
-
-async function saveItemNote() {
-    const popup = document.getElementById('note-popup');
-    const description = popup.dataset.description;
-    const note = document.getElementById('note-popup-text').value.trim();
-    if (!note) { deleteItemNote(); return; }
-    try {
-        await apiPut('/item-notes', { item_description: description, note });
-        const key = noteKey(description);
-        itemNotes[key] = { description, note };
-        closeNotePopup();
-        renderDetail();
-        showToast('Note saved');
-    } catch (e) {
-        showToast('Failed to save note', 'error');
-    }
-}
-
-async function deleteItemNote() {
-    const popup = document.getElementById('note-popup');
-    const description = popup.dataset.description;
-    const key = noteKey(description);
-    if (!itemNotes[key]) { closeNotePopup(); return; }
-    try {
-        await apiDelete(`/item-notes/${encodeURIComponent(key)}`);
-        delete itemNotes[key];
-        closeNotePopup();
-        renderDetail();
-        showToast('Note cleared');
-    } catch (e) {
-        showToast('Failed to clear note', 'error');
-    }
-}
 
 // ---- Inline Edit Panel ----
 
-function toggleInlineEdit(supplierIdx, itemIdx) {
+function toggleInlineEdit(supplierIdx, itemIdx, event) {
     if (isViewingHistory) return;
     if (inlineEditItem && inlineEditItem.supplierIdx === supplierIdx && inlineEditItem.itemIdx === itemIdx) {
-        cleanupInlineEditState();
-        inlineEditItem = null;
-    } else {
-        cleanupInlineEditState();
-        inlineEditItem = { supplierIdx, itemIdx };
-        // Initialize edit state
-        const item = currentDelivery.suppliers[supplierIdx].items[itemIdx];
-        item._iePullQty = item.pull_quantity ?? 0;
-        item._iePullConfirmed = item.pull_confirmed || false;
-        item._ieRcvQty = item.quantity_received ?? item.quantity_expected;
-        item._ieRcvConfirmed = false;
-        item._ieOosQty = 0;
-        item._ieOosConfirmed = false;
-        item._ieReturnQty = 0;
-        item._ieReturnConfirmed = false;
-        item._ieReturnAll = false;
-        item._ieReturnQuality = false;
-        item._ieReturnMispick = false;
-        item._ieReturnNote = '';
-        // Snapshot originals for undo
-        item._ieOriginal = {
-            pull_quantity: item.pull_quantity,
-            pull_confirmed: item.pull_confirmed,
-            pull_submitted: item.pull_submitted,
-            pull_for_floor: item.pull_for_floor,
-            quantity_expected: item.quantity_expected,
-            quantity_received: item.quantity_received,
-            received_status: item.received_status,
-            received_notes: item.received_notes,
-        };
+        closeInlineEdit();
+        return;
     }
+    cleanupInlineEditState();
+    inlineEditItem = { supplierIdx, itemIdx };
+    // Initialize edit state
+    const item = currentDelivery.suppliers[supplierIdx].items[itemIdx];
+    item._iePullQty = item.pull_quantity ?? 0;
+    item._iePullConfirmed = item.pull_confirmed || false;
+    item._ieRcvQty = item.quantity_received ?? item.quantity_expected;
+    item._ieRcvConfirmed = item.received_status !== 'pending';
+    item._ieOosQty = 0;
+    item._ieOosConfirmed = false;
+    item._ieReturnQty = 0;
+    item._ieReturnConfirmed = false;
+    item._ieReturnAll = false;
+    item._ieReturnQuality = false;
+    item._ieReturnMispick = false;
+    item._ieReturnNote = '';
+    // Note state
+    const nKey = noteKey(item.raw_description);
+    item._ieItemNote = itemNotes[nKey] ? itemNotes[nKey].note : '';
+    item._ieItemNoteOriginal = item._ieItemNote;
+    // Snapshot originals for undo
+    item._ieOriginal = {
+        pull_quantity: item.pull_quantity,
+        pull_confirmed: item.pull_confirmed,
+        pull_submitted: item.pull_submitted,
+        pull_for_floor: item.pull_for_floor,
+        quantity_expected: item.quantity_expected,
+        quantity_received: item.quantity_received,
+        received_status: item.received_status,
+        received_notes: item.received_notes,
+    };
+    // Render and show overlay
+    item.supplierIdx = supplierIdx;
+    item.itemIdx = itemIdx;
+    renderInlineEditPanel(item);
+    const overlay = document.getElementById('ie-overlay');
+    const backdrop = document.getElementById('ie-backdrop');
+    overlay.classList.remove('hidden');
+    backdrop.classList.remove('hidden');
+    // Position near the clicked element
+    if (event && event.target) {
+        const rect = event.target.getBoundingClientRect();
+        const pw = overlay.offsetWidth || 350;
+        const ph = overlay.offsetHeight || 200;
+        const margin = 10;
+        let top = rect.bottom + margin;
+        let left = rect.left;
+        if (left + pw > window.innerWidth - margin) left = window.innerWidth - pw - margin;
+        if (left < margin) left = margin;
+        if (top + ph > window.innerHeight - margin) top = rect.top - ph - margin;
+        if (top < margin) top = margin;
+        overlay.style.top = top + 'px';
+        overlay.style.left = left + 'px';
+    }
+}
+
+function closeInlineEdit() {
+    document.getElementById('ie-overlay').classList.add('hidden');
+    document.getElementById('ie-backdrop').classList.add('hidden');
+    cleanupInlineEditState();
+    inlineEditItem = null;
     renderItemList();
 }
 
@@ -1532,6 +1495,8 @@ function cleanupInlineEditState() {
     delete item._ieReturnMispick;
     delete item._ieReturnNote;
     delete item._ieShowReturnNote;
+    delete item._ieItemNote;
+    delete item._ieItemNoteOriginal;
     delete item._ieOriginal;
 }
 
@@ -1545,9 +1510,10 @@ function renderInlineEditPanel(item) {
     const oosConfirmed = item._ieOosConfirmed || false;
     const retQty = item._ieReturnQty ?? 0;
     const retConfirmed = item._ieReturnConfirmed || false;
+    const itemNote = item._ieItemNote || '';
 
-    return `
-    <div class="inline-edit-wrapper"><div class="inline-edit-panel" onclick="event.stopPropagation()">
+    document.getElementById('ie-overlay').innerHTML = `
+    <div class="inline-edit-panel">
         <div class="ie-columns">
             <div class="ie-col">
                 <span class="ie-label${pullConfirmed ? ' ie-confirmed' : ''}">${pullConfirmed ? 'Pulled' : 'Pull'}</span>
@@ -1597,12 +1563,25 @@ function renderInlineEditPanel(item) {
                 </div>
                 ${item._ieShowReturnNote ? `<input type="text" class="ie-note-input" placeholder="Return note..." value="${escapeAttr(item._ieReturnNote || '')}" oninput="ieUpdateReturnNote(${si}, ${ii}, this.value)">` : ''}
             </div>
+            <div class="ie-col ie-col-note">
+                <span class="ie-label">Note</span>
+                <textarea class="ie-note-textarea" placeholder="Add note..." oninput="ieUpdateItemNote(${si}, ${ii}, this.value)">${escapeAttr(itemNote)}</textarea>
+                ${itemNote ? `<span class="ie-note-clear" onclick="ieClearItemNote(${si}, ${ii})">Clear</span>` : ''}
+            </div>
         </div>
         <div class="ie-bottom-row">
             <span class="ie-accept" onclick="ieAcceptAll(${si}, ${ii})">Accept all</span>
-            <span class="ie-cancel" onclick="ieUndo(${si}, ${ii})">cancel all changes</span>
+            <span class="ie-cancel" onclick="ieUndo(${si}, ${ii})">cancel changes</span>
         </div>
-    </div></div>`;
+    </div>`;
+}
+
+// Helper: refresh just the overlay panel
+function refreshOverlay(si, ii) {
+    const item = currentDelivery.suppliers[si].items[ii];
+    item.supplierIdx = si;
+    item.itemIdx = ii;
+    renderInlineEditPanel(item);
 }
 
 // -- Pull: adjust qty (auto-saves, resets confirmed) --
@@ -1611,6 +1590,7 @@ async function ieAdjustPull(si, ii, delta) {
     const newQty = Math.max(0, (item._iePullQty ?? 0) + delta);
     item._iePullQty = newQty;
     item._iePullConfirmed = false;
+    refreshOverlay(si, ii);
     try {
         await apiPatch(
             `/deliveries/${currentDelivery.id}/suppliers/${si}/items/${ii}/set-pull`,
@@ -1622,7 +1602,6 @@ async function ieAdjustPull(si, ii, delta) {
     } catch (e) {
         showToast('Failed to update pull', 'error');
     }
-    renderItemList();
 }
 
 // -- Pull: toggle confirmed --
@@ -1642,7 +1621,7 @@ async function ieConfirmPull(si, ii) {
     } catch (e) {
         showToast('Failed to update pull', 'error');
     }
-    renderItemList();
+    refreshOverlay(si, ii);
 }
 
 // -- Received: adjust qty --
@@ -1650,7 +1629,7 @@ function ieAdjustReceived(si, ii, delta) {
     const item = currentDelivery.suppliers[si].items[ii];
     const newQty = Math.max(0, (item._ieRcvQty ?? item.quantity_expected) + delta);
     item._ieRcvQty = newQty;
-    renderItemList();
+    refreshOverlay(si, ii);
 }
 
 // -- Out of Stock: toggle (all or nothing) --
@@ -1667,7 +1646,7 @@ function ieConfirmOos(si, ii) {
         item._ieOosQty = 0;
         item._ieRcvQty = item.quantity_expected;
     }
-    renderItemList();
+    refreshOverlay(si, ii);
 }
 
 // -- Return: adjust qty (subtracts from received) --
@@ -1678,7 +1657,7 @@ function ieAdjustReturn(si, ii, delta) {
     const retDelta = newRetQty - oldRetQty;
     item._ieReturnQty = newRetQty;
     item._ieRcvQty = Math.max(0, (item._ieRcvQty ?? item.quantity_expected) - retDelta);
-    renderItemList();
+    refreshOverlay(si, ii);
 }
 
 // -- Done: commit all numbers --
@@ -1697,7 +1676,7 @@ async function ieCommitAll(si, ii) {
             item.received_status = 'pending';
             item.received_notes = null;
             item._ieRcvConfirmed = false;
-            renderItemList();
+            refreshOverlay(si, ii);
         } catch (e) {
             showToast('Failed to revert', 'error');
         }
@@ -1752,14 +1731,29 @@ async function ieCommitAll(si, ii) {
             item.pull_for_floor = false;
             item.pull_confirmed = false;
         }
+        // Save item note if changed
+        const newNote = (item._ieItemNote || '').trim();
+        const origNote = (item._ieItemNoteOriginal || '').trim();
+        if (newNote !== origNote) {
+            const desc = item.raw_description;
+            if (newNote) {
+                await apiPut('/item-notes', { item_description: desc, note: newNote });
+                const nk = noteKey(desc);
+                itemNotes[nk] = { description: desc, note: newNote };
+            } else {
+                const nk = noteKey(desc);
+                if (itemNotes[nk]) {
+                    await apiDelete(`/item-notes/${encodeURIComponent(nk)}`);
+                    delete itemNotes[nk];
+                }
+            }
+        }
         lastWriteTimestamp = Date.now();
         item.quantity_received = rcvQty;
         item.received_status = status;
         item.received_notes = notes;
         item._ieRcvConfirmed = true;
-        cleanupInlineEditState();
-        inlineEditItem = null;
-        renderItemList();
+        closeInlineEdit();
 
         if (!completionShown && checkAllItemsReceived()) {
             completionShown = true;
@@ -1783,23 +1777,53 @@ async function ieAcceptAll(si, ii) {
     const wasAlreadyReceived = orig.received_status !== 'pending';
     const rcvQtyChanged = rcvQty !== origRcvQty;
     const pullQtyChanged = (item._iePullQty ?? 0) !== (orig.pull_quantity ?? 0);
+    const noteChanged = (item._ieItemNote || '').trim() !== (item._ieItemNoteOriginal || '').trim();
 
-    if (wasAlreadyReceived && !rcvQtyChanged && !pullQtyChanged && !hasOos && !hasReturn) {
+    if (wasAlreadyReceived && !rcvQtyChanged && !pullQtyChanged && !hasOos && !hasReturn && !noteChanged) {
         // Already received, no edits made — just close
-        cleanupInlineEditState();
-        inlineEditItem = null;
-        renderItemList();
+        closeInlineEdit();
         return;
     }
 
-    if (!item._ieRcvConfirmed && !hasOos && !hasReturn && !rcvQtyChanged && !pullQtyChanged) {
+    if (!item._ieRcvConfirmed && !hasOos && !hasReturn && !rcvQtyChanged && !pullQtyChanged && !noteChanged) {
         // No meaningful input or changes — just close
-        cleanupInlineEditState();
-        inlineEditItem = null;
-        renderItemList();
+        closeInlineEdit();
         return;
     }
-    // Has changes — commit everything
+
+    // Check if only pull and/or note changed (no receive/oos/return changes)
+    const onlyPullOrNote = !hasOos && !hasReturn && !rcvQtyChanged &&
+        (!wasAlreadyReceived ? !item._ieRcvConfirmed : true);
+
+    if (onlyPullOrNote && (pullQtyChanged || noteChanged)) {
+        try {
+            // Save note if changed
+            if (noteChanged) {
+                const newNote = (item._ieItemNote || '').trim();
+                const desc = item.raw_description;
+                if (newNote) {
+                    await apiPut('/item-notes', { item_description: desc, note: newNote });
+                    const nk = noteKey(desc);
+                    itemNotes[nk] = { description: desc, note: newNote };
+                } else {
+                    const nk = noteKey(desc);
+                    if (itemNotes[nk]) {
+                        await apiDelete(`/item-notes/${encodeURIComponent(nk)}`);
+                        delete itemNotes[nk];
+                    }
+                }
+            }
+            if (pullQtyChanged || noteChanged) {
+                showToast(noteChanged ? 'Saved' : 'Pull updated');
+            }
+        } catch (e) {
+            showToast('Failed to save', 'error');
+        }
+        closeInlineEdit();
+        return;
+    }
+
+    // Has receive/oos/return changes — commit everything
     await ieCommitAll(si, ii);
 }
 
@@ -1835,8 +1859,7 @@ async function ieUndo(si, ii) {
         item.quantity_received = orig.quantity_received;
         item.received_status = orig.received_status;
         item.received_notes = orig.received_notes;
-        cleanupInlineEditState();
-        inlineEditItem = null;
+        closeInlineEdit();
         if (supplierFilter !== null) updateFilteredSupplierSummary();
         renderDetail();
         showToast('Reverted');
@@ -1858,7 +1881,7 @@ function ieToggleReturnAll(si, ii) {
         item._ieRcvQty = (item._ieRcvQty ?? 0) + (item._ieReturnQty ?? 0);
         item._ieReturnQty = 0;
     }
-    renderItemList();
+    refreshOverlay(si, ii);
 }
 
 function ieToggleReturnTag(si, ii, tag) {
@@ -1871,18 +1894,29 @@ function ieToggleReturnTag(si, ii, tag) {
         item._ieReturnMispick = !item._ieReturnMispick;
         if (item._ieReturnMispick) item._ieReturnQuality = false;
     }
-    renderItemList();
+    refreshOverlay(si, ii);
 }
 
 function ieToggleReturnNote(si, ii) {
     const item = currentDelivery.suppliers[si].items[ii];
     item._ieShowReturnNote = !item._ieShowReturnNote;
-    renderItemList();
+    renderInlineEditPanel(item);
 }
 
 function ieUpdateReturnNote(si, ii, value) {
     const item = currentDelivery.suppliers[si].items[ii];
     item._ieReturnNote = value;
+}
+
+function ieUpdateItemNote(si, ii, value) {
+    const item = currentDelivery.suppliers[si].items[ii];
+    item._ieItemNote = value;
+}
+
+function ieClearItemNote(si, ii) {
+    const item = currentDelivery.suppliers[si].items[ii];
+    item._ieItemNote = '';
+    renderInlineEditPanel(item);
 }
 
 // ---- Delivery Detail ----
@@ -1905,6 +1939,7 @@ async function openDelivery(id) {
         document.body.classList.toggle('viewing-history', isViewingHistory);
         updateNotTodayBanner();
         updateDateDropdownState();
+        updateTitleTooltip();
 
         // If today's delivery is completed, show the delivery-over screen
         if (delivery.status === 'completed' && !isViewingHistory) {
@@ -1914,7 +1949,6 @@ async function openDelivery(id) {
 
         supplierFilter = null; // reset filter
         pullChangeAlerts = new Set();
-        pullSessionOriginals = {};
         expandedSuppliers = new Set(currentDelivery.suppliers.map((_, idx) => idx)); // default all expanded
         expandedLocations = new Set(); // reset location accordion
         showReceived = true; // reset to show-all view
@@ -2192,14 +2226,14 @@ function renderItemList() {
             }
         });
         container.innerHTML = html;
-        return;
+    } else {
+        container.innerHTML = sortedGroups.map(group =>
+            group.length === 1
+                ? renderCompactRow(group[0], supplierFilter === null, null)
+                : renderMultiSupplierRow(group)
+        ).join('');
     }
 
-    container.innerHTML = sortedGroups.map(group =>
-        group.length === 1
-            ? renderCompactRow(group[0], supplierFilter === null, null)
-            : renderMultiSupplierRow(group)
-    ).join('');
 }
 
 function buildCrossSupplierMap() {
@@ -2234,7 +2268,6 @@ function renderCompactRow(item, showSupplier, crossMap = null) {
 
     const pullConfirmedClass = item.pull_confirmed ? 'pull-confirmed' : '';
     const si = item.supplierIdx, ii = item.itemIdx;
-    const isEditing = inlineEditItem && inlineEditItem.supplierIdx === si && inlineEditItem.itemIdx === ii;
     const origPull = item.original_pull_quantity !== undefined && item.original_pull_quantity !== null
         ? item.original_pull_quantity : item.pull_quantity;
     const pullChangedTip = item.pull_quantity != null && (item.pull_quantity || 0) !== (origPull || 0)
@@ -2261,28 +2294,26 @@ function renderCompactRow(item, showSupplier, crossMap = null) {
                 const ePullTip = e.pull_quantity != null && (e.pull_quantity || 0) !== (eOrigPull || 0)
                     ? ` title="Original: ${eOrigPull || 0}"` : '';
                 const ePullQty = e.pull_quantity != null
-                    ? `<span class="pull-qty ${ePullConfirmedClass}"${ePullTip} onclick="event.stopPropagation(); openPullPopup(event, ${e.supplierIdx}, ${e.itemIdx})">(${e.pull_quantity})</span> `
-                    : `<span class="pull-qty pull-qty-empty" onclick="event.stopPropagation(); openPullPopup(event, ${e.supplierIdx}, ${e.itemIdx})" ></span> `;
+                    ? `<span class="pull-qty ${ePullConfirmedClass}"${ePullTip} onclick="event.stopPropagation(); toggleInlineEdit(${e.supplierIdx}, ${e.itemIdx}, event)">(${e.pull_quantity})</span> `
+                    : `<span class="pull-qty pull-qty-empty" onclick="event.stopPropagation(); toggleInlineEdit(${e.supplierIdx}, ${e.itemIdx}, event)"></span> `;
                 const eIsPending = e.received_status === 'pending';
                 const eDoneQty = e.quantity_received ?? e.qty;
-                const eIsEditing = inlineEditItem && inlineEditItem.supplierIdx === e.supplierIdx && inlineEditItem.itemIdx === e.itemIdx;
                 const eItem = currentDelivery.suppliers[e.supplierIdx].items[e.itemIdx];
                 eItem.supplierIdx = e.supplierIdx;
                 eItem.itemIdx = e.itemIdx;
                 const eRcvChanged = !eIsPending && e.quantity_received != null && e.quantity_received !== e.qty;
                 const eRcvTip = eRcvChanged ? ` title="Expected: ${e.qty}"` : '';
                 const eQtyCircle = eIsPending
-                    ? `<div class="qty-circle pending${qtyDigitClass(e.qty)}" onclick="event.stopPropagation(); toggleInlineEdit(${e.supplierIdx}, ${e.itemIdx})">${e.qty}</div>`
-                    : `<div class="qty-circle done${qtyDigitClass(eDoneQty)}"${eRcvTip} onclick="event.stopPropagation(); toggleInlineEdit(${e.supplierIdx}, ${e.itemIdx})">${eDoneQty}</div>`;
+                    ? `<div class="qty-circle pending${qtyDigitClass(e.qty)}" onclick="event.stopPropagation(); toggleInlineEdit(${e.supplierIdx}, ${e.itemIdx}, event)">${e.qty}</div>`
+                    : `<div class="qty-circle done${qtyDigitClass(eDoneQty)}"${eRcvTip} onclick="event.stopPropagation(); toggleInlineEdit(${e.supplierIdx}, ${e.itemIdx}, event)">${eDoneQty}</div>`;
                 const eIsFullyConfirmed = e.received_status !== 'pending' && e.pull_confirmed;
                 const eExpressCheckSvg = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="4,12 10,18 20,6"/></svg>';
                 const eExpressCircle = `<div class="express-circle ${eIsFullyConfirmed ? 'done' : 'pending'}" onclick="event.stopPropagation(); expressConfirmItem(${e.supplierIdx}, ${e.itemIdx})">${eIsFullyConfirmed ? eExpressCheckSvg : ''}</div>`;
-                const eEditPanel = eIsEditing ? renderInlineEditPanel(eItem) : '';
-                return `<div class="compact-row supplier-sub-row ${eStatus}${eIsEditing ? ' editing' : ''}">
-                    <div class="compact-qty" onclick="event.stopPropagation(); toggleInlineEdit(${e.supplierIdx}, ${e.itemIdx})">${ePullQty}${eQtyCircle}</div>
+                return `<div class="compact-row supplier-sub-row ${eStatus}">
+                    <div class="compact-qty" onclick="event.stopPropagation(); toggleInlineEdit(${e.supplierIdx}, ${e.itemIdx}, event)">${ePullQty}${eQtyCircle}</div>
                     <div class="compact-supplier sub-row-supplier" onclick="event.stopPropagation(); filterBySupplier(${e.supplierIdx})">${e.supplierName}</div>
                     ${eExpressCircle}
-                </div>${eEditPanel}`;
+                </div>`;
             }).join('');
         }
     }
@@ -2294,39 +2325,32 @@ function renderCompactRow(item, showSupplier, crossMap = null) {
         ? `<div class="hc-strip"><span class="hc-day">${hc.sat}</span><span class="hc-day">${hc.sun}</span><span class="hc-day">${hc.mon}</span></div>`
         : '';
 
-    // When inline editing, show the live received number in the circle
-    // (returns are already subtracted from _ieRcvQty)
-    let circleQty = item.quantity_expected;
-    if (isEditing) {
-        circleQty = item._ieRcvQty ?? item.quantity_expected;
-    }
-
-    const doneQty = isEditing ? circleQty : (item.quantity_received ?? item.quantity_expected);
+    const circleQty = item.quantity_expected;
+    const doneQty = item.quantity_received ?? item.quantity_expected;
     const rcvChanged = !isPending && item.quantity_received != null && item.quantity_received !== item.quantity_expected;
     const rcvTip = rcvChanged ? ` title="Expected: ${item.quantity_expected}"` : '';
     const qtyCircle = isPending
-        ? `<div class="qty-circle pending${qtyDigitClass(circleQty)}" onclick="event.stopPropagation(); toggleInlineEdit(${si}, ${ii})">${circleQty}</div>`
-        : `<div class="qty-circle done${qtyDigitClass(doneQty)}"${rcvTip} onclick="event.stopPropagation(); toggleInlineEdit(${si}, ${ii})">${doneQty}</div>`;
+        ? `<div class="qty-circle pending${qtyDigitClass(circleQty)}" onclick="event.stopPropagation(); toggleInlineEdit(${si}, ${ii}, event)">${circleQty}</div>`
+        : `<div class="qty-circle done${qtyDigitClass(doneQty)}"${rcvTip} onclick="event.stopPropagation(); toggleInlineEdit(${si}, ${ii}, event)">${doneQty}</div>`;
 
-    const noteKey = item.raw_description.toLowerCase().trim().replace(/\//g, '_');
-    const hasNote = itemNotes[noteKey];
+    const nk = item.raw_description.toLowerCase().trim().replace(/\//g, '_');
+    const hasNote = itemNotes[nk];
     const noteIcon = hasNote ? '<svg class="inline-note-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>' : '';
 
     const isFullyConfirmed = item.received_status !== 'pending' && item.pull_confirmed;
     const expressCheckSvg = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="4,12 10,18 20,6"/></svg>';
     const expressCircle = `<div class="express-circle ${isFullyConfirmed ? 'done' : 'pending'}" onclick="event.stopPropagation(); expressConfirmItem(${si}, ${ii})">${isFullyConfirmed ? expressCheckSvg : ''}</div>`;
 
-    const editPanel = isEditing ? renderInlineEditPanel(item) : '';
-    const isOos = item._ieOosConfirmed || (item.received_notes && item.received_notes.includes('O/S'));
+    const isOos = (item.received_notes && item.received_notes.includes('O/S'));
 
     return `
-    <div class="compact-row ${statusClass} ${processingClass} ${floorClass}${showSupplier ? '' : ' accordion-item'}${isEditing ? ' editing' : ''}">
-        <div class="compact-qty" onclick="event.stopPropagation(); toggleInlineEdit(${si}, ${ii})"><div class="qty-left-stack">${leftLabel}</div>${qtyCircle}</div>
-        <div class="compact-name${isOos ? ' oos' : ''}${hasNote ? ' has-note' : ''}" onclick="event.stopPropagation(); openNotePopup('${escapeAttr(item.raw_description)}', event)">${item.raw_description}${noteIcon}</div>
+    <div class="compact-row ${statusClass} ${processingClass} ${floorClass}${showSupplier ? '' : ' accordion-item'}">
+        <div class="compact-qty" onclick="event.stopPropagation(); toggleInlineEdit(${si}, ${ii}, event)"><div class="qty-left-stack">${leftLabel}</div>${qtyCircle}</div>
+        <div class="compact-name${isOos ? ' oos' : ''}${hasNote ? ' has-note' : ''}" onclick="event.stopPropagation(); toggleInlineEdit(${si}, ${ii}, event)">${item.raw_description}${noteIcon}</div>
         ${supplierChip}
         ${hcStrip}
         ${expressCircle}
-    </div>${editPanel}${alsoRow}`;
+    </div>${alsoRow}`;
 }
 
 function renderMultiSupplierRow(items) {
@@ -2347,7 +2371,7 @@ function renderMultiSupplierRow(items) {
     const mainRow = `
     <div class="compact-row multi-supplier-header">
         <div class="compact-qty">${totalQty}</div>
-        <div class="compact-name${msHasNote ? ' has-note' : ''}" onclick="event.stopPropagation(); openNotePopup('${escapeAttr(firstName)}', event)">${firstName}${msNoteIcon}</div>
+        <div class="compact-name${msHasNote ? ' has-note' : ''}" onclick="event.stopPropagation(); toggleInlineEdit(${items[0].supplierIdx}, ${items[0].itemIdx}, event)">${firstName}${msNoteIcon}</div>
         ${hcStrip}
     </div>`;
 
@@ -2356,23 +2380,21 @@ function renderMultiSupplierRow(items) {
         const statusClass = isPending ? '' : `checked-${item.received_status}`;
         const pullConfirmedClass = item.pull_confirmed ? 'pull-confirmed' : '';
         const pullQty = item.pull_quantity != null
-            ? `<span class="pull-qty ${pullConfirmedClass}" onclick="event.stopPropagation(); openPullPopup(event, ${item.supplierIdx}, ${item.itemIdx})">(${item.pull_quantity})</span> `
-            : `<span class="pull-qty pull-qty-empty" onclick="event.stopPropagation(); openPullPopup(event, ${item.supplierIdx}, ${item.itemIdx})">+</span> `;
+            ? `<span class="pull-qty ${pullConfirmedClass}" onclick="event.stopPropagation(); toggleInlineEdit(${item.supplierIdx}, ${item.itemIdx}, event)">(${item.pull_quantity})</span> `
+            : `<span class="pull-qty pull-qty-empty" onclick="event.stopPropagation(); toggleInlineEdit(${item.supplierIdx}, ${item.itemIdx}, event)">+</span> `;
         const msDoneQty = item.quantity_received ?? item.quantity_expected;
-        const isEditing = inlineEditItem && inlineEditItem.supplierIdx === item.supplierIdx && inlineEditItem.itemIdx === item.itemIdx;
         const msQtyCircle = isPending
-            ? `<div class="qty-circle pending${qtyDigitClass(item.quantity_expected)}" onclick="event.stopPropagation(); toggleInlineEdit(${item.supplierIdx}, ${item.itemIdx})">${item.quantity_expected}</div>`
-            : `<div class="qty-circle done${qtyDigitClass(msDoneQty)}" onclick="event.stopPropagation(); toggleInlineEdit(${item.supplierIdx}, ${item.itemIdx})">${msDoneQty}</div>`;
+            ? `<div class="qty-circle pending${qtyDigitClass(item.quantity_expected)}" onclick="event.stopPropagation(); toggleInlineEdit(${item.supplierIdx}, ${item.itemIdx}, event)">${item.quantity_expected}</div>`
+            : `<div class="qty-circle done${qtyDigitClass(msDoneQty)}" onclick="event.stopPropagation(); toggleInlineEdit(${item.supplierIdx}, ${item.itemIdx}, event)">${msDoneQty}</div>`;
         const msIsFullyConfirmed = item.received_status !== 'pending' && item.pull_confirmed;
         const msExpressCheckSvg = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="4,12 10,18 20,6"/></svg>';
         const msExpressCircle = `<div class="express-circle ${msIsFullyConfirmed ? 'done' : 'pending'}" onclick="event.stopPropagation(); expressConfirmItem(${item.supplierIdx}, ${item.itemIdx})">${msIsFullyConfirmed ? msExpressCheckSvg : ''}</div>`;
-        const editPanel = isEditing ? renderInlineEditPanel(item) : '';
         return `
-        <div class="compact-row supplier-sub-row ${statusClass}${isEditing ? ' editing' : ''}">
-            <div class="compact-qty" onclick="event.stopPropagation(); toggleInlineEdit(${item.supplierIdx}, ${item.itemIdx})">${pullQty}${msQtyCircle}</div>
+        <div class="compact-row supplier-sub-row ${statusClass}">
+            <div class="compact-qty" onclick="event.stopPropagation(); toggleInlineEdit(${item.supplierIdx}, ${item.itemIdx}, event)">${pullQty}${msQtyCircle}</div>
             <div class="compact-supplier sub-row-supplier" onclick="event.stopPropagation(); filterBySupplier(${item.supplierIdx})">${item.supplierName}</div>
             ${msExpressCircle}
-        </div>${editPanel}`;
+        </div>`;
     }).join('');
 
     return mainRow + subRows;
@@ -3030,156 +3052,10 @@ async function togglePullConfirmed() {
     }
 }
 
-// ---- Pull Popup ----
-function openPullPopup(event, supplierIdx, itemIdx) {
-    if (isViewingHistory) return;
-    const item = currentDelivery.suppliers[supplierIdx].items[itemIdx];
-    pullPopupItem = { supplierIdx, itemIdx };
-
-    document.getElementById('pull-popup-name').textContent = item.raw_description;
-    const qty = item.pull_quantity ?? 0;
-    const popupKey = `${supplierIdx}-${itemIdx}`;
-    if (!(popupKey in pullSessionOriginals)) {
-        pullSessionOriginals[popupKey] = qty;
-    }
-    pullPopupOriginalQty = pullSessionOriginals[popupKey];
-    pullChangeAlerts.delete(popupKey);
-    document.getElementById('pull-popup-qty').value = qty;
-
-    const hasQty = qty > 0;
-    document.getElementById('pull-popup-submit').classList.toggle('hidden', !hasQty);
-    document.getElementById('pull-popup-confirm').classList.toggle('hidden', !hasQty);
-    // Both checkboxes always open blank
-    document.getElementById('pull-popup-submit').querySelector('.pull-checkbox').classList.remove('checked');
-    document.getElementById('pull-popup-checkbox').classList.remove('checked');
-
-    // Position near the tapped element
-    const popup = document.getElementById('pull-popup');
-    popup.classList.remove('hidden');
-    document.getElementById('pull-popup-backdrop').classList.remove('hidden');
-
-    const rect = event.target.getBoundingClientRect();
-    const pw = popup.offsetWidth || 220;
-    const ph = popup.offsetHeight || 160;
-    const margin = 10;
-
-    let top = rect.bottom + margin;
-    let left = rect.left;
-    if (left + pw > window.innerWidth - margin) left = window.innerWidth - pw - margin;
-    if (left < margin) left = margin;
-    if (top + ph > window.innerHeight - margin) top = rect.top - ph - margin;
-
-    popup.style.top = top + 'px';
-    popup.style.left = left + 'px';
-}
-
-function closePullPopup() {
-    if (pullPopupItem !== null) {
-        const currentQty = parseInt(document.getElementById('pull-popup-qty').value) || 0;
-        if (pullPopupOriginalQty !== null) {
-            const key = `${pullPopupItem.supplierIdx}-${pullPopupItem.itemIdx}`;
-            if (currentQty !== pullPopupOriginalQty) {
-                pullChangeAlerts.add(key);
-            } else {
-                pullChangeAlerts.delete(key);
-            }
-        }
-    }
-    document.getElementById('pull-popup').classList.add('hidden');
-    document.getElementById('pull-popup-backdrop').classList.add('hidden');
-    pullPopupItem = null;
-    pullPopupOriginalQty = null;
-    applyPendingUpdate();
-    updateAlertBadge();
-    renderLiveReport();
-}
-
 function acknowledgePullAlert(supplierIdx, itemIdx) {
     pullChangeAlerts.delete(`${supplierIdx}-${itemIdx}`);
     updateAlertBadge();
     renderLiveReport();
-}
-
-function _pullPopupShowHideRows(qty) {
-    const hasQty = qty > 0;
-    document.getElementById('pull-popup-submit').classList.toggle('hidden', !hasQty);
-    document.getElementById('pull-popup-confirm').classList.toggle('hidden', !hasQty);
-}
-
-async function adjustPullPopupQty(delta) {
-    if (!pullPopupItem) return;
-    const input = document.getElementById('pull-popup-qty');
-    const newQty = Math.max(0, (parseInt(input.value) || 0) + delta);
-    input.value = newQty;
-    _pullPopupShowHideRows(newQty);
-    // Qty changed — clear both checkboxes to await explicit Submit or Confirm
-    document.getElementById('pull-popup-submit').querySelector('.pull-checkbox').classList.remove('checked');
-    document.getElementById('pull-popup-checkbox').classList.remove('checked');
-
-    const { supplierIdx, itemIdx } = pullPopupItem;
-    lastWriteTimestamp = Date.now();
-    try {
-        await apiPatch(
-            `/deliveries/${currentDelivery.id}/suppliers/${supplierIdx}/items/${itemIdx}/set-pull`,
-            { quantity: newQty }
-        );
-        const item = currentDelivery.suppliers[supplierIdx].items[itemIdx];
-        item.pull_quantity = newQty > 0 ? newQty : null;
-        item.pull_for_floor = newQty > 0;
-        renderItemList();
-    } catch (e) {
-        showToast('Failed to update pull quantity', 'error');
-    }
-}
-
-async function submitPullPopup() {
-    // Submit: mark as requested for pulling. Resets confirmed since qty may have changed.
-    if (!pullPopupItem) return;
-    const { supplierIdx, itemIdx } = pullPopupItem;
-    const item = currentDelivery.suppliers[supplierIdx].items[itemIdx];
-    try {
-        if (!item.pull_submitted) {
-            await apiPatch(
-                `/deliveries/${currentDelivery.id}/suppliers/${supplierIdx}/items/${itemIdx}/pull-submit`,
-                {}
-            );
-            lastWriteTimestamp = Date.now();
-            item.pull_submitted = true;
-        }
-        if (item.pull_confirmed) {
-            await apiPatch(
-                `/deliveries/${currentDelivery.id}/suppliers/${supplierIdx}/items/${itemIdx}/pull-confirm`,
-                {}
-            );
-            lastWriteTimestamp = Date.now();
-            item.pull_confirmed = false;
-        }
-        renderItemList();
-    } catch (e) {
-        showToast('Failed to submit pull', 'error');
-        return;
-    }
-    closePullPopup();
-}
-
-async function confirmPullPopup() {
-    // Toggle pull_confirmed — works whether currently confirmed or not.
-    if (!pullPopupItem) return;
-    const { supplierIdx, itemIdx } = pullPopupItem;
-    const item = currentDelivery.suppliers[supplierIdx].items[itemIdx];
-    try {
-        await apiPatch(
-            `/deliveries/${currentDelivery.id}/suppliers/${supplierIdx}/items/${itemIdx}/pull-confirm`,
-            {}
-        );
-        lastWriteTimestamp = Date.now();
-        item.pull_confirmed = !item.pull_confirmed;
-        renderItemList();
-    } catch (e) {
-        showToast('Failed to update pull confirmation', 'error');
-        return;
-    }
-    closePullPopup();
 }
 
 async function togglePullFromList(supplierIdx, itemIdx) {
@@ -3612,6 +3488,12 @@ function formatTimestamp(ts) {
     });
 }
 
+function formatTimeOnly(ts) {
+    if (!ts) return '';
+    const d = new Date(ts);
+    return d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+}
+
 function friendlyDateStr(dateStr) {
     // Convert "2026-02-27" -> "Friday, Feb 27, 2026"
     const m = dateStr.match(/(\d{4})-(\d{2})-(\d{2})/);
@@ -3951,7 +3833,8 @@ function updateNotTodayBanner() {
     const isToday = currentDelivery.delivery_date === todayStr;
     banner.classList.toggle('hidden', isToday);
     if (!isToday && isViewingHistory) {
-        banner.setAttribute('data-text', "NOT TODAY'S DATA\nCOMPLETED DELIVERY");
+        const dow = currentDelivery.day_of_week || '';
+        banner.setAttribute('data-text', `NOT TODAY'S DATA\n${dow.toUpperCase()}'S DELIVERY`);
     } else if (!isToday) {
         banner.setAttribute('data-text', "NOT TODAY'S DATA");
     }
@@ -3999,7 +3882,10 @@ async function renderDateDropdown() {
         const isCompleted = d.status === 'completed';
         const isReceived = allReceived(d);
         const statusClass = (isCompleted || isReceived) ? 'completed' : 'active';
-        const statusLabel = (isCompleted || isReceived) ? 'Received' : 'Active';
+        let statusLabel = (isCompleted || isReceived) ? 'Received' : 'Active';
+        if ((isCompleted || isReceived) && d.completed_at) {
+            statusLabel += ` ${formatTimeOnly(d.completed_at)}`;
+        }
         return `<div class="date-dropdown-item${isActive ? ' active' : ''}"
                      onclick="selectDateDelivery('${d.id}')">
             <span>${d.day_of_week} ${formatDate(d.delivery_date)}</span>
@@ -4035,6 +3921,41 @@ document.addEventListener('click', (e) => {
         }
     }
 });
+
+// ---- Title tooltip (check-in times) ----
+function updateTitleTooltip() {
+    const titleEl = document.getElementById('page-title');
+    if (!currentDelivery || !titleEl) {
+        if (titleEl) titleEl.title = '';
+        return;
+    }
+    const delivery = currentDelivery;
+
+    // Completed delivery — show completion time
+    if (delivery.status === 'completed' && delivery.completed_at) {
+        titleEl.title = `Received at ${formatTimeOnly(delivery.completed_at)}`;
+        return;
+    }
+
+    // In-progress — find first and last checked_in_at across all items
+    const times = [];
+    for (const s of delivery.suppliers) {
+        for (const item of s.items) {
+            if (item.checked_in_at) times.push(new Date(item.checked_in_at).getTime());
+        }
+    }
+    if (times.length === 0) {
+        titleEl.title = '';
+        return;
+    }
+    const first = formatTimeOnly(new Date(Math.min(...times)));
+    const last = formatTimeOnly(new Date(Math.max(...times)));
+    if (first === last) {
+        titleEl.title = `Started: ${first}`;
+    } else {
+        titleEl.title = `First: ${first} · Latest: ${last}`;
+    }
+}
 
 // ---- Week color ----
 function applyWeekColor(dateStr) {

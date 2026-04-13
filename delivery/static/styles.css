@@ -271,7 +271,7 @@ html, body {
 }
 
 #page-title {
-    font-size: 18px;
+    font-size: 22px;
     font-weight: 500;
     opacity: 0.75;
     position: absolute;
@@ -2732,11 +2732,11 @@ textarea {
 
 /* ---- Street View Edit Panel ---- */
 .pull-sheet-row.se-editing {
-    background: #faf3ef;
+    background: #fff9c4;
 }
 
 .se-panel {
-    background: #faf3ef;
+    background: #fff9c4;
     border-left: 3px solid var(--primary);
     padding: 10px 14px 10px 16px;
     display: flex;
@@ -2882,35 +2882,46 @@ textarea {
     height: 14px;
 }
 
-/* ---- Note Popup ---- */
-.note-popup {
-    position: absolute;
-    z-index: 1100;
-    background: var(--surface);
-    border-radius: var(--radius);
-    box-shadow: 0 8px 32px rgba(0,0,0,0.25);
-    padding: 16px;
-    width: 320px;
-    max-width: 90vw;
+/* ---- Inline Edit Overlay ---- */
+.ie-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 200;
+    background: rgba(0,0,0,0.15);
 }
 
-.note-popup textarea {
-    width: 100%;
-    border: 1px solid var(--border);
+.ie-overlay {
+    position: fixed;
+    z-index: 201;
+    background: #fff9c4;
+    border-left: 3px solid var(--primary);
     border-radius: 8px;
-    padding: 10px;
-    font-size: 14px;
+    box-shadow: 0 4px 24px rgba(0,0,0,0.18), 0 1px 4px rgba(0,0,0,0.08);
+    padding: 10px 14px 10px 16px;
+}
+
+.ie-col-note {
+    align-items: stretch;
+    min-width: 120px;
+}
+
+.ie-note-textarea {
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 6px 8px;
+    font-size: 13px;
+    resize: none;
+    min-height: 60px;
+    width: 100%;
     font-family: inherit;
-    resize: vertical;
-    margin-top: 8px;
     box-sizing: border-box;
 }
 
-.note-popup-actions {
-    display: flex;
-    justify-content: flex-end;
-    gap: 8px;
-    margin-top: 12px;
+.ie-note-clear {
+    font-size: 12px;
+    color: var(--text-secondary);
+    cursor: pointer;
+    text-align: center;
 }
 
 .btn-sm {
@@ -2972,18 +2983,7 @@ textarea {
 }
 
 /* ---- Inline Edit Panel ---- */
-.compact-row.editing {
-    background: var(--surface);
-}
-
-.inline-edit-wrapper {
-    background: var(--surface);
-    border-left: 3px solid var(--primary);
-}
-
 .inline-edit-panel {
-    background: #faf3ef;
-    padding: 10px 14px 10px 16px;
     display: flex;
     flex-direction: column;
     gap: 8px;
@@ -3032,7 +3032,6 @@ textarea {
 }
 
 .ie-bottom-row .ie-cancel {
-    flex: 2;
     text-align: center;
 }
 
@@ -3230,8 +3229,12 @@ textarea {
 
 .ie-cancel {
     font-size: 12px;
-    color: #d33;
-    opacity: 0.7;
+    font-weight: 600;
+    color: #d32f2f;
+    border: 1px solid #d32f2f;
+    border-radius: 10px;
+    padding: 5px 6px;
+    margin-left: 10px;
     cursor: pointer;
     -webkit-tap-highlight-color: transparent;
     flex-shrink: 0;
@@ -3455,112 +3458,6 @@ textarea {
     border-radius: 100px;
 }
 
-/* ---- Pull Popup (positioned card) ---- */
-.pull-popup-backdrop {
-    position: fixed;
-    inset: 0;
-    z-index: 200;
-    background: transparent;
-}
-
-.pull-popup {
-    position: fixed;
-    z-index: 201;
-    background: var(--surface);
-    border-radius: var(--radius);
-    border: 1px solid var(--border);
-    box-shadow: 0 4px 24px rgba(0,0,0,0.18), 0 1px 4px rgba(0,0,0,0.08);
-    padding: 16px 20px 18px;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 10px;
-    min-width: 230px;
-}
-
-.pull-popup-title {
-    font-size: 15px;
-    font-weight: 700;
-    letter-spacing: 0.01em;
-    color: var(--text);
-    background: #faf3ef;
-    align-self: stretch;
-    text-align: center;
-    padding: 10px 20px;
-    margin: -16px -20px 4px;
-    border-radius: var(--radius) var(--radius) 0 0;
-    position: relative;
-}
-
-.pull-popup-close {
-    position: absolute;
-    right: 8px;
-    top: 50%;
-    transform: translateY(-50%);
-    background: none;
-    border: none;
-    color: var(--text-secondary);
-    font-size: 14px;
-    line-height: 1;
-    cursor: pointer;
-    padding: 4px;
-}
-
-.pull-popup-name {
-    font-size: 16px;
-    font-weight: 600;
-    color: var(--text);
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    max-width: 240px;
-    text-align: center;
-}
-
-.pull-popup-actions-row {
-    display: flex;
-    justify-content: center;
-    gap: 32px;
-    padding: 4px 0;
-}
-
-.pull-popup-action {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 6px;
-    cursor: pointer;
-    -webkit-tap-highlight-color: transparent;
-}
-
-.pull-popup-row-label {
-    font-size: 13px;
-    font-weight: 600;
-    color: var(--text-secondary);
-}
-
-.pull-popup-action .pull-checkbox {
-    width: 36px;
-    height: 36px;
-    flex-shrink: 0;
-}
-
-.pull-popup-stepper {
-    justify-content: center;
-}
-
-#pull-popup-qty {
-    width: 72px;
-    height: 56px;
-    text-align: center;
-    font-size: 32px;
-    font-weight: 700;
-    border: 1px solid var(--border);
-    border-radius: var(--radius-sm);
-    -webkit-appearance: none;
-    color: var(--text);
-    background: var(--bg);
-}
 
 /* ---- Daily Logs ---- */
 

@@ -200,39 +200,9 @@
             </div>
         </div>
 
-        <!-- Pop-up: Pull Quantity (positioned near tap) -->
-        <div id="pull-popup-backdrop" class="pull-popup-backdrop hidden" onclick="closePullPopup()"></div>
-        <div id="pull-popup" class="pull-popup hidden">
-            <div class="pull-popup-title">Pull Status<button class="pull-popup-close" onclick="closePullPopup()">✕</button></div>
-            <div id="pull-popup-name" class="pull-popup-name"></div>
-            <div class="qty-input-row pull-popup-stepper">
-                <button class="qty-btn" onclick="adjustPullPopupQty(-1)">-</button>
-                <input type="number" id="pull-popup-qty" min="0" inputmode="numeric">
-                <button class="qty-btn" onclick="adjustPullPopupQty(1)">+</button>
-            </div>
-            <div class="pull-popup-actions-row">
-                <div id="pull-popup-submit" class="pull-popup-action hidden" onclick="submitPullPopup()">
-                    <span class="pull-checkbox"></span>
-                    <span class="pull-popup-row-label">Request</span>
-                </div>
-                <div id="pull-popup-confirm" class="pull-popup-action hidden" onclick="confirmPullPopup()">
-                    <span id="pull-popup-checkbox" class="pull-checkbox"></span>
-                    <span class="pull-popup-row-label">Confirm</span>
-                </div>
-            </div>
-        </div>
-
-        <!-- Pop-up: Item Note -->
-        <div id="note-popup-backdrop" class="pull-popup-backdrop hidden" onclick="closeNotePopup()"></div>
-        <div id="note-popup" class="note-popup hidden">
-            <div id="note-popup-name" class="pull-popup-name"></div>
-            <textarea id="note-popup-text" rows="4" placeholder="Add a note about this item..."></textarea>
-            <div class="note-popup-actions">
-                <button class="btn btn-sm" style="background:#d32f2f;color:#fff;border:none" onclick="closeNotePopup()">Cancel</button>
-                <button class="btn btn-secondary btn-sm" onclick="deleteItemNote()">Clear</button>
-                <button class="btn btn-success btn-sm" onclick="saveItemNote()">Save</button>
-            </div>
-        </div>
+        <!-- Overlay: Inline Edit Panel -->
+        <div id="ie-backdrop" class="ie-backdrop hidden" onclick="closeInlineEdit()"></div>
+        <div id="ie-overlay" class="ie-overlay hidden" onclick="event.stopPropagation()"></div>
 
         <!-- Modal: Delivery Complete -->
         <div id="complete-modal" class="modal hidden">

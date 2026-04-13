@@ -144,6 +144,13 @@ class DeliveryService:
                 for it in s.items
                 if it.received_status != ReceivedStatus.PENDING
             )
+            # Compute first and last check-in times
+            check_in_times = [
+                it.checked_in_at for s in d.suppliers
+                for it in s.items if it.checked_in_at
+            ]
+            first_checked_in = min(check_in_times) if check_in_times else None
+            last_checked_in = max(check_in_times) if check_in_times else None
             summaries.append(DeliverySummary(
                 id=d.id,
                 day_of_week=d.day_of_week,
@@ -152,6 +159,9 @@ class DeliveryService:
                 source_filename=d.source_filename,
                 status=d.status,
                 parsed_at=d.parsed_at,
+                completed_at=d.completed_at,
+                first_checked_in_at=first_checked_in,
+                last_checked_in_at=last_checked_in,
                 supplier_count=len(d.suppliers),
                 item_count=total_items,
                 checked_in_count=checked_in,
@@ -207,8 +217,11 @@ class DeliveryService:
         )
         if all_suppliers_done:
             delivery.status = DeliveryStatus.COMPLETED
+            if not delivery.completed_at:
+                delivery.completed_at = datetime.utcnow()
         else:
             delivery.status = DeliveryStatus.IN_PROGRESS
+            delivery.completed_at = None
 
         # Persist changes
         self._save_delivery(delivery)
@@ -310,8 +323,11 @@ class DeliveryService:
         )
         if all_suppliers_done:
             delivery.status = DeliveryStatus.COMPLETED
+            if not delivery.completed_at:
+                delivery.completed_at = datetime.utcnow()
         else:
             delivery.status = DeliveryStatus.IN_PROGRESS
+            delivery.completed_at = None
 
         # Single Firestore write
         self._save_delivery(delivery)
@@ -353,13 +369,17 @@ class DeliveryService:
         )
         if all_suppliers_done:
             delivery.status = DeliveryStatus.COMPLETED
+            if not delivery.completed_at:
+                delivery.completed_at = datetime.utcnow()
         elif any(
             s.status != SupplierStatus.PENDING
             for s in delivery.suppliers
         ):
             delivery.status = DeliveryStatus.IN_PROGRESS
+            delivery.completed_at = None
         else:
             delivery.status = DeliveryStatus.PARSED
+            delivery.completed_at = None
 
         # Single Firestore write
         self._save_delivery(delivery)
@@ -414,13 +434,17 @@ class DeliveryService:
         )
         if all_suppliers_done:
             delivery.status = DeliveryStatus.COMPLETED
+            if not delivery.completed_at:
+                delivery.completed_at = datetime.utcnow()
         elif any(
             s.status != SupplierStatus.PENDING
             for s in delivery.suppliers
         ):
             delivery.status = DeliveryStatus.IN_PROGRESS
+            delivery.completed_at = None
         else:
             delivery.status = DeliveryStatus.PARSED
+            delivery.completed_at = None
 
         self._save_delivery(delivery)
         return item
@@ -490,6 +514,8 @@ class DeliveryService:
 
         # Update delivery status
         delivery.status = DeliveryStatus.COMPLETED
+        if not delivery.completed_at:
+            delivery.completed_at = datetime.utcnow()
         self._save_delivery(delivery)
 
         return report

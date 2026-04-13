@@ -140,6 +140,7 @@ class Delivery(DeliveryBase):
     id: str = ""
     parsed_at: Optional[datetime] = None
     status: DeliveryStatus = DeliveryStatus.PARSED
+    completed_at: Optional[datetime] = None
     notes: Optional[str] = None
     suppliers: List[SupplierEntry] = Field(default_factory=list)
 
@@ -155,6 +156,9 @@ class DeliverySummary(BaseModel):
     source_filename: str
     status: DeliveryStatus
     parsed_at: Optional[datetime]
+    completed_at: Optional[datetime] = None
+    first_checked_in_at: Optional[datetime] = None
+    last_checked_in_at: Optional[datetime] = None
     supplier_count: int
     item_count: int
     checked_in_count: int
