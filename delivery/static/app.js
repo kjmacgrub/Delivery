@@ -2294,8 +2294,8 @@ function renderCompactRow(item, showSupplier, crossMap = null) {
                 const ePullTip = e.pull_quantity != null && (e.pull_quantity || 0) !== (eOrigPull || 0)
                     ? ` title="Original: ${eOrigPull || 0}"` : '';
                 const ePullQty = e.pull_quantity != null
-                    ? `<span class="pull-qty ${ePullConfirmedClass}"${ePullTip} onclick="event.stopPropagation(); toggleInlineEdit(${e.supplierIdx}, ${e.itemIdx}, event)">(${e.pull_quantity})</span> `
-                    : `<span class="pull-qty pull-qty-empty" onclick="event.stopPropagation(); toggleInlineEdit(${e.supplierIdx}, ${e.itemIdx}, event)"></span> `;
+                    ? `<span class="pull-indicator ${ePullConfirmedClass}"${ePullTip} onclick="event.stopPropagation(); toggleInlineEdit(${e.supplierIdx}, ${e.itemIdx}, event)">${e.pull_quantity}</span>`
+                    : '';
                 const eIsPending = e.received_status === 'pending';
                 const eDoneQty = e.quantity_received ?? e.qty;
                 const eItem = currentDelivery.suppliers[e.supplierIdx].items[e.itemIdx];
@@ -2310,8 +2310,8 @@ function renderCompactRow(item, showSupplier, crossMap = null) {
                 const eExpressCheckSvg = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="4,12 10,18 20,6"/></svg>';
                 const eExpressCircle = `<div class="express-circle ${eIsFullyConfirmed ? 'done' : 'pending'}" onclick="event.stopPropagation(); expressConfirmItem(${e.supplierIdx}, ${e.itemIdx})">${eIsFullyConfirmed ? eExpressCheckSvg : ''}</div>`;
                 return `<div class="compact-row supplier-sub-row ${eStatus}">
-                    <div class="compact-qty" onclick="event.stopPropagation(); toggleInlineEdit(${e.supplierIdx}, ${e.itemIdx}, event)">${ePullQty}${eQtyCircle}</div>
-                    <div class="compact-supplier sub-row-supplier" onclick="event.stopPropagation(); filterBySupplier(${e.supplierIdx})">${e.supplierName}</div>
+                    <div class="compact-qty" onclick="event.stopPropagation(); toggleInlineEdit(${e.supplierIdx}, ${e.itemIdx}, event)"><div class="qty-left-stack">${ePullQty}</div>${eQtyCircle}</div>
+                    <div class="compact-supplier sub-row-supplier" onclick="event.stopPropagation(); filterBySupplier(${e.supplierIdx})"><span class="also-from-label">also from</span>${e.supplierName}</div>
                     ${eExpressCircle}
                 </div>`;
             }).join('');
@@ -2380,8 +2380,8 @@ function renderMultiSupplierRow(items) {
         const statusClass = isPending ? '' : `checked-${item.received_status}`;
         const pullConfirmedClass = item.pull_confirmed ? 'pull-confirmed' : '';
         const pullQty = item.pull_quantity != null
-            ? `<span class="pull-qty ${pullConfirmedClass}" onclick="event.stopPropagation(); toggleInlineEdit(${item.supplierIdx}, ${item.itemIdx}, event)">(${item.pull_quantity})</span> `
-            : `<span class="pull-qty pull-qty-empty" onclick="event.stopPropagation(); toggleInlineEdit(${item.supplierIdx}, ${item.itemIdx}, event)">+</span> `;
+            ? `<span class="pull-indicator ${pullConfirmedClass}" onclick="event.stopPropagation(); toggleInlineEdit(${item.supplierIdx}, ${item.itemIdx}, event)">${item.pull_quantity}</span>`
+            : '';
         const msDoneQty = item.quantity_received ?? item.quantity_expected;
         const msQtyCircle = isPending
             ? `<div class="qty-circle pending${qtyDigitClass(item.quantity_expected)}" onclick="event.stopPropagation(); toggleInlineEdit(${item.supplierIdx}, ${item.itemIdx}, event)">${item.quantity_expected}</div>`
@@ -2391,8 +2391,8 @@ function renderMultiSupplierRow(items) {
         const msExpressCircle = `<div class="express-circle ${msIsFullyConfirmed ? 'done' : 'pending'}" onclick="event.stopPropagation(); expressConfirmItem(${item.supplierIdx}, ${item.itemIdx})">${msIsFullyConfirmed ? msExpressCheckSvg : ''}</div>`;
         return `
         <div class="compact-row supplier-sub-row ${statusClass}">
-            <div class="compact-qty" onclick="event.stopPropagation(); toggleInlineEdit(${item.supplierIdx}, ${item.itemIdx}, event)">${pullQty}${msQtyCircle}</div>
-            <div class="compact-supplier sub-row-supplier" onclick="event.stopPropagation(); filterBySupplier(${item.supplierIdx})">${item.supplierName}</div>
+            <div class="compact-qty" onclick="event.stopPropagation(); toggleInlineEdit(${item.supplierIdx}, ${item.itemIdx}, event)"><div class="qty-left-stack">${pullQty}</div>${msQtyCircle}</div>
+            <div class="compact-supplier sub-row-supplier" onclick="event.stopPropagation(); filterBySupplier(${item.supplierIdx})"><span class="also-from-label">from</span>${item.supplierName}</div>
             ${msExpressCircle}
         </div>`;
     }).join('');
@@ -3469,6 +3469,13 @@ function progressBar(done, total) {
         </div>
         <div class="progress-bar-track">
             <div class="progress-bar-fill" style="width: ${pct}%; transition: width 0.4s ease"></div>
+        </div>
+        <div class="legend-row">
+            <span class="legend-item"><span class="legend-num">3</span> pull request</span>
+            <span class="legend-item"><span class="legend-circle legend-pending">4</span> expected</span>
+            <span class="legend-item"><span class="legend-circle legend-received">4</span> received</span>
+            <span class="legend-item"><span class="legend-circle legend-pull">2</span> pulled</span>
+            <span class="legend-item"><span class="legend-hc"><span class="legend-hc-day">20</span><span class="legend-hc-day">0</span><span class="legend-hc-day">30</span></span> next 3 days</span>
         </div>
     </div>`;
 }

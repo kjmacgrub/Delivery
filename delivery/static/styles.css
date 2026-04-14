@@ -826,6 +826,77 @@ html, body {
     background: #c8e6c9;
 }
 
+/* ---- Legend Row ---- */
+.legend-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-top: 8px;
+    justify-content: center;
+}
+
+.legend-item {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 11px;
+    color: var(--text-secondary);
+    white-space: nowrap;
+}
+
+.legend-circle {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    font-size: 11px;
+    font-weight: 700;
+    flex-shrink: 0;
+}
+
+.legend-circle.legend-pending {
+    border: 2px solid var(--border);
+    color: #000;
+}
+
+.legend-circle.legend-received {
+    border: 2px solid var(--success);
+    color: var(--success);
+}
+
+.legend-circle.legend-pull {
+    border: 2px solid var(--primary);
+    color: var(--primary);
+    font-size: 10px;
+    width: 18px;
+    height: 18px;
+}
+
+.legend-num {
+    font-weight: 700;
+    font-size: 12px;
+    color: #888;
+}
+
+.legend-hc {
+    display: inline-flex;
+    gap: 2px;
+}
+
+.legend-hc-day {
+    font-size: 10px;
+    font-weight: 600;
+    background: white;
+    color: black;
+    border: 1px solid #ccc;
+    padding: 1px 4px;
+    border-radius: 3px;
+    min-width: 18px;
+    text-align: center;
+}
+
 /* ---- Card List ---- */
 .card-list {
     display: flex;
@@ -1251,7 +1322,7 @@ html, body {
 }
 
 .supplier-sub-row {
-    padding-left: 88px;
+    padding-left: 110px;
 }
 
 .supplier-sub-row .compact-qty {
@@ -1261,7 +1332,15 @@ html, body {
 .sub-row-supplier {
     position: static;
     transform: none;
-    margin-left: 8px;
+    margin-left: 0;
+}
+
+.also-from-label {
+    font-size: 11px;
+    color: var(--text-secondary);
+    font-style: italic;
+    margin-right: 3px;
+    white-space: nowrap;
 }
 
 .hc-strip {
@@ -2932,7 +3011,7 @@ textarea {
 /* ---- Edit Trigger & Pull Indicator (left margin) ---- */
 .qty-left-stack {
     position: absolute;
-    right: calc(100% + 10px);
+    right: calc(100% + 4px);
     top: 50%;
     transform: translateY(-50%);
     display: flex;
