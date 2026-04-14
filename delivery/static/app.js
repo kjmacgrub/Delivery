@@ -81,6 +81,7 @@ let pullChangeAlerts = new Set(); // "supplierIdx-itemIdx" keys for items change
 let searchQuery = ''; // search filter for item list
 let completionShown = false; // prevent duplicate completion modal
 let expandedSuppliers = new Set(); // supplier indices expanded in accordion view
+let expandedMultiItems = new Set(); // multi-supplier item descriptions that are expanded
 let expandedLocations = new Set(); // location zone keys expanded in accordion view
 let highCountData = null; // { lowercase_item_name: { sat, sun, mon } } or null
 let itemNotes = {}; // { note_key: { description, note } } — persists across deliveries
@@ -2284,7 +2285,7 @@ function renderCompactRow(item, showSupplier, crossMap = null) {
         : '';
 
     const supplierChip = showSupplier
-        ? `<div class="compact-supplier" onclick="event.stopPropagation(); filterBySupplier(${item.supplierIdx})">${item.supplierAbbrev}</div>`
+        ? `<div class="compact-supplier">${item.supplierAbbrev}</div>`
         : '';
 
     // Build "also from" sub-rows for items shared across suppliers
@@ -2318,7 +2319,7 @@ function renderCompactRow(item, showSupplier, crossMap = null) {
                 const eExpressCircle = `<div class="express-circle ${eIsFullyConfirmed ? 'done' : 'pending'}" onclick="event.stopPropagation(); expressConfirmItem(${e.supplierIdx}, ${e.itemIdx})">${eIsFullyConfirmed ? eExpressCheckSvg : ''}</div>`;
                 return `<div class="compact-row supplier-sub-row ${eStatus}">
                     <div class="compact-qty" onclick="event.stopPropagation(); toggleInlineEdit(${e.supplierIdx}, ${e.itemIdx}, event)"><div class="qty-left-stack">${ePullQty}</div>${eQtyCircle}</div>
-                    <div class="compact-supplier sub-row-supplier" onclick="event.stopPropagation(); filterBySupplier(${e.supplierIdx})"><span class="also-from-label">also from</span>${e.supplierName}</div>
+                    <div class="compact-supplier sub-row-supplier" onclick="event.stopPropagation(); toggleInlineEdit(${e.supplierIdx}, ${e.itemIdx}, event)"><span class="also-from-label">also from</span>${e.supplierName}</div>
                     ${eExpressCircle}
                 </div>`;
             }).join('');
@@ -2363,6 +2364,8 @@ function renderCompactRow(item, showSupplier, crossMap = null) {
 function renderMultiSupplierRow(items) {
     const totalQty = items.reduce((sum, item) => sum + item.quantity_expected, 0);
     const firstName = items[0].raw_description;
+    const multiKey = firstName.toLowerCase();
+    const isExpanded = expandedMultiItems.has(multiKey);
 
     // High count strip (same item name across all)
     const hcKey = firstName.toLowerCase();
@@ -2375,12 +2378,17 @@ function renderMultiSupplierRow(items) {
     const msHasNote = itemNotes[msNoteKey];
     const msNoteIcon = msHasNote ? '<svg class="inline-note-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>' : '';
 
+    const multiPill = `<div class="multi-pill${isExpanded ? ' expanded' : ''}" onclick="event.stopPropagation(); toggleMultiExpand('${multiKey.replace(/'/g, "\\'")}')">multi</div>`;
+
     const mainRow = `
     <div class="compact-row multi-supplier-header">
-        <div class="compact-qty">${totalQty}</div>
-        <div class="compact-name${msHasNote ? ' has-note' : ''}" onclick="event.stopPropagation(); toggleInlineEdit(${items[0].supplierIdx}, ${items[0].itemIdx}, event)">${firstName}${msNoteIcon}</div>
+        <div class="compact-qty"><span class="multi-total-qty">${totalQty}</span></div>
+        <div class="compact-name${msHasNote ? ' has-note' : ''}">${firstName}${msNoteIcon}</div>
         ${hcStrip}
+        ${multiPill}
     </div>`;
+
+    if (!isExpanded) return mainRow;
 
     const subRows = items.map(item => {
         const isPending = item.received_status === 'pending';
@@ -2399,12 +2407,21 @@ function renderMultiSupplierRow(items) {
         return `
         <div class="compact-row supplier-sub-row ${statusClass}">
             <div class="compact-qty" onclick="event.stopPropagation(); toggleInlineEdit(${item.supplierIdx}, ${item.itemIdx}, event)"><div class="qty-left-stack">${pullQty}</div>${msQtyCircle}</div>
-            <div class="compact-supplier sub-row-supplier" onclick="event.stopPropagation(); filterBySupplier(${item.supplierIdx})"><span class="also-from-label">from</span>${item.supplierName}</div>
+            <div class="compact-supplier sub-row-supplier" onclick="event.stopPropagation(); toggleInlineEdit(${item.supplierIdx}, ${item.itemIdx}, event)"><span class="also-from-label">from</span>${item.supplierName}</div>
             ${msExpressCircle}
         </div>`;
     }).join('');
 
     return mainRow + subRows;
+}
+
+function toggleMultiExpand(key) {
+    if (expandedMultiItems.has(key)) {
+        expandedMultiItems.delete(key);
+    } else {
+        expandedMultiItems.add(key);
+    }
+    renderItemList();
 }
 
 function renderSupplierAccordion(container, flatItems) {
