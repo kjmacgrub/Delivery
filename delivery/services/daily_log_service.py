@@ -7,7 +7,7 @@ Stored in Firestore collection 'dailyLogs' with 7-day retention.
 
 import base64
 import uuid
-from datetime import datetime, date, timedelta
+from datetime import datetime, date, timedelta, timezone
 from typing import Optional, List, Dict
 
 from delivery.models import Delivery, ReceivedStatus
@@ -90,7 +90,7 @@ class DailyLogService:
             "dayOfWeek": delivery.day_of_week,
             "deliveryId": delivery.id,
             "sourceFilename": delivery.source_filename,
-            "snapshotAt": datetime.utcnow().isoformat(),
+            "snapshotAt": datetime.now(timezone.utc).isoformat(),
             "totalItemsExpected": total_items,
             "totalCasesExpected": total_cases_expected,
             "totalItemsReceived": total_items_received,
@@ -136,7 +136,7 @@ class DailyLogService:
         if not doc.exists:
             log_ref.set({
                 "date": date_key,
-                "snapshotAt": datetime.utcnow().isoformat(),
+                "snapshotAt": datetime.now(timezone.utc).isoformat(),
                 "status": "partial",
             })
 
@@ -146,7 +146,7 @@ class DailyLogService:
         log_ref.update({
             "totalItemsProcessed": len(completed),
             "totalCasesProcessed": total_cases_processed,
-            "processingSnapshotAt": datetime.utcnow().isoformat(),
+            "processingSnapshotAt": datetime.now(timezone.utc).isoformat(),
         })
 
         # Write processing subcollection
@@ -195,7 +195,7 @@ class DailyLogService:
                 "itemName": note.get("itemName"),
                 "itemSku": item_id,
                 "text": note.get("text", ""),
-                "createdAt": note.get("updatedAt", datetime.utcnow().isoformat()),
+                "createdAt": note.get("updatedAt", datetime.now(timezone.utc).isoformat()),
             })
 
         for note_id, note in freeform_notes.items():
@@ -205,7 +205,7 @@ class DailyLogService:
                 "itemName": None,
                 "itemSku": None,
                 "text": note.get("text", ""),
-                "createdAt": note.get("createdAt", datetime.utcnow().isoformat()),
+                "createdAt": note.get("createdAt", datetime.now(timezone.utc).isoformat()),
             })
 
         return {"itemsProcessed": len(completed), "casesProcessed": total_cases_processed}
@@ -224,7 +224,7 @@ class DailyLogService:
         if not doc.exists:
             log_ref.set({
                 "date": date_key,
-                "snapshotAt": datetime.utcnow().isoformat(),
+                "snapshotAt": datetime.now(timezone.utc).isoformat(),
                 "status": "partial",
             })
 
@@ -235,7 +235,7 @@ class DailyLogService:
             "itemName": note_data.get("itemName"),
             "itemSku": note_data.get("itemSku"),
             "text": note_data.get("text", ""),
-            "createdAt": datetime.utcnow().isoformat(),
+            "createdAt": datetime.now(timezone.utc).isoformat(),
         }
         log_ref.collection("notes").document(note_id).set(note_doc)
         return {"noteId": note_id, **note_doc}

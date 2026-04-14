@@ -5,7 +5,7 @@ Supports both in-memory (for testing) and Firestore (for production) persistence
 """
 
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional, List
 
@@ -96,7 +96,7 @@ class DeliveryService:
         # Convert raw dict to model objects
         delivery = self._raw_to_delivery(raw)
         delivery.source_filename = path.name
-        delivery.parsed_at = datetime.utcnow()
+        delivery.parsed_at = datetime.now(timezone.utc)
 
         # Check for existing non-completed delivery on the same date
         if delivery.delivery_date:
@@ -196,7 +196,7 @@ class DeliveryService:
         item.quantity_received = check_in.quantity_received
         item.received_status = check_in.received_status
         item.received_notes = check_in.received_notes
-        item.checked_in_at = datetime.utcnow()
+        item.checked_in_at = datetime.now(timezone.utc)
         if check_in.pull_confirmed is not None:
             item.pull_confirmed = check_in.pull_confirmed
 
@@ -218,7 +218,7 @@ class DeliveryService:
         if all_suppliers_done:
             delivery.status = DeliveryStatus.COMPLETED
             if not delivery.completed_at:
-                delivery.completed_at = datetime.utcnow()
+                delivery.completed_at = datetime.now(timezone.utc)
         else:
             delivery.status = DeliveryStatus.IN_PROGRESS
             delivery.completed_at = None
@@ -303,7 +303,7 @@ class DeliveryService:
             if item.received_status == ReceivedStatus.PENDING:
                 item.quantity_received = item.quantity_expected
                 item.received_status = ReceivedStatus.OK
-                item.checked_in_at = datetime.utcnow()
+                item.checked_in_at = datetime.now(timezone.utc)
                 count += 1
 
         # Update supplier status
@@ -324,7 +324,7 @@ class DeliveryService:
         if all_suppliers_done:
             delivery.status = DeliveryStatus.COMPLETED
             if not delivery.completed_at:
-                delivery.completed_at = datetime.utcnow()
+                delivery.completed_at = datetime.now(timezone.utc)
         else:
             delivery.status = DeliveryStatus.IN_PROGRESS
             delivery.completed_at = None
@@ -370,7 +370,7 @@ class DeliveryService:
         if all_suppliers_done:
             delivery.status = DeliveryStatus.COMPLETED
             if not delivery.completed_at:
-                delivery.completed_at = datetime.utcnow()
+                delivery.completed_at = datetime.now(timezone.utc)
         elif any(
             s.status != SupplierStatus.PENDING
             for s in delivery.suppliers
@@ -435,7 +435,7 @@ class DeliveryService:
         if all_suppliers_done:
             delivery.status = DeliveryStatus.COMPLETED
             if not delivery.completed_at:
-                delivery.completed_at = datetime.utcnow()
+                delivery.completed_at = datetime.now(timezone.utc)
         elif any(
             s.status != SupplierStatus.PENDING
             for s in delivery.suppliers
@@ -500,7 +500,7 @@ class DeliveryService:
             delivery_date=delivery.delivery_date,
             day_of_week=delivery.day_of_week,
             source_filename=delivery.source_filename,
-            completed_at=datetime.utcnow(),
+            completed_at=datetime.now(timezone.utc),
             total_items=total_items,
             total_exceptions=len(exceptions),
             exception_items=exceptions,
@@ -515,7 +515,7 @@ class DeliveryService:
         # Update delivery status
         delivery.status = DeliveryStatus.COMPLETED
         if not delivery.completed_at:
-            delivery.completed_at = datetime.utcnow()
+            delivery.completed_at = datetime.now(timezone.utc)
         self._save_delivery(delivery)
 
         return report

@@ -3937,15 +3937,19 @@ function updateTitleTooltip() {
         return;
     }
 
-    // In-progress — find first and last checked_in_at across all items
+    // In-progress — find first and last checked_in_at from today only
+    const today = new Date().toDateString();
     const times = [];
     for (const s of delivery.suppliers) {
         for (const item of s.items) {
-            if (item.checked_in_at) times.push(new Date(item.checked_in_at).getTime());
+            if (item.checked_in_at) {
+                const d = new Date(item.checked_in_at);
+                if (d.toDateString() === today) times.push(d.getTime());
+            }
         }
     }
     if (times.length === 0) {
-        titleEl.title = '';
+        titleEl.title = 'None received yet';
         return;
     }
     const first = formatTimeOnly(new Date(Math.min(...times)));

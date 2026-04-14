@@ -149,7 +149,7 @@ async def parse_inventory_file(file_name: str, request: Request):
     parse name→location mappings, and save to Firestore inventory/latest.
     """
     import re
-    from datetime import datetime
+    from datetime import datetime, timezone
     from delivery.config import STORAGE_INCOMING
     from delivery.parser.inventory_parser import parse_inventory
 
@@ -167,14 +167,14 @@ async def parse_inventory_file(file_name: str, request: Request):
         raise HTTPException(status_code=500, detail=f"Parse error: {str(e)}")
 
     date_match = re.search(r'(\d{4}-\d{2}-\d{2})', file_name)
-    date_str = date_match.group(1) if date_match else datetime.utcnow().strftime('%Y-%m-%d')
+    date_str = date_match.group(1) if date_match else datetime.now(timezone.utc).strftime('%Y-%m-%d')
 
     db = request.app.state.delivery_service._db
     if db:
         db.collection('inventory').document('latest').set({
             'date': date_str,
             'source_filename': file_name,
-            'parsed_at': datetime.utcnow().isoformat(),
+            'parsed_at': datetime.now(timezone.utc).isoformat(),
             'items': items,
         })
 
@@ -205,7 +205,7 @@ async def parse_high_count_file(file_name: str, request: Request):
     parse the 3-day forecast, and save to Firestore high_counts collection.
     """
     import re
-    from datetime import datetime
+    from datetime import datetime, timezone
     from delivery.config import STORAGE_INCOMING
     from delivery.parser.high_count_parser import parse_high_count
 
@@ -224,7 +224,7 @@ async def parse_high_count_file(file_name: str, request: Request):
 
     # Extract date from filename (e.g., "basement_high_count_fri_2026-02-27.pdf")
     date_match = re.search(r'(\d{4}-\d{2}-\d{2})', file_name)
-    date_str = date_match.group(1) if date_match else datetime.utcnow().strftime('%Y-%m-%d')
+    date_str = date_match.group(1) if date_match else datetime.now(timezone.utc).strftime('%Y-%m-%d')
 
     # Save to Firestore
     db = request.app.state.delivery_service._db
@@ -232,7 +232,7 @@ async def parse_high_count_file(file_name: str, request: Request):
         db.collection('high_counts').document(date_str).set({
             'date': date_str,
             'source_filename': file_name,
-            'parsed_at': datetime.utcnow().isoformat(),
+            'parsed_at': datetime.now(timezone.utc).isoformat(),
             'items': items,
         })
 
@@ -265,7 +265,7 @@ async def scan_downloads():
     }
 
     import re
-    from datetime import datetime
+    from datetime import datetime, timezone
 
     result = {}
     for type_key, matcher in patterns.items():
