@@ -3416,7 +3416,9 @@ async function expressConfirmItem(supplierIdx, itemIdx) {
     }
     lastWriteTimestamp = Date.now();
     if (supplierFilter !== null) updateFilteredSupplierSummary();
+    const scrollY = window.scrollY;
     renderDetail();
+    window.scrollTo(0, scrollY);
 
     try {
         if (isFullyConfirmed) {
