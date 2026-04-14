@@ -1820,11 +1820,13 @@ async function ieAcceptAll(si, ii) {
             showToast('Failed to save', 'error');
         }
         closeInlineEdit();
+        clearSearchIfActive();
         return;
     }
 
     // Has receive/oos/return changes — commit everything
     await ieCommitAll(si, ii);
+    clearSearchIfActive();
 }
 
 async function ieUndo(si, ii) {
@@ -2878,6 +2880,15 @@ function clearSearch() {
     document.getElementById('search-clear-btn').classList.add('hidden');
     renderItemList();
     input.focus();
+}
+
+function clearSearchIfActive() {
+    if (!searchQuery) return;
+    const input = document.getElementById('item-search');
+    input.value = '';
+    searchQuery = '';
+    document.getElementById('search-clear-btn').classList.add('hidden');
+    renderItemList();
 }
 
 async function setItemSort(mode) {
