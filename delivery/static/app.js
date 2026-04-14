@@ -2274,14 +2274,31 @@ function renderCompactRow(item, showSupplier, crossMap = null) {
     const floorClass = item.pull_for_floor ? 'pull-for-floor' : '';
 
 
-    const pullConfirmedClass = item.pull_confirmed ? 'pull-confirmed' : '';
     const si = item.supplierIdx, ii = item.itemIdx;
+
+    // For multi-supplier items, check if any supplier has confirmed the pull
+    let pullConfirmed = item.pull_confirmed;
+    let pullQtyDisplay = item.pull_quantity;
+    if (crossMap) {
+        const allEntries = crossMap.get(item.raw_description.toLowerCase()) || [];
+        if (allEntries.length > 1) {
+            const anyConfirmed = allEntries.some(e => e.pull_confirmed);
+            if (anyConfirmed) {
+                pullConfirmed = true;
+                // Show the pull qty from whichever supplier confirmed it
+                const confirmed = allEntries.find(e => e.pull_confirmed);
+                pullQtyDisplay = confirmed ? confirmed.pull_quantity : pullQtyDisplay;
+            }
+        }
+    }
+
+    const pullConfirmedClass = pullConfirmed ? 'pull-confirmed' : '';
     const origPull = item.original_pull_quantity !== undefined && item.original_pull_quantity !== null
         ? item.original_pull_quantity : item.pull_quantity;
     const pullChangedTip = item.pull_quantity != null && (item.pull_quantity || 0) !== (origPull || 0)
         ? ` title="Original: ${origPull || 0}"` : '';
-    const leftLabel = item.pull_quantity != null
-        ? `<span class="pull-indicator ${pullConfirmedClass}"${pullChangedTip}>${item.pull_quantity}</span>`
+    const leftLabel = pullQtyDisplay != null
+        ? `<span class="pull-indicator ${pullConfirmedClass}"${pullChangedTip}>${pullQtyDisplay}</span>`
         : '';
 
     const supplierChip = showSupplier
@@ -3374,6 +3391,9 @@ async function expressConfirmItem(supplierIdx, itemIdx) {
     const item = currentDelivery.suppliers[supplierIdx].items[itemIdx];
     const isFullyConfirmed = item.received_status !== 'pending' && item.pull_confirmed;
 
+    // Find sibling items across suppliers (same description)
+    const siblings = getMultiSupplierSiblings(supplierIdx, itemIdx);
+
     // Optimistically update local state and re-render immediately
     if (isFullyConfirmed) {
         item.quantity_received = null;
@@ -3385,6 +3405,14 @@ async function expressConfirmItem(supplierIdx, itemIdx) {
         item.received_status = 'ok';
         item.received_notes = null;
         item.pull_confirmed = true;
+        // Clear pull from sibling suppliers since this one fulfilled it
+        if (siblings.length > 0 && (item.pull_quantity || 0) > 0) {
+            for (const sib of siblings) {
+                const sibItem = currentDelivery.suppliers[sib.supplierIdx].items[sib.itemIdx];
+                sibItem.pull_quantity = null;
+                sibItem.pull_confirmed = false;
+            }
+        }
     }
     lastWriteTimestamp = Date.now();
     if (supplierFilter !== null) updateFilteredSupplierSummary();
@@ -3408,6 +3436,14 @@ async function expressConfirmItem(supplierIdx, itemIdx) {
                 apiPatch(`/deliveries/${currentDelivery.id}/suppliers/${supplierIdx}/items/${itemIdx}/checkin`,
                     { quantity_received: item.quantity_expected, received_status: 'ok', received_notes: null, pull_confirmed: true })
             );
+            // Clear pull from sibling suppliers on the server
+            for (const sib of siblings) {
+                if ((currentDelivery.suppliers[sib.supplierIdx].items[sib.itemIdx].original_pull_quantity ?? currentDelivery.suppliers[sib.supplierIdx].items[sib.itemIdx].pull_quantity) != null) {
+                    calls.push(
+                        apiPatch(`/deliveries/${currentDelivery.id}/suppliers/${sib.supplierIdx}/items/${sib.itemIdx}/set-pull`, { quantity: 0 })
+                    );
+                }
+            }
             await Promise.all(calls);
         }
         lastWriteTimestamp = Date.now();
@@ -3419,6 +3455,21 @@ async function expressConfirmItem(supplierIdx, itemIdx) {
     } catch (e) {
         showToast('Failed to update item', 'error');
     }
+}
+
+function getMultiSupplierSiblings(supplierIdx, itemIdx) {
+    if (!currentDelivery) return [];
+    const desc = currentDelivery.suppliers[supplierIdx].items[itemIdx].raw_description.toLowerCase();
+    const siblings = [];
+    currentDelivery.suppliers.forEach((supplier, sIdx) => {
+        supplier.items.forEach((it, iIdx) => {
+            if (sIdx === supplierIdx && iIdx === itemIdx) return;
+            if (it.raw_description.toLowerCase() === desc) {
+                siblings.push({ supplierIdx: sIdx, itemIdx: iIdx });
+            }
+        });
+    });
+    return siblings;
 }
 
 // ---- Bulk Receive / Unreceive ----
