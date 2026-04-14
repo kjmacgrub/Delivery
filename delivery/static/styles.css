@@ -894,11 +894,9 @@ html, body {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    width: 20px;
-    height: 20px;
+    width: 12px;
+    height: 12px;
     border-radius: 50%;
-    font-size: 11px;
-    font-weight: 700;
     flex-shrink: 0;
 }
 
@@ -914,22 +912,36 @@ html, body {
 
 .legend-circle.legend-pull {
     border: 2px solid var(--primary);
-    color: var(--primary);
-    font-size: 10px;
-    width: 18px;
-    height: 18px;
+    background: var(--primary);
+    width: 12px;
+    height: 12px;
 }
 
 .legend-num {
     font-weight: 700;
     font-size: 12px;
     color: #888;
+    position: relative;
+    display: inline-block;
 }
 
 .legend-total {
     font-weight: 700;
     font-size: 12px;
     color: var(--text);
+    position: relative;
+    display: inline-block;
+}
+
+.legend-tilde {
+    position: absolute;
+    bottom: -8px;
+    left: 0;
+    right: 0;
+    text-align: center;
+    font-size: 12px;
+    line-height: 1;
+    color: inherit;
 }
 
 .legend-hc {
