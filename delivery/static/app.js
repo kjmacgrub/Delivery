@@ -2301,7 +2301,7 @@ function renderCompactRow(item, showSupplier, crossMap = null) {
             const multiKey = `${item.raw_description.toLowerCase()}::${si}`;
             const isExpanded = expandedMultiItems.has(multiKey);
             if (isExpanded) {
-                alsoRow = others.map(e => {
+                alsoRow = allEntries.map(e => {
                     const eStatus = e.received_status === 'pending' ? '' : `checked-${e.received_status}`;
                     const ePullConfirmedClass = e.pull_confirmed ? 'pull-confirmed' : '';
                     const eOrigPull = e.original_pull_quantity !== undefined && e.original_pull_quantity !== null
@@ -2324,9 +2324,10 @@ function renderCompactRow(item, showSupplier, crossMap = null) {
                     const eIsFullyConfirmed = e.received_status !== 'pending' && e.pull_confirmed;
                     const eExpressCheckSvg = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="4,12 10,18 20,6"/></svg>';
                     const eExpressCircle = `<div class="express-circle ${eIsFullyConfirmed ? 'done' : 'pending'}" onclick="event.stopPropagation(); expressConfirmItem(${e.supplierIdx}, ${e.itemIdx})">${eIsFullyConfirmed ? eExpressCheckSvg : ''}</div>`;
+                    const fromLabel = e.supplierIdx === item.supplierIdx ? 'from' : 'also from';
                     return `<div class="compact-row supplier-sub-row ${eStatus}">
                         <div class="compact-qty" onclick="event.stopPropagation(); toggleInlineEdit(${e.supplierIdx}, ${e.itemIdx}, event)"><div class="qty-left-stack">${ePullQty}</div>${eQtyCircle}</div>
-                        <div class="compact-supplier sub-row-supplier" onclick="event.stopPropagation(); toggleInlineEdit(${e.supplierIdx}, ${e.itemIdx}, event)"><span class="also-from-label">also from</span>${e.supplierName}</div>
+                        <div class="compact-supplier sub-row-supplier" onclick="event.stopPropagation(); toggleInlineEdit(${e.supplierIdx}, ${e.itemIdx}, event)"><span class="also-from-label">${fromLabel}</span>${e.supplierName}</div>
                         ${eExpressCircle}
                     </div>`;
                 }).join('');
