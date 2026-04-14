@@ -1408,10 +1408,21 @@ html, body {
     background: rgba(0,0,0,0.04);
 }
 
+.multi-chevron {
+    display: inline-block;
+    margin-left: 3px;
+    font-size: 13px;
+    line-height: 1;
+    transition: transform 0.2s ease;
+}
+
+.multi-pill.expanded .multi-chevron {
+    transform: rotate(90deg);
+}
+
 .multi-pill.expanded {
-    background: var(--text-secondary);
-    color: white;
-    border-color: var(--text-secondary);
+    border-color: #1d1d1f;
+    color: #1d1d1f;
 }
 
 .supplier-sub-row {
@@ -2311,7 +2322,7 @@ textarea {
 .supplier-accordion-header {
     display: flex;
     align-items: center;
-    justify-content: center;
+    justify-content: flex-start;
     gap: 8px;
     padding: 10px 12px;
     background: var(--highlight);
