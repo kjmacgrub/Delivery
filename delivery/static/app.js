@@ -2296,7 +2296,7 @@ function renderCompactRow(item, showSupplier, crossMap = null) {
             .filter(e => e.supplierIdx !== item.supplierIdx);
         if (others.length > 0) {
             hasMultiSupplier = true;
-            const multiKey = item.raw_description.toLowerCase();
+            const multiKey = `${item.raw_description.toLowerCase()}::${si}`;
             const isExpanded = expandedMultiItems.has(multiKey);
             if (isExpanded) {
                 alsoRow = others.map(e => {
@@ -2343,9 +2343,14 @@ function renderCompactRow(item, showSupplier, crossMap = null) {
     const doneQty = item.quantity_received ?? item.quantity_expected;
     const rcvChanged = !isPending && item.quantity_received != null && item.quantity_received !== item.quantity_expected;
     const rcvTip = rcvChanged ? ` title="Expected: ${item.quantity_expected}"` : '';
-    const qtyCircle = isPending
-        ? `<div class="qty-circle pending${qtyDigitClass(circleQty)}" onclick="event.stopPropagation(); toggleInlineEdit(${si}, ${ii}, event)">${circleQty}</div>`
-        : `<div class="qty-circle done${qtyDigitClass(doneQty)}"${rcvTip} onclick="event.stopPropagation(); toggleInlineEdit(${si}, ${ii}, event)">${doneQty}</div>`;
+    let qtyCircle;
+    if (hasMultiSupplier) {
+        qtyCircle = `<span class="multi-total-qty" onclick="event.stopPropagation(); toggleMultiExpand('${item.raw_description.toLowerCase().replace(/'/g, "\\'")}::${si}')">${circleQty}</span>`;
+    } else {
+        qtyCircle = isPending
+            ? `<div class="qty-circle pending${qtyDigitClass(circleQty)}" onclick="event.stopPropagation(); toggleInlineEdit(${si}, ${ii}, event)">${circleQty}</div>`
+            : `<div class="qty-circle done${qtyDigitClass(doneQty)}"${rcvTip} onclick="event.stopPropagation(); toggleInlineEdit(${si}, ${ii}, event)">${doneQty}</div>`;
+    }
 
     const nk = item.raw_description.toLowerCase().trim().replace(/\//g, '_');
     const hasNote = itemNotes[nk];
@@ -2359,16 +2364,20 @@ function renderCompactRow(item, showSupplier, crossMap = null) {
 
     let rightIndicator;
     if (hasMultiSupplier) {
-        const multiKey = item.raw_description.toLowerCase();
+        const multiKey = `${item.raw_description.toLowerCase()}::${si}`;
         const isExp = expandedMultiItems.has(multiKey);
         rightIndicator = `<div class="multi-pill${isExp ? ' expanded' : ''}" onclick="event.stopPropagation(); toggleMultiExpand('${multiKey.replace(/'/g, "\\'")}')">${isExp ? 'multi' : 'multi'}</div>`;
     } else {
         rightIndicator = expressCircle;
     }
 
+    const qtyClick = hasMultiSupplier
+        ? `onclick="event.stopPropagation(); toggleMultiExpand('${item.raw_description.toLowerCase().replace(/'/g, "\\'")}::${si}')"`
+        : `onclick="event.stopPropagation(); toggleInlineEdit(${si}, ${ii}, event)"`;
+
     return `
     <div class="compact-row ${statusClass} ${processingClass} ${floorClass}${showSupplier ? '' : ' accordion-item'}">
-        <div class="compact-qty" onclick="event.stopPropagation(); toggleInlineEdit(${si}, ${ii}, event)"><div class="qty-left-stack">${leftLabel}</div>${qtyCircle}</div>
+        <div class="compact-qty" ${qtyClick}><div class="qty-left-stack">${leftLabel}</div>${qtyCircle}</div>
         <div class="compact-name${isOos ? ' oos' : ''}${hasNote ? ' has-note' : ''}" onclick="event.stopPropagation(); toggleInlineEdit(${si}, ${ii}, event)">${item.raw_description}${noteIcon}</div>
         ${supplierChip}
         ${hcStrip}
