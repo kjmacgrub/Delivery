@@ -2290,39 +2290,45 @@ function renderCompactRow(item, showSupplier, crossMap = null) {
 
     // Build "also from" sub-rows for items shared across suppliers
     let alsoRow = '';
+    let hasMultiSupplier = false;
     if (crossMap) {
         const others = (crossMap.get(item.raw_description.toLowerCase()) || [])
             .filter(e => e.supplierIdx !== item.supplierIdx);
         if (others.length > 0) {
-            alsoRow = others.map(e => {
-                const eStatus = e.received_status === 'pending' ? '' : `checked-${e.received_status}`;
-                const ePullConfirmedClass = e.pull_confirmed ? 'pull-confirmed' : '';
-                const eOrigPull = e.original_pull_quantity !== undefined && e.original_pull_quantity !== null
-                    ? e.original_pull_quantity : e.pull_quantity;
-                const ePullTip = e.pull_quantity != null && (e.pull_quantity || 0) !== (eOrigPull || 0)
-                    ? ` title="Original: ${eOrigPull || 0}"` : '';
-                const ePullQty = e.pull_quantity != null
-                    ? `<span class="pull-indicator ${ePullConfirmedClass}"${ePullTip} onclick="event.stopPropagation(); toggleInlineEdit(${e.supplierIdx}, ${e.itemIdx}, event)">${e.pull_quantity}</span>`
-                    : '';
-                const eIsPending = e.received_status === 'pending';
-                const eDoneQty = e.quantity_received ?? e.qty;
-                const eItem = currentDelivery.suppliers[e.supplierIdx].items[e.itemIdx];
-                eItem.supplierIdx = e.supplierIdx;
-                eItem.itemIdx = e.itemIdx;
-                const eRcvChanged = !eIsPending && e.quantity_received != null && e.quantity_received !== e.qty;
-                const eRcvTip = eRcvChanged ? ` title="Expected: ${e.qty}"` : '';
-                const eQtyCircle = eIsPending
-                    ? `<div class="qty-circle pending${qtyDigitClass(e.qty)}" onclick="event.stopPropagation(); toggleInlineEdit(${e.supplierIdx}, ${e.itemIdx}, event)">${e.qty}</div>`
-                    : `<div class="qty-circle done${qtyDigitClass(eDoneQty)}"${eRcvTip} onclick="event.stopPropagation(); toggleInlineEdit(${e.supplierIdx}, ${e.itemIdx}, event)">${eDoneQty}</div>`;
-                const eIsFullyConfirmed = e.received_status !== 'pending' && e.pull_confirmed;
-                const eExpressCheckSvg = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="4,12 10,18 20,6"/></svg>';
-                const eExpressCircle = `<div class="express-circle ${eIsFullyConfirmed ? 'done' : 'pending'}" onclick="event.stopPropagation(); expressConfirmItem(${e.supplierIdx}, ${e.itemIdx})">${eIsFullyConfirmed ? eExpressCheckSvg : ''}</div>`;
-                return `<div class="compact-row supplier-sub-row ${eStatus}">
-                    <div class="compact-qty" onclick="event.stopPropagation(); toggleInlineEdit(${e.supplierIdx}, ${e.itemIdx}, event)"><div class="qty-left-stack">${ePullQty}</div>${eQtyCircle}</div>
-                    <div class="compact-supplier sub-row-supplier" onclick="event.stopPropagation(); toggleInlineEdit(${e.supplierIdx}, ${e.itemIdx}, event)"><span class="also-from-label">also from</span>${e.supplierName}</div>
-                    ${eExpressCircle}
-                </div>`;
-            }).join('');
+            hasMultiSupplier = true;
+            const multiKey = item.raw_description.toLowerCase();
+            const isExpanded = expandedMultiItems.has(multiKey);
+            if (isExpanded) {
+                alsoRow = others.map(e => {
+                    const eStatus = e.received_status === 'pending' ? '' : `checked-${e.received_status}`;
+                    const ePullConfirmedClass = e.pull_confirmed ? 'pull-confirmed' : '';
+                    const eOrigPull = e.original_pull_quantity !== undefined && e.original_pull_quantity !== null
+                        ? e.original_pull_quantity : e.pull_quantity;
+                    const ePullTip = e.pull_quantity != null && (e.pull_quantity || 0) !== (eOrigPull || 0)
+                        ? ` title="Original: ${eOrigPull || 0}"` : '';
+                    const ePullQty = e.pull_quantity != null
+                        ? `<span class="pull-indicator ${ePullConfirmedClass}"${ePullTip} onclick="event.stopPropagation(); toggleInlineEdit(${e.supplierIdx}, ${e.itemIdx}, event)">${e.pull_quantity}</span>`
+                        : '';
+                    const eIsPending = e.received_status === 'pending';
+                    const eDoneQty = e.quantity_received ?? e.qty;
+                    const eItem = currentDelivery.suppliers[e.supplierIdx].items[e.itemIdx];
+                    eItem.supplierIdx = e.supplierIdx;
+                    eItem.itemIdx = e.itemIdx;
+                    const eRcvChanged = !eIsPending && e.quantity_received != null && e.quantity_received !== e.qty;
+                    const eRcvTip = eRcvChanged ? ` title="Expected: ${e.qty}"` : '';
+                    const eQtyCircle = eIsPending
+                        ? `<div class="qty-circle pending${qtyDigitClass(e.qty)}" onclick="event.stopPropagation(); toggleInlineEdit(${e.supplierIdx}, ${e.itemIdx}, event)">${e.qty}</div>`
+                        : `<div class="qty-circle done${qtyDigitClass(eDoneQty)}"${eRcvTip} onclick="event.stopPropagation(); toggleInlineEdit(${e.supplierIdx}, ${e.itemIdx}, event)">${eDoneQty}</div>`;
+                    const eIsFullyConfirmed = e.received_status !== 'pending' && e.pull_confirmed;
+                    const eExpressCheckSvg = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="4,12 10,18 20,6"/></svg>';
+                    const eExpressCircle = `<div class="express-circle ${eIsFullyConfirmed ? 'done' : 'pending'}" onclick="event.stopPropagation(); expressConfirmItem(${e.supplierIdx}, ${e.itemIdx})">${eIsFullyConfirmed ? eExpressCheckSvg : ''}</div>`;
+                    return `<div class="compact-row supplier-sub-row ${eStatus}">
+                        <div class="compact-qty" onclick="event.stopPropagation(); toggleInlineEdit(${e.supplierIdx}, ${e.itemIdx}, event)"><div class="qty-left-stack">${ePullQty}</div>${eQtyCircle}</div>
+                        <div class="compact-supplier sub-row-supplier" onclick="event.stopPropagation(); toggleInlineEdit(${e.supplierIdx}, ${e.itemIdx}, event)"><span class="also-from-label">also from</span>${e.supplierName}</div>
+                        ${eExpressCircle}
+                    </div>`;
+                }).join('');
+            }
         }
     }
 
@@ -2351,13 +2357,22 @@ function renderCompactRow(item, showSupplier, crossMap = null) {
 
     const isOos = (item.received_notes && item.received_notes.includes('O/S'));
 
+    let rightIndicator;
+    if (hasMultiSupplier) {
+        const multiKey = item.raw_description.toLowerCase();
+        const isExp = expandedMultiItems.has(multiKey);
+        rightIndicator = `<div class="multi-pill${isExp ? ' expanded' : ''}" onclick="event.stopPropagation(); toggleMultiExpand('${multiKey.replace(/'/g, "\\'")}')">${isExp ? 'multi' : 'multi'}</div>`;
+    } else {
+        rightIndicator = expressCircle;
+    }
+
     return `
     <div class="compact-row ${statusClass} ${processingClass} ${floorClass}${showSupplier ? '' : ' accordion-item'}">
         <div class="compact-qty" onclick="event.stopPropagation(); toggleInlineEdit(${si}, ${ii}, event)"><div class="qty-left-stack">${leftLabel}</div>${qtyCircle}</div>
         <div class="compact-name${isOos ? ' oos' : ''}${hasNote ? ' has-note' : ''}" onclick="event.stopPropagation(); toggleInlineEdit(${si}, ${ii}, event)">${item.raw_description}${noteIcon}</div>
         ${supplierChip}
         ${hcStrip}
-        ${expressCircle}
+        ${rightIndicator}
     </div>${alsoRow}`;
 }
 
@@ -2382,7 +2397,7 @@ function renderMultiSupplierRow(items) {
 
     const mainRow = `
     <div class="compact-row multi-supplier-header">
-        <div class="compact-qty"><span class="multi-total-qty">${totalQty}</span></div>
+        <div class="compact-qty" onclick="event.stopPropagation(); toggleMultiExpand('${multiKey.replace(/'/g, "\\'")}')"><span class="multi-total-qty">${totalQty}</span></div>
         <div class="compact-name${msHasNote ? ' has-note' : ''}">${firstName}${msNoteIcon}</div>
         ${hcStrip}
         ${multiPill}
@@ -3566,6 +3581,7 @@ function progressBar(done, total) {
             <span class="legend-item"><span class="legend-circle legend-pending">4</span> expected</span>
             <span class="legend-item"><span class="legend-circle legend-received">4</span> received</span>
             <span class="legend-item"><span class="legend-circle legend-pull">2</span> pulled</span>
+            <span class="legend-item"><span class="legend-total">12</span> daily total</span>
             <span class="legend-item"><span class="legend-hc"><span class="legend-hc-day">20</span><span class="legend-hc-day">0</span><span class="legend-hc-day">30</span></span> next 3 days</span>
         </div>
     </div>`;
