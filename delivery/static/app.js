@@ -1512,8 +1512,13 @@ function renderInlineEditPanel(item) {
     const retConfirmed = item._ieReturnConfirmed || false;
     const itemNote = item._ieItemNote || '';
 
+    const supplierName = currentDelivery.suppliers[si].supplier_name || item.supplierName || '';
     document.getElementById('ie-overlay').innerHTML = `
     <div class="inline-edit-panel">
+        <div class="ie-title">
+            <span class="ie-title-item">${item.raw_description}</span>
+            <span class="ie-title-supplier">${supplierName}</span>
+        </div>
         <div class="ie-columns">
             <div class="ie-col">
                 <span class="ie-label${pullConfirmed ? ' ie-confirmed' : ''}">${pullConfirmed ? 'Pulled' : 'Pull'}</span>

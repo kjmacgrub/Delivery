@@ -3115,6 +3115,28 @@ textarea {
     width: fit-content;
 }
 
+.ie-title {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    padding-bottom: 4px;
+    border-bottom: 1px solid var(--border);
+}
+
+.ie-title-item {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.ie-title-supplier {
+    font-size: 11px;
+    color: var(--text-secondary);
+}
+
 .ie-columns {
     display: inline-flex;
     gap: 12px;
