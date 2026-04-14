@@ -2291,11 +2291,13 @@ function renderCompactRow(item, showSupplier, crossMap = null) {
     // Build "also from" sub-rows for items shared across suppliers
     let alsoRow = '';
     let hasMultiSupplier = false;
+    let multiDailyTotal = 0;
     if (crossMap) {
-        const others = (crossMap.get(item.raw_description.toLowerCase()) || [])
-            .filter(e => e.supplierIdx !== item.supplierIdx);
+        const allEntries = crossMap.get(item.raw_description.toLowerCase()) || [];
+        const others = allEntries.filter(e => e.supplierIdx !== item.supplierIdx);
         if (others.length > 0) {
             hasMultiSupplier = true;
+            multiDailyTotal = allEntries.reduce((sum, e) => sum + e.qty, 0);
             const multiKey = `${item.raw_description.toLowerCase()}::${si}`;
             const isExpanded = expandedMultiItems.has(multiKey);
             if (isExpanded) {
@@ -2345,7 +2347,7 @@ function renderCompactRow(item, showSupplier, crossMap = null) {
     const rcvTip = rcvChanged ? ` title="Expected: ${item.quantity_expected}"` : '';
     let qtyCircle;
     if (hasMultiSupplier) {
-        qtyCircle = `<span class="multi-total-qty" onclick="event.stopPropagation(); toggleMultiExpand('${item.raw_description.toLowerCase().replace(/'/g, "\\'")}::${si}')">${circleQty}</span>`;
+        qtyCircle = `<span class="multi-total-qty">${multiDailyTotal}</span>`;
     } else {
         qtyCircle = isPending
             ? `<div class="qty-circle pending${qtyDigitClass(circleQty)}" onclick="event.stopPropagation(); toggleInlineEdit(${si}, ${ii}, event)">${circleQty}</div>`
@@ -2371,14 +2373,19 @@ function renderCompactRow(item, showSupplier, crossMap = null) {
         rightIndicator = expressCircle;
     }
 
+    const multiExpandKey = `${item.raw_description.toLowerCase().replace(/'/g, "\\'")}::${si}`;
+    const multiExpandClick = `onclick="event.stopPropagation(); toggleMultiExpand('${multiExpandKey}')"`;
     const qtyClick = hasMultiSupplier
-        ? `onclick="event.stopPropagation(); toggleMultiExpand('${item.raw_description.toLowerCase().replace(/'/g, "\\'")}::${si}')"`
+        ? multiExpandClick
+        : `onclick="event.stopPropagation(); toggleInlineEdit(${si}, ${ii}, event)"`;
+    const nameClick = hasMultiSupplier
+        ? multiExpandClick
         : `onclick="event.stopPropagation(); toggleInlineEdit(${si}, ${ii}, event)"`;
 
     return `
     <div class="compact-row ${statusClass} ${processingClass} ${floorClass}${showSupplier ? '' : ' accordion-item'}">
         <div class="compact-qty" ${qtyClick}><div class="qty-left-stack">${leftLabel}</div>${qtyCircle}</div>
-        <div class="compact-name${isOos ? ' oos' : ''}${hasNote ? ' has-note' : ''}" onclick="event.stopPropagation(); toggleInlineEdit(${si}, ${ii}, event)">${item.raw_description}${noteIcon}</div>
+        <div class="compact-name${isOos ? ' oos' : ''}${hasNote ? ' has-note' : ''}" ${nameClick}>${item.raw_description}${noteIcon}</div>
         ${supplierChip}
         ${hcStrip}
         ${rightIndicator}
