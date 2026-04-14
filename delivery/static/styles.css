@@ -540,6 +540,52 @@ html, body {
     color: var(--text);
 }
 
+.search-recents-dropdown {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    margin-top: 4px;
+    background: var(--surface);
+    border: 1.5px solid var(--border);
+    border-radius: 10px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.12);
+    z-index: 50;
+    overflow: hidden;
+}
+
+.search-recents-dropdown.hidden {
+    display: none;
+}
+
+.search-recent-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 12px;
+    font-size: 13px;
+    color: var(--text);
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+}
+
+.search-recent-item:active {
+    background: var(--hover);
+}
+
+.search-recent-item .recent-icon {
+    color: var(--text-secondary);
+    flex-shrink: 0;
+}
+
+.search-recent-item .recent-text {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
 /* ---- Sort Bar ---- */
 .sort-bar {
     display: flex;

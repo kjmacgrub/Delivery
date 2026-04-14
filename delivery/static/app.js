@@ -2870,11 +2870,13 @@ function onSearchInput() {
     const input = document.getElementById('item-search');
     searchQuery = input.value.trim().toLowerCase();
     document.getElementById('search-clear-btn').classList.toggle('hidden', !searchQuery);
+    hideRecentSearches();
     renderItemList();
 }
 
 function clearSearch() {
     const input = document.getElementById('item-search');
+    if (input.value.trim()) saveRecentSearch(input.value.trim());
     input.value = '';
     searchQuery = '';
     document.getElementById('search-clear-btn').classList.add('hidden');
@@ -2884,12 +2886,68 @@ function clearSearch() {
 
 function clearSearchIfActive() {
     if (!searchQuery) return;
+    saveRecentSearch(searchQuery);
     const input = document.getElementById('item-search');
     input.value = '';
     searchQuery = '';
     document.getElementById('search-clear-btn').classList.add('hidden');
     renderItemList();
 }
+
+// --- Recent searches ---
+const RECENT_SEARCHES_KEY = 'delivery-recent-searches';
+const MAX_RECENT_SEARCHES = 5;
+
+function getRecentSearches() {
+    try { return JSON.parse(localStorage.getItem(RECENT_SEARCHES_KEY)) || []; }
+    catch { return []; }
+}
+
+function saveRecentSearch(term) {
+    const t = term.trim().toLowerCase();
+    if (!t) return;
+    let recents = getRecentSearches().filter(r => r !== t);
+    recents.unshift(t);
+    if (recents.length > MAX_RECENT_SEARCHES) recents.length = MAX_RECENT_SEARCHES;
+    localStorage.setItem(RECENT_SEARCHES_KEY, JSON.stringify(recents));
+}
+
+function showRecentSearches() {
+    const dropdown = document.getElementById('search-recents-dropdown');
+    const input = document.getElementById('item-search');
+    if (input.value.trim()) return; // only show when input is empty
+    const recents = getRecentSearches();
+    if (!recents.length) return;
+    const clockSvg = '<svg class="recent-icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>';
+    dropdown.innerHTML = recents.map(t =>
+        `<div class="search-recent-item" onmousedown="selectRecentSearch('${t.replace(/'/g, "\\'")}')">
+            ${clockSvg}<span class="recent-text">${t}</span>
+        </div>`
+    ).join('');
+    dropdown.classList.remove('hidden');
+}
+
+function hideRecentSearches() {
+    document.getElementById('search-recents-dropdown').classList.add('hidden');
+}
+
+function selectRecentSearch(term) {
+    const input = document.getElementById('item-search');
+    input.value = term;
+    searchQuery = term;
+    document.getElementById('search-clear-btn').classList.remove('hidden');
+    hideRecentSearches();
+    renderItemList();
+}
+
+// Save search term when user leaves the field
+document.addEventListener('DOMContentLoaded', () => {
+    const input = document.getElementById('item-search');
+    input.addEventListener('blur', () => {
+        setTimeout(hideRecentSearches, 150);
+        if (input.value.trim()) saveRecentSearch(input.value.trim());
+    });
+});
 
 async function setItemSort(mode) {
     if (mode !== 'alpha') multiFilter = false;
