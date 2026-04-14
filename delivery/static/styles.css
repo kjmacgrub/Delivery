@@ -898,6 +898,8 @@ html, body {
     height: 20px;
     border-radius: 50%;
     flex-shrink: 0;
+    font-size: 11px;
+    font-weight: 700;
 }
 
 .legend-circle.legend-pending {
@@ -912,6 +914,7 @@ html, body {
 
 .legend-circle.legend-pull {
     border: 2px solid var(--primary);
+    color: var(--primary);
 }
 
 .legend-num {
@@ -1383,6 +1386,20 @@ html, body {
 .multi-total-qty {
     font-weight: 700;
     cursor: pointer;
+}
+
+.multi-done-chevron {
+    display: inline-block;
+    font-size: 20px;
+    font-weight: 700;
+    color: var(--success);
+    transition: transform 0.2s ease;
+    cursor: pointer;
+    line-height: 1;
+}
+
+.multi-done-chevron.expanded {
+    transform: rotate(90deg);
 }
 
 .multi-pill {
@@ -3081,28 +3098,28 @@ textarea {
     border-left: 3px solid var(--primary);
     border-radius: 8px;
     box-shadow: 0 4px 24px rgba(0,0,0,0.18), 0 1px 4px rgba(0,0,0,0.08);
-    padding: 10px 14px 10px 16px;
+    padding: 15px 21px 15px 24px;
 }
 
 .ie-col-note {
     align-items: stretch;
-    min-width: 120px;
+    min-width: 180px;
 }
 
 .ie-note-textarea {
     border: 1px solid var(--border);
     border-radius: 6px;
-    padding: 6px 8px;
-    font-size: 13px;
+    padding: 9px 12px;
+    font-size: 20px;
     resize: none;
-    min-height: 60px;
+    min-height: 90px;
     width: 100%;
     font-family: inherit;
     box-sizing: border-box;
 }
 
 .ie-note-clear {
-    font-size: 12px;
+    font-size: 18px;
     color: var(--text-secondary);
     cursor: pointer;
     text-align: center;
@@ -3170,20 +3187,20 @@ textarea {
 .inline-edit-panel {
     display: flex;
     flex-direction: column;
-    gap: 8px;
+    gap: 12px;
     width: fit-content;
 }
 
 .ie-title {
     display: flex;
     flex-direction: column;
-    gap: 1px;
-    padding-bottom: 4px;
+    gap: 2px;
+    padding-bottom: 6px;
     border-bottom: 1px solid var(--border);
 }
 
 .ie-title-item {
-    font-size: 13px;
+    font-size: 20px;
     font-weight: 600;
     color: var(--text);
     white-space: nowrap;
@@ -3192,39 +3209,39 @@ textarea {
 }
 
 .ie-title-supplier {
-    font-size: 11px;
+    font-size: 17px;
     color: var(--text-secondary);
 }
 
 .ie-columns {
     display: inline-flex;
-    gap: 12px;
+    gap: 18px;
 }
 
 .ie-col {
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 6px;
-    padding-top: 9px;
+    gap: 9px;
+    padding-top: 14px;
 }
 
 .ie-col-return {
     align-items: center;
     border: 1px solid var(--border);
     border-radius: 8px;
-    padding: 8px 10px;
+    padding: 12px 15px;
 }
 
 .ie-return-stepper-row {
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: 12px;
 }
 
 .ie-return-tags {
     display: flex;
-    gap: 6px;
+    gap: 9px;
 }
 
 .ie-bottom-row {
@@ -3242,12 +3259,12 @@ textarea {
 }
 
 .ie-accept {
-    font-size: 13px;
+    font-size: 20px;
     font-weight: 600;
     color: white;
     background: var(--success);
-    padding: 5px 18px;
-    border-radius: 14px;
+    padding: 16px 27px;
+    border-radius: 28px;
     cursor: pointer;
     -webkit-tap-highlight-color: transparent;
 }
@@ -3257,7 +3274,7 @@ textarea {
 }
 
 .ie-label {
-    font-size: 11px;
+    font-size: 17px;
     font-weight: 600;
     color: var(--text-secondary);
     text-transform: uppercase;
@@ -3275,13 +3292,13 @@ textarea {
 }
 
 .ie-oos-qty {
-    font-size: 17px;
+    font-size: 26px;
     font-weight: 700;
     color: var(--text);
     display: flex;
     align-items: center;
     justify-content: center;
-    height: 32px;
+    height: 48px;
 }
 
 .ie-label-row {
@@ -3303,8 +3320,8 @@ textarea {
 }
 
 .ie-checkbox {
-    width: 22px;
-    height: 22px;
+    width: 33px;
+    height: 33px;
     border-radius: 4px;
     border: 2px solid var(--border);
     cursor: pointer;
@@ -3321,24 +3338,24 @@ textarea {
 .ie-checkbox.checked::after {
     content: '';
     position: absolute;
-    left: 6px;
-    top: 2px;
-    width: 6px;
-    height: 11px;
+    left: 9px;
+    top: 3px;
+    width: 9px;
+    height: 17px;
     border: solid white;
-    border-width: 0 2px 2px 0;
+    border-width: 0 3px 3px 0;
     transform: rotate(45deg);
 }
 
 .ie-tag {
     display: inline-flex;
     align-items: center;
-    gap: 4px;
-    font-size: 12px;
+    gap: 6px;
+    font-size: 18px;
     font-weight: 600;
     color: var(--text-secondary);
-    padding: 3px 10px;
-    border-radius: 12px;
+    padding: 5px 15px;
+    border-radius: 18px;
     border: 1px solid var(--border);
     background: var(--surface);
     cursor: pointer;
@@ -3352,8 +3369,8 @@ textarea {
 }
 
 .ie-tag-check {
-    width: 12px;
-    height: 12px;
+    width: 18px;
+    height: 18px;
     border-radius: 3px;
     border: 1.5px solid currentColor;
     position: relative;
@@ -3367,12 +3384,12 @@ textarea {
 .ie-tag.checked .ie-tag-check::after {
     content: '';
     position: absolute;
-    left: 2px;
+    left: 3px;
     top: 0px;
-    width: 4px;
-    height: 7px;
+    width: 6px;
+    height: 11px;
     border: solid white;
-    border-width: 0 1.5px 1.5px 0;
+    border-width: 0 2px 2px 0;
     transform: rotate(45deg);
 }
 
@@ -3434,13 +3451,13 @@ textarea {
 }
 
 .ie-cancel {
-    font-size: 12px;
+    font-size: 18px;
     font-weight: 600;
     color: #d32f2f;
     border: 1px solid #d32f2f;
-    border-radius: 10px;
-    padding: 5px 6px;
-    margin-left: 10px;
+    border-radius: 15px;
+    padding: 16px 9px;
+    margin-left: 15px;
     cursor: pointer;
     -webkit-tap-highlight-color: transparent;
     flex-shrink: 0;
@@ -3454,8 +3471,8 @@ textarea {
     flex: 1;
     border: 1px solid var(--border);
     border-radius: 8px;
-    padding: 6px 10px;
-    font-size: 13px;
+    padding: 9px 15px;
+    font-size: 20px;
     font-family: inherit;
     background: var(--surface);
     box-sizing: border-box;
@@ -3472,11 +3489,11 @@ textarea {
 }
 
 .ie-btn {
-    width: 36px;
-    height: 32px;
+    width: 54px;
+    height: 48px;
     border: none;
     background: none;
-    font-size: 18px;
+    font-size: 27px;
     font-weight: 600;
     color: var(--text-secondary);
     cursor: pointer;
@@ -3488,9 +3505,9 @@ textarea {
 }
 
 .ie-value {
-    min-width: 32px;
+    min-width: 48px;
     text-align: center;
-    font-size: 15px;
+    font-size: 23px;
     font-weight: 700;
     color: #000;
 }

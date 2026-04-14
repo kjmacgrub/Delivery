@@ -2314,7 +2314,10 @@ function renderCompactRow(item, showSupplier, crossMap = null) {
         const others = allEntries.filter(e => e.supplierIdx !== item.supplierIdx);
         if (others.length > 0) {
             hasMultiSupplier = true;
-            multiDailyTotal = allEntries.reduce((sum, e) => sum + e.qty, 0);
+            multiDailyTotal = allEntries.reduce((sum, e) => {
+                if (e.received_status !== 'pending') return sum + e.qty - (e.quantity_received ?? e.qty);
+                return sum + e.qty;
+            }, 0);
             const multiKey = `${item.raw_description.toLowerCase()}::${si}`;
             const isExpanded = expandedMultiItems.has(multiKey);
             if (isExpanded) {
@@ -2365,7 +2368,11 @@ function renderCompactRow(item, showSupplier, crossMap = null) {
     const rcvTip = rcvChanged ? ` title="Expected: ${item.quantity_expected}"` : '';
     let qtyCircle;
     if (hasMultiSupplier) {
-        qtyCircle = `<span class="multi-total-qty">${multiDailyTotal}</span>`;
+        const multiKey2 = `${item.raw_description.toLowerCase()}::${si}`;
+        const isExp2 = expandedMultiItems.has(multiKey2);
+        qtyCircle = multiDailyTotal === 0
+            ? `<span class="multi-done-chevron${isExp2 ? ' expanded' : ''}">&#x203A;</span>`
+            : `<span class="multi-total-qty">${multiDailyTotal}</span>`;
     } else {
         qtyCircle = isPending
             ? `<div class="qty-circle pending${qtyDigitClass(circleQty)}" onclick="event.stopPropagation(); toggleInlineEdit(${si}, ${ii}, event)">${circleQty}</div>`
@@ -2411,7 +2418,10 @@ function renderCompactRow(item, showSupplier, crossMap = null) {
 }
 
 function renderMultiSupplierRow(items) {
-    const totalQty = items.reduce((sum, item) => sum + item.quantity_expected, 0);
+    const totalQty = items.reduce((sum, item) => {
+        if (item.received_status !== 'pending') return sum + item.quantity_expected - (item.quantity_received ?? item.quantity_expected);
+        return sum + item.quantity_expected;
+    }, 0);
     const firstName = items[0].raw_description;
     const multiKey = firstName.toLowerCase();
     const isExpanded = expandedMultiItems.has(multiKey);
@@ -2431,7 +2441,11 @@ function renderMultiSupplierRow(items) {
 
     const mainRow = `
     <div class="compact-row multi-supplier-header">
-        <div class="compact-qty" onclick="event.stopPropagation(); toggleMultiExpand('${multiKey.replace(/'/g, "\\'")}')"><span class="multi-total-qty">${totalQty}</span></div>
+        <div class="compact-qty" onclick="event.stopPropagation(); toggleMultiExpand('${multiKey.replace(/'/g, "\\'")}')">
+            ${totalQty === 0
+                ? `<span class="multi-done-chevron${isExpanded ? ' expanded' : ''}">&#x203A;</span>`
+                : `<span class="multi-total-qty">${totalQty}</span>`}
+        </div>
         <div class="compact-name${msHasNote ? ' has-note' : ''}">${firstName}${msNoteIcon}</div>
         ${hcStrip}
         ${multiPill}
@@ -2535,7 +2549,7 @@ function renderSupplierAccordion(container, flatItems) {
 
         const arrowSvg = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><polyline points="19,12 12,19 5,12"/></svg>';
         const editHeader = '';
-        const acceptHeader = (isExpanded && !isViewingHistory) ? `<span class="accept-column-header" title="Double-click to accept/unaccept all items" onclick="event.stopPropagation(); event.preventDefault(); shiftAcceptAll(event, ${sIdx})">Accept ${arrowSvg}</span>` : '';
+        const acceptHeader = (isExpanded && !isViewingHistory) ? `<span class="accept-column-header" title="Accept/unaccept all items" onclick="event.stopPropagation(); event.preventDefault(); shiftAcceptAll(event, ${sIdx})">Accept ${arrowSvg}</span>` : '';
         html += `
         <div class="supplier-accordion-header ${statusClass}" onclick="toggleSupplierAccordion(${sIdx})">
             ${editHeader}
@@ -3527,7 +3541,7 @@ async function unreceiveItem() {
 
 function shiftAcceptAll(event, supplierIdx) {
     if (isViewingHistory) return;
-    if (event.detail < 2) return; // require double-click
+    // confirm dialog provides safety — no double-click needed
     const supplier = currentDelivery.suppliers[supplierIdx];
     const pendingCount = supplier.items.filter(i => i.received_status === 'pending').length;
     const receivedCount = supplier.items.filter(i => i.received_status !== 'pending').length;
@@ -3647,12 +3661,12 @@ function progressBar(done, total) {
             <div class="progress-bar-fill" style="width: ${pct}%; transition: width 0.4s ease"></div>
         </div>
         <div class="legend-row">
-            <span class="legend-item"><span class="legend-num legend-underline">3</span> pull request</span>
-            <span class="legend-item"><span class="legend-circle legend-pending"></span> expected</span>
-            <span class="legend-item"><span class="legend-circle legend-received"></span> received</span>
-            <span class="legend-item"><span class="legend-circle legend-pull"></span> pulled</span>
-            <span class="legend-item"><span class="legend-total legend-underline">12</span> daily total</span>
-            <span class="legend-item"><span class="legend-hc"><span class="legend-hc-day">20</span><span class="legend-hc-day">0</span><span class="legend-hc-day">30</span></span> next 3 days</span>
+            <span class="legend-item"><span class="legend-num legend-underline">#</span> pull request</span>
+            <span class="legend-item"><span class="legend-circle legend-pending">#</span> expected</span>
+            <span class="legend-item"><span class="legend-circle legend-received">#</span> received</span>
+            <span class="legend-item"><span class="legend-circle legend-pull">#</span> pulled</span>
+            <span class="legend-item"><span class="legend-total legend-underline">#</span> daily total</span>
+            <span class="legend-item"><span class="legend-hc"><span class="legend-hc-day">#</span><span class="legend-hc-day">#</span><span class="legend-hc-day">#</span></span> next 3 days of orders</span>
         </div>
     </div>`;
 }
