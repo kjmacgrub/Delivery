@@ -3647,11 +3647,11 @@ function progressBar(done, total) {
             <div class="progress-bar-fill" style="width: ${pct}%; transition: width 0.4s ease"></div>
         </div>
         <div class="legend-row">
-            <span class="legend-item"><span class="legend-num">3<span class="legend-tilde">~</span></span> pull request</span>
+            <span class="legend-item"><span class="legend-num legend-underline">3</span> pull request</span>
             <span class="legend-item"><span class="legend-circle legend-pending"></span> expected</span>
             <span class="legend-item"><span class="legend-circle legend-received"></span> received</span>
             <span class="legend-item"><span class="legend-circle legend-pull"></span> pulled</span>
-            <span class="legend-item"><span class="legend-total">12<span class="legend-tilde">~</span></span> daily total</span>
+            <span class="legend-item"><span class="legend-total legend-underline">12</span> daily total</span>
             <span class="legend-item"><span class="legend-hc"><span class="legend-hc-day">20</span><span class="legend-hc-day">0</span><span class="legend-hc-day">30</span></span> next 3 days</span>
         </div>
     </div>`;

@@ -930,15 +930,9 @@ html, body {
     display: inline-block;
 }
 
-.legend-tilde {
-    position: absolute;
-    bottom: -8px;
-    left: 0;
-    right: 0;
-    text-align: center;
-    font-size: 12px;
-    line-height: 1;
-    color: inherit;
+.legend-underline {
+    text-decoration: underline;
+    text-underline-offset: 3px;
 }
 
 .legend-hc {
