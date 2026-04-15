@@ -1517,8 +1517,13 @@ function renderInlineEditPanel(item) {
     document.getElementById('ie-overlay').innerHTML = `
     <div class="inline-edit-panel">
         <div class="ie-title">
-            <span class="ie-title-item">${item.raw_description}</span>
+            <span class="ie-title-item${oosConfirmed ? ' ie-oos-struck' : ''}">${item.raw_description}</span>
             <span class="ie-title-supplier">${supplierName}</span>
+            <div class="ie-title-note">
+                <span class="ie-title-note-label">note</span>
+                <textarea class="ie-title-note-input" rows="2" placeholder="Add note..." oninput="ieUpdateItemNote(${si}, ${ii}, this.value)">${escapeAttr(itemNote)}</textarea>
+                ${itemNote ? `<span class="ie-note-clear" onclick="ieClearItemNote(${si}, ${ii})">&times;</span>` : ''}
+            </div>
         </div>
         <div class="ie-columns">
             <div class="ie-col">
@@ -1530,7 +1535,7 @@ function renderInlineEditPanel(item) {
                 </div>
                 <span class="ie-checkbox${pullConfirmed ? ' checked' : ''}" onclick="ieConfirmPull(${si}, ${ii})"></span>
             </div>
-            <div class="ie-col">
+            <div class="ie-col${oosConfirmed ? ' ie-rcv-cancelled' : ''}">
                 <span class="ie-label">Receive</span>
                 <div class="ie-stepper">
                     <button class="ie-btn" onclick="ieAdjustReceived(${si}, ${ii}, -1)">−</button>
@@ -1540,15 +1545,12 @@ function renderInlineEditPanel(item) {
                 <span class="ie-checkbox${rcvConfirmed ? ' checked' : ''}" onclick="ieCommitAll(${si}, ${ii})"></span>
             </div>
             <div class="ie-col">
-                <span class="ie-label" title="Out of Stock">O/S</span>
+                <span class="ie-label ie-oos-label${oosConfirmed ? ' active' : ''}" title="Out of Stock" onclick="ieConfirmOos(${si}, ${ii})">None</span>
+                <span class="ie-oos-arrow">&uarr;</span>
                 <span class="ie-oos-qty">${item.quantity_expected}</span>
-                <span class="ie-checkbox${oosConfirmed ? ' checked' : ''}" onclick="ieConfirmOos(${si}, ${ii})"></span>
             </div>
             <div class="ie-col ie-col-return">
-                <div class="ie-label-row">
-                    <span class="ie-label">${retConfirmed ? 'Returned' : 'Return'}</span>
-                    <svg class="ie-note-icon${item._ieShowReturnNote ? ' active' : ''}" onclick="ieToggleReturnNote(${si}, ${ii})" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
-                </div>
+                <span class="ie-label">${retConfirmed ? 'Returned' : 'Return'}</span>
                 <div class="ie-return-stepper-row">
                     <div class="ie-stepper">
                         <button class="ie-btn" onclick="ieAdjustReturn(${si}, ${ii}, -1)">−</button>
@@ -1567,12 +1569,6 @@ function renderInlineEditPanel(item) {
                         <span class="ie-tag-check"></span>Mispick
                     </label>
                 </div>
-                ${item._ieShowReturnNote ? `<input type="text" class="ie-note-input" placeholder="Return note..." value="${escapeAttr(item._ieReturnNote || '')}" oninput="ieUpdateReturnNote(${si}, ${ii}, this.value)">` : ''}
-            </div>
-            <div class="ie-col ie-col-note">
-                <span class="ie-label">Note</span>
-                <textarea class="ie-note-textarea" placeholder="Add note..." oninput="ieUpdateItemNote(${si}, ${ii}, this.value)">${escapeAttr(itemNote)}</textarea>
-                ${itemNote ? `<span class="ie-note-clear" onclick="ieClearItemNote(${si}, ${ii})">Clear</span>` : ''}
             </div>
         </div>
         <div class="ie-bottom-row">
@@ -2017,10 +2013,15 @@ function renderDetail() {
 }
 
 function updateSortBarStickyTop() {
+    const header = document.getElementById('app-header');
     const summary = document.getElementById('delivery-summary');
     const sortBar = document.querySelector('#tab-content-items .sort-bar');
-    if (summary && sortBar) {
-        sortBar.style.top = summary.offsetHeight + 'px';
+    const headerH = header ? header.offsetHeight : 0;
+    if (summary) {
+        document.documentElement.style.setProperty('--summary-height', summary.offsetHeight + 'px');
+    }
+    if (sortBar) {
+        sortBar.style.top = (headerH + (summary ? summary.offsetHeight : 0)) + 'px';
     }
 }
 
@@ -2093,7 +2094,7 @@ function renderItemList() {
     }
 
     // Multi filter: items appearing in 2+ supplier blocks
-    if (multiFilter && itemSortMode === 'alpha') {
+    if (multiFilter) {
         const descSuppliers = new Map();
         currentDelivery.suppliers.forEach((supplier, sIdx) => {
             supplier.items.forEach(item => {
@@ -2125,9 +2126,10 @@ function renderItemList() {
     supplierBtn.classList.toggle('chevron-expanded', allSuppExpanded);
     supplierBtn.classList.toggle('chevron-collapsed', itemSortMode === 'supplier' && !allSuppExpanded);
 
-    // Multi button: only in Items mode
+    // Multi button: available in supplier, alpha, location, pulls modes
     const multiBtn = document.getElementById('sort-multi');
-    multiBtn.classList.toggle('hidden', itemSortMode !== 'alpha' || supplierFilter !== null);
+    const multiModes = ['supplier', 'alpha', 'location', 'pulls'];
+    multiBtn.classList.toggle('hidden', !multiModes.includes(itemSortMode) || supplierFilter !== null);
     multiBtn.classList.toggle('active', multiFilter);
 
     const pullsBtn = document.getElementById('sort-pulls');
@@ -2413,7 +2415,7 @@ function renderCompactRow(item, showSupplier, crossMap = null) {
         : `onclick="event.stopPropagation(); toggleInlineEdit(${si}, ${ii}, event)"`;
 
     return `
-    <div class="compact-row ${statusClass} ${processingClass} ${floorClass}${showSupplier ? '' : ' accordion-item'}">
+    <div class="compact-row ${statusClass} ${processingClass} ${floorClass}${showSupplier ? '' : ' accordion-item'}${hasMultiSupplier ? ' multi-row' : ''}">
         <div class="compact-qty" ${qtyClick}><div class="qty-left-stack">${leftLabel}</div>${qtyCircle}</div>
         <div class="compact-name${isOos ? ' oos' : ''}${hasNote ? ' has-note' : ''}" ${nameClick}>${item.raw_description}${noteIcon}</div>
         ${supplierChip}
@@ -2533,6 +2535,7 @@ function renderSupplierAccordion(container, flatItems) {
         // Skip suppliers with no matching items when filter is active
         if (pullsOnlyFilter && supplierItems.length === 0) return;
         if (notesChangesFilter && supplierItems.length === 0) return;
+        if (multiFilter && supplierItems.length === 0) return;
 
         anyVisible = true;
 
@@ -3040,7 +3043,7 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 async function setItemSort(mode) {
-    if (mode !== 'alpha') multiFilter = false;
+    if (!['supplier', 'alpha', 'location', 'pulls'].includes(mode)) multiFilter = false;
     itemSortMode = mode;
     if (mode === 'location') await loadInventory();
     renderItemList();
@@ -4183,7 +4186,16 @@ function applyWeekColor(dateStr) {
 }
 
 // ---- Init ----
+function updateHeaderHeight() {
+    const h = document.getElementById('app-header');
+    if (h) document.documentElement.style.setProperty('--header-height', h.offsetHeight + 'px');
+    const s = document.querySelector('.summary-bar');
+    if (s) document.documentElement.style.setProperty('--summary-height', s.offsetHeight + 'px');
+}
+
 document.addEventListener('DOMContentLoaded', async () => {
+    updateHeaderHeight();
+    window.addEventListener('resize', updateHeaderHeight);
     applyWeekColor();
 
     const currentVersion = VERSION_HISTORY[0].version;

@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  :root {
+    --surface: #fff;
+    --bg: #f5f5f7;
+    --border: #d2d2d7;
+    --text: #1d1d1f;
+    --text-secondary: #6e6e73;
+    --primary: #5a7a52;
+    --success: #34c759;
+  }
+  body { font-family: system-ui; background: #e8e8ed; padding: 20px; }
+  h1 { font-size: 18px; color: #333; margin-bottom: 8px; }
+  p.sub { font-size: 13px; color: #888; margin-bottom: 24px; }
+  .options { display: flex; flex-direction: column; gap: 36px; }
+  .option-label { font-size: 14px; font-weight: 700; color: #444; margin-bottom: 10px; }
+
+  .demo-panel {
+    background: #fff9c4;
+    border-left: 3px solid var(--primary);
+    border-radius: 8px;
+    box-shadow: 0 4px 24px rgba(0,0,0,0.18);
+    padding: 15px 21px 15px 24px;
+    display: inline-block;
+    min-width: 500px;
+  }
+  .demo-title-item { font-size: 20px; font-weight: 600; color: var(--text); }
+  .demo-title-supplier { font-size: 17px; color: var(--text-secondary); }
+  .demo-columns {
+    display: inline-flex; gap: 18px; margin-top: 12px;
+  }
+  .demo-col { display: flex; flex-direction: column; align-items: center; gap: 9px; padding-top: 14px; }
+  .demo-label { font-size: 17px; font-weight: 600; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px; }
+  .demo-stepper {
+    display: flex; align-items: center; background: var(--surface);
+    border-radius: 8px; border: 1px solid var(--border); overflow: hidden;
+  }
+  .demo-btn { width: 54px; height: 48px; border: none; background: none; font-size: 27px; font-weight: 600; color: var(--text-secondary); }
+  .demo-val { min-width: 48px; text-align: center; font-size: 23px; font-weight: 700; }
+  .demo-check { width: 33px; height: 33px; border-radius: 4px; border: 2px solid var(--border); }
+  .demo-bottom { display: flex; align-items: center; margin-top: 12px; }
+  .demo-accept { font-size: 20px; font-weight: 600; color: white; background: var(--success); padding: 16px 27px; border-radius: 28px; flex: 3; text-align: center; }
+  .demo-cancel { font-size: 18px; font-weight: 600; color: #d32f2f; border: 1px solid #d32f2f; border-radius: 15px; padding: 16px 9px; margin-left: 15px; text-align: center; }
+  .divider { border-bottom: 1px solid var(--border); padding-bottom: 6px; margin-bottom: 0; }
+</style>
+</head>
+<body>
+<h1>Note field placement — pick a number</h1>
+<p class="sub">Each shows a different approach for the note within the edit panel</p>
+
+<div class="options">
+
+<!-- 1: Full-width row between title and columns -->
+<div>
+  <div class="option-label">1 — Full-width row under supplier name, before controls</div>
+  <div class="demo-panel">
+    <div class="divider">
+      <div class="demo-title-item">Strawberries- 1 lb box organic</div>
+      <div class="demo-title-supplier">SYSCO</div>
+    </div>
+    <div style="margin: 10px 0; display: flex; align-items: center; gap: 8px;">
+      <span style="font-size: 14px; font-style: italic; font-family: Georgia, serif; color: #aaa;">note</span>
+      <input type="text" style="flex: 1; border: 1px solid #ccc; border-radius: 6px; padding: 8px 10px; font-size: 15px; background: transparent; font-family: inherit; color: var(--text);" placeholder="Add note...">
+    </div>
+    <div class="demo-columns">
+      <div class="demo-col"><span class="demo-label">Pull</span><div class="demo-stepper"><button class="demo-btn">−</button><span class="demo-val">2</span><button class="demo-btn">+</button></div><div class="demo-check"></div></div>
+      <div class="demo-col"><span class="demo-label">Receive</span><div class="demo-stepper"><button class="demo-btn">−</button><span class="demo-val">12</span><button class="demo-btn">+</button></div><div class="demo-check"></div></div>
+      <div class="demo-col"><span class="demo-label">O/S</span><span style="font-size:26px;font-weight:700;height:48px;display:flex;align-items:center">12</span><div class="demo-check"></div></div>
+    </div>
+    <div class="demo-bottom"><span class="demo-accept">Accept all</span><span class="demo-cancel">cancel changes</span></div>
+  </div>
+</div>
+
+<!-- 2: Full-width between controls and accept -->
+<div>
+  <div class="option-label">2 — Full-width row between controls and accept buttons</div>
+  <div class="demo-panel">
+    <div class="divider">
+      <div class="demo-title-item">Strawberries- 1 lb box organic</div>
+      <div class="demo-title-supplier">SYSCO</div>
+    </div>
+    <div class="demo-columns">
+      <div class="demo-col"><span class="demo-label">Pull</span><div class="demo-stepper"><button class="demo-btn">−</button><span class="demo-val">2</span><button class="demo-btn">+</button></div><div class="demo-check"></div></div>
+      <div class="demo-col"><span class="demo-label">Receive</span><div class="demo-stepper"><button class="demo-btn">−</button><span class="demo-val">12</span><button class="demo-btn">+</button></div><div class="demo-check"></div></div>
+      <div class="demo-col"><span class="demo-label">O/S</span><span style="font-size:26px;font-weight:700;height:48px;display:flex;align-items:center">12</span><div class="demo-check"></div></div>
+    </div>
+    <div style="margin: 12px 0 4px; display: flex; align-items: center; gap: 8px;">
+      <span style="font-size: 14px; font-style: italic; font-family: Georgia, serif; color: #aaa;">note</span>
+      <input type="text" style="flex: 1; border: 1px solid #ccc; border-radius: 6px; padding: 8px 10px; font-size: 15px; background: transparent; font-family: inherit; color: var(--text);" placeholder="Add note...">
+    </div>
+    <div class="demo-bottom"><span class="demo-accept">Accept all</span><span class="demo-cancel">cancel changes</span></div>
+  </div>
+</div>
+
+<!-- 3: Inline with accept row -->
+<div>
+  <div class="option-label">3 — Note input inline in the accept row</div>
+  <div class="demo-panel">
+    <div class="divider">
+      <div class="demo-title-item">Strawberries- 1 lb box organic</div>
+      <div class="demo-title-supplier">SYSCO</div>
+    </div>
+    <div class="demo-columns">
+      <div class="demo-col"><span class="demo-label">Pull</span><div class="demo-stepper"><button class="demo-btn">−</button><span class="demo-val">2</span><button class="demo-btn">+</button></div><div class="demo-check"></div></div>
+      <div class="demo-col"><span class="demo-label">Receive</span><div class="demo-stepper"><button class="demo-btn">−</button><span class="demo-val">12</span><button class="demo-btn">+</button></div><div class="demo-check"></div></div>
+      <div class="demo-col"><span class="demo-label">O/S</span><span style="font-size:26px;font-weight:700;height:48px;display:flex;align-items:center">12</span><div class="demo-check"></div></div>
+    </div>
+    <div style="display: flex; align-items: center; margin-top: 12px; gap: 10px;">
+      <span class="demo-accept" style="flex: 2;">Accept all</span>
+      <div style="flex: 3; display: flex; align-items: center; gap: 6px;">
+        <span style="font-size: 14px; font-style: italic; font-family: Georgia, serif; color: #aaa;">note</span>
+        <input type="text" style="flex: 1; border: 1px solid #ccc; border-radius: 6px; padding: 8px 10px; font-size: 15px; background: transparent; font-family: inherit; color: var(--text);" placeholder="Add note...">
+      </div>
+      <span class="demo-cancel">cancel</span>
+    </div>
+  </div>
+</div>
+
+<!-- 4: Larger textarea under title, subtle card -->
+<div>
+  <div class="option-label">4 — Two-line textarea under title in a subtle card</div>
+  <div class="demo-panel">
+    <div style="margin-bottom: 8px;">
+      <div class="demo-title-item">Strawberries- 1 lb box organic</div>
+      <div class="demo-title-supplier">SYSCO</div>
+    </div>
+    <div style="background: rgba(0,0,0,0.03); border-radius: 8px; padding: 8px 10px; margin-bottom: 8px; border-bottom: 1px solid var(--border);">
+      <div style="font-size: 13px; font-style: italic; font-family: Georgia, serif; color: #aaa; margin-bottom: 4px;">note</div>
+      <textarea style="width: 100%; border: none; background: transparent; font-size: 15px; font-family: inherit; resize: none; color: var(--text); box-sizing: border-box; outline: none;" rows="2" placeholder="Add note..."></textarea>
+    </div>
+    <div class="demo-columns">
+      <div class="demo-col"><span class="demo-label">Pull</span><div class="demo-stepper"><button class="demo-btn">−</button><span class="demo-val">2</span><button class="demo-btn">+</button></div><div class="demo-check"></div></div>
+      <div class="demo-col"><span class="demo-label">Receive</span><div class="demo-stepper"><button class="demo-btn">−</button><span class="demo-val">12</span><button class="demo-btn">+</button></div><div class="demo-check"></div></div>
+      <div class="demo-col"><span class="demo-label">O/S</span><span style="font-size:26px;font-weight:700;height:48px;display:flex;align-items:center">12</span><div class="demo-check"></div></div>
+    </div>
+    <div class="demo-bottom"><span class="demo-accept">Accept all</span><span class="demo-cancel">cancel changes</span></div>
+  </div>
+</div>
+
+<!-- 5: Floating right of title, two-line textarea -->
+<div>
+  <div class="option-label">5 — Two-line textarea floating right of title area</div>
+  <div class="demo-panel">
+    <div style="display: flex; gap: 20px; padding-bottom: 6px; border-bottom: 1px solid var(--border);">
+      <div style="flex: 1;">
+        <div class="demo-title-item">Strawberries- 1 lb box organic</div>
+        <div class="demo-title-supplier">SYSCO</div>
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 3px; width: 160px; flex-shrink: 0;">
+        <div style="font-size: 13px; font-style: italic; font-family: Georgia, serif; color: #aaa; text-align: center;">note</div>
+        <textarea style="border: 1px solid #ccc; border-radius: 6px; padding: 6px 8px; font-size: 14px; background: transparent; font-family: inherit; resize: none; color: var(--text); box-sizing: border-box;" rows="2" placeholder="Add note..."></textarea>
+      </div>
+    </div>
+    <div class="demo-columns">
+      <div class="demo-col"><span class="demo-label">Pull</span><div class="demo-stepper"><button class="demo-btn">−</button><span class="demo-val">2</span><button class="demo-btn">+</button></div><div class="demo-check"></div></div>
+      <div class="demo-col"><span class="demo-label">Receive</span><div class="demo-stepper"><button class="demo-btn">−</button><span class="demo-val">12</span><button class="demo-btn">+</button></div><div class="demo-check"></div></div>
+      <div class="demo-col"><span class="demo-label">O/S</span><span style="font-size:26px;font-weight:700;height:48px;display:flex;align-items:center">12</span><div class="demo-check"></div></div>
+    </div>
+    <div class="demo-bottom"><span class="demo-accept">Accept all</span><span class="demo-cancel">cancel changes</span></div>
+  </div>
+</div>
+
+<!-- 6: Collapsible — just a pencil icon that reveals -->
+<div>
+  <div class="option-label">6 — Pencil icon next to item name, expands a row on click</div>
+  <div class="demo-panel">
+    <div class="divider">
+      <div style="display: flex; align-items: center; gap: 8px;">
+        <span class="demo-title-item">Strawberries- 1 lb box organic</span>
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#aaa" stroke-width="2" style="cursor:pointer; flex-shrink:0;"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+      </div>
+      <div class="demo-title-supplier">SYSCO</div>
+    </div>
+    <div style="margin: 8px 0; display: flex; align-items: center; gap: 8px; padding: 8px 10px; background: rgba(0,0,0,0.03); border-radius: 6px;">
+      <span style="font-size: 14px; font-style: italic; font-family: Georgia, serif; color: #aaa;">note</span>
+      <input type="text" style="flex: 1; border: 1px solid #ccc; border-radius: 6px; padding: 8px 10px; font-size: 15px; background: transparent; font-family: inherit; color: var(--text);" placeholder="Add note...">
+    </div>
+    <div class="demo-columns">
+      <div class="demo-col"><span class="demo-label">Pull</span><div class="demo-stepper"><button class="demo-btn">−</button><span class="demo-val">2</span><button class="demo-btn">+</button></div><div class="demo-check"></div></div>
+      <div class="demo-col"><span class="demo-label">Receive</span><div class="demo-stepper"><button class="demo-btn">−</button><span class="demo-val">12</span><button class="demo-btn">+</button></div><div class="demo-check"></div></div>
+      <div class="demo-col"><span class="demo-label">O/S</span><span style="font-size:26px;font-weight:700;height:48px;display:flex;align-items:center">12</span><div class="demo-check"></div></div>
+    </div>
+    <div class="demo-bottom"><span class="demo-accept">Accept all</span><span class="demo-cancel">cancel changes</span></div>
+  </div>
+</div>
+
+<!-- 7: Bottom strip, always visible -->
+<div>
+  <div class="option-label">7 — Bottom strip below accept buttons</div>
+  <div class="demo-panel">
+    <div class="divider">
+      <div class="demo-title-item">Strawberries- 1 lb box organic</div>
+      <div class="demo-title-supplier">SYSCO</div>
+    </div>
+    <div class="demo-columns">
+      <div class="demo-col"><span class="demo-label">Pull</span><div class="demo-stepper"><button class="demo-btn">−</button><span class="demo-val">2</span><button class="demo-btn">+</button></div><div class="demo-check"></div></div>
+      <div class="demo-col"><span class="demo-label">Receive</span><div class="demo-stepper"><button class="demo-btn">−</button><span class="demo-val">12</span><button class="demo-btn">+</button></div><div class="demo-check"></div></div>
+      <div class="demo-col"><span class="demo-label">O/S</span><span style="font-size:26px;font-weight:700;height:48px;display:flex;align-items:center">12</span><div class="demo-check"></div></div>
+    </div>
+    <div class="demo-bottom"><span class="demo-accept">Accept all</span><span class="demo-cancel">cancel changes</span></div>
+    <div style="margin-top: 10px; padding-top: 8px; border-top: 1px solid var(--border); display: flex; align-items: center; gap: 8px;">
+      <span style="font-size: 14px; font-style: italic; font-family: Georgia, serif; color: #aaa;">note</span>
+      <input type="text" style="flex: 1; border: 1px solid #ccc; border-radius: 6px; padding: 8px 10px; font-size: 15px; background: transparent; font-family: inherit; color: var(--text);" placeholder="Add note...">
+    </div>
+  </div>
+</div>
+
+<!-- 8: Same line as supplier name -->
+<div>
+  <div class="option-label">8 — Inline with supplier name row</div>
+  <div class="demo-panel">
+    <div class="divider">
+      <div class="demo-title-item">Strawberries- 1 lb box organic</div>
+      <div style="display: flex; align-items: center; gap: 12px;">
+        <span class="demo-title-supplier">SYSCO</span>
+        <span style="font-size: 13px; font-style: italic; font-family: Georgia, serif; color: #bbb;">note</span>
+        <input type="text" style="flex: 1; border: 1px solid #ccc; border-radius: 6px; padding: 5px 8px; font-size: 14px; background: transparent; font-family: inherit; color: var(--text);" placeholder="Add note...">
+      </div>
+    </div>
+    <div class="demo-columns">
+      <div class="demo-col"><span class="demo-label">Pull</span><div class="demo-stepper"><button class="demo-btn">−</button><span class="demo-val">2</span><button class="demo-btn">+</button></div><div class="demo-check"></div></div>
+      <div class="demo-col"><span class="demo-label">Receive</span><div class="demo-stepper"><button class="demo-btn">−</button><span class="demo-val">12</span><button class="demo-btn">+</button></div><div class="demo-check"></div></div>
+      <div class="demo-col"><span class="demo-label">O/S</span><span style="font-size:26px;font-weight:700;height:48px;display:flex;align-items:center">12</span><div class="demo-check"></div></div>
+    </div>
+    <div class="demo-bottom"><span class="demo-accept">Accept all</span><span class="demo-cancel">cancel changes</span></div>
+  </div>
+</div>
+
+</div>
+</body>
+</html>
