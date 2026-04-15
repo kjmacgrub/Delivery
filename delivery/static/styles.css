@@ -928,9 +928,16 @@ html, body {
 .legend-total {
     font-weight: 700;
     font-size: 12px;
-    color: var(--text);
     position: relative;
     display: inline-block;
+}
+
+.legend-rcv {
+    color: var(--success);
+}
+
+.legend-exp {
+    color: var(--text);
 }
 
 .legend-underline {
@@ -1388,11 +1395,39 @@ html, body {
     cursor: pointer;
 }
 
+.multi-total-fraction {
+    font-size: 13px;
+    font-weight: 700;
+    cursor: pointer;
+    white-space: nowrap;
+}
+
+.multi-rcv {
+    color: var(--success);
+}
+
+.multi-slash {
+    color: var(--text-secondary);
+    margin: 0 1px;
+}
+
+.multi-exp {
+    color: var(--text);
+}
+
+.multi-total-done {
+    font-weight: 700;
+    color: var(--success);
+    cursor: pointer;
+    white-space: nowrap;
+}
+
 .multi-done-chevron {
     display: inline-block;
     font-size: 20px;
     font-weight: 700;
     color: var(--success);
+    margin-left: 2px;
     transition: transform 0.2s ease;
     cursor: pointer;
     line-height: 1;

@@ -2309,15 +2309,18 @@ function renderCompactRow(item, showSupplier, crossMap = null) {
     let alsoRow = '';
     let hasMultiSupplier = false;
     let multiDailyTotal = 0;
+    let multiExpected = 0;
+    let multiReceived = 0;
     if (crossMap) {
         const allEntries = crossMap.get(item.raw_description.toLowerCase()) || [];
         const others = allEntries.filter(e => e.supplierIdx !== item.supplierIdx);
         if (others.length > 0) {
             hasMultiSupplier = true;
-            multiDailyTotal = allEntries.reduce((sum, e) => {
-                if (e.received_status !== 'pending') return sum + e.qty - (e.quantity_received ?? e.qty);
-                return sum + e.qty;
+            multiExpected = allEntries.reduce((sum, e) => sum + e.qty, 0);
+            multiReceived = allEntries.reduce((sum, e) => {
+                return sum + (e.received_status !== 'pending' ? (e.quantity_received ?? e.qty) : 0);
             }, 0);
+            multiDailyTotal = multiExpected - multiReceived;
             const multiKey = `${item.raw_description.toLowerCase()}::${si}`;
             const isExpanded = expandedMultiItems.has(multiKey);
             if (isExpanded) {
@@ -2370,9 +2373,11 @@ function renderCompactRow(item, showSupplier, crossMap = null) {
     if (hasMultiSupplier) {
         const multiKey2 = `${item.raw_description.toLowerCase()}::${si}`;
         const isExp2 = expandedMultiItems.has(multiKey2);
-        qtyCircle = multiDailyTotal === 0
-            ? `<span class="multi-done-chevron${isExp2 ? ' expanded' : ''}">&#x203A;</span>`
-            : `<span class="multi-total-qty">${multiDailyTotal}</span>`;
+        if (multiReceived >= multiExpected) {
+            qtyCircle = `<span class="multi-total-done">${multiExpected}<span class="multi-done-chevron${isExp2 ? ' expanded' : ''}">&#x203A;</span></span>`;
+        } else {
+            qtyCircle = `<span class="multi-total-fraction"><span class="multi-rcv">${multiReceived}</span><span class="multi-slash">/</span><span class="multi-exp">${multiExpected}</span></span>`;
+        }
     } else {
         qtyCircle = isPending
             ? `<div class="qty-circle pending${qtyDigitClass(circleQty)}" onclick="event.stopPropagation(); toggleInlineEdit(${si}, ${ii}, event)">${circleQty}</div>`
@@ -2418,9 +2423,9 @@ function renderCompactRow(item, showSupplier, crossMap = null) {
 }
 
 function renderMultiSupplierRow(items) {
-    const totalQty = items.reduce((sum, item) => {
-        if (item.received_status !== 'pending') return sum + item.quantity_expected - (item.quantity_received ?? item.quantity_expected);
-        return sum + item.quantity_expected;
+    const msExpected = items.reduce((sum, item) => sum + item.quantity_expected, 0);
+    const msReceived = items.reduce((sum, item) => {
+        return sum + (item.received_status !== 'pending' ? (item.quantity_received ?? item.quantity_expected) : 0);
     }, 0);
     const firstName = items[0].raw_description;
     const multiKey = firstName.toLowerCase();
@@ -2442,9 +2447,9 @@ function renderMultiSupplierRow(items) {
     const mainRow = `
     <div class="compact-row multi-supplier-header">
         <div class="compact-qty" onclick="event.stopPropagation(); toggleMultiExpand('${multiKey.replace(/'/g, "\\'")}')">
-            ${totalQty === 0
-                ? `<span class="multi-done-chevron${isExpanded ? ' expanded' : ''}">&#x203A;</span>`
-                : `<span class="multi-total-qty">${totalQty}</span>`}
+            ${msReceived >= msExpected
+                ? `<span class="multi-total-done">${msExpected}<span class="multi-done-chevron${isExpanded ? ' expanded' : ''}">&#x203A;</span></span>`
+                : `<span class="multi-total-fraction"><span class="multi-rcv">${msReceived}</span><span class="multi-slash">/</span><span class="multi-exp">${msExpected}</span></span>`}
         </div>
         <div class="compact-name${msHasNote ? ' has-note' : ''}">${firstName}${msNoteIcon}</div>
         ${hcStrip}
@@ -3665,7 +3670,7 @@ function progressBar(done, total) {
             <span class="legend-item"><span class="legend-circle legend-pending">#</span> expected</span>
             <span class="legend-item"><span class="legend-circle legend-received">#</span> received</span>
             <span class="legend-item"><span class="legend-circle legend-pull">#</span> pulled</span>
-            <span class="legend-item"><span class="legend-total legend-underline">#</span> daily total</span>
+            <span class="legend-item"><span class="legend-total legend-underline"><span class="legend-rcv">#</span>/<span class="legend-exp">#</span></span> received/expected multi supplier</span>
             <span class="legend-item"><span class="legend-hc"><span class="legend-hc-day">#</span><span class="legend-hc-day">#</span><span class="legend-hc-day">#</span></span> next 3 days of orders</span>
         </div>
     </div>`;
