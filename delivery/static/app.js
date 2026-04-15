@@ -3670,7 +3670,7 @@ function progressBar(done, total) {
             <span class="legend-item"><span class="legend-circle legend-pending">#</span> expected</span>
             <span class="legend-item"><span class="legend-circle legend-received">#</span> received</span>
             <span class="legend-item"><span class="legend-circle legend-pull">#</span> pulled</span>
-            <span class="legend-item"><span class="legend-total legend-underline"><span class="legend-rcv">#</span>/<span class="legend-exp">#</span></span> received/expected multi supplier</span>
+            <span class="legend-item"><span class="legend-total legend-underline"><span class="legend-rcv">#</span>/<span class="legend-exp">#</span></span> multi supplier</span>
             <span class="legend-item"><span class="legend-hc"><span class="legend-hc-day">#</span><span class="legend-hc-day">#</span><span class="legend-hc-day">#</span></span> next 3 days of orders</span>
         </div>
     </div>`;
