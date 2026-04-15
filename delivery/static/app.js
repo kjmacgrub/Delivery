@@ -139,8 +139,8 @@ function showView(name) {
             break;
         case 'complete':
             brandText.textContent = 'Delivery';
-            badge.textContent = 'completed';
-            badge.className = 'badge badge-completed';
+            badge.textContent = '';
+            badge.className = 'badge';
             break;
         case 'pullsheet':
             brandText.textContent = 'Street View';
