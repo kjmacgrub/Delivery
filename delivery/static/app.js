@@ -1573,7 +1573,7 @@ function renderInlineEditPanel(item) {
         </div>
         <div class="ie-bottom-row">
             <span class="ie-accept" onclick="ieAcceptAll(${si}, ${ii})">Accept all</span>
-            <span class="ie-cancel" onclick="ieUndo(${si}, ${ii})">cancel changes</span>
+            <span class="ie-cancel" onclick="ieUndo(${si}, ${ii})">Cancel</span>
         </div>
     </div>`;
 }
