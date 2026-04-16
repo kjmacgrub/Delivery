@@ -452,9 +452,10 @@ class PDFWorksheetParser(WorksheetParser):
             return True
         return False
 
-    # Pattern: "Supplier Name 123" — text ending with a case count
+    # Pattern: "Supplier Name 123" — text ending with a case count.
+    # Name may contain digits (e.g. "Zone 7") as long as it doesn't start with one.
     SUPPLIER_HEADER_PATTERN = re.compile(
-        r'^([A-Z][A-Za-z\'\.\-\&\/\, ]+?)\s+(\d+)\s*$'
+        r'^([A-Z][A-Za-z0-9\'\.\-\&\/\, ]+?)\s+(\d+)\s*$'
     )
 
     # Pattern to recover mangled category lines where PDF dropped a space:
