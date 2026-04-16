@@ -245,6 +245,127 @@ async def parse_high_count_file(file_name: str, request: Request):
     }
 
 
+@router.post("/storage/fetch-daily")
+async def fetch_daily_files(request: Request):
+    """
+    Fetch the 3 daily files from the coop intranet and upload to Firebase Storage.
+    Requires being on the coop wifi or VPN AND running locally (Cloud Run cannot
+    reach the intranet). Credentials read from COOP_USER / COOP_PASS env vars.
+
+    Files fetched:
+    - Delivery worksheet (tomorrow's date)
+    - Basement high count (tomorrow's date)
+    - Inventory worksheet CSV (today's date)
+    """
+    import os
+    import re
+    import httpx
+    from datetime import date, timedelta
+
+    storage = _get_storage(request)
+    today = date.today()
+    tomorrow = today + timedelta(days=1)
+    today_str = today.strftime('%Y-%m-%d')
+    tomorrow_str = tomorrow.strftime('%Y-%m-%d')
+    dow = tomorrow.strftime('%a').lower()
+
+    username = os.environ.get("COOP_USER")
+    password = os.environ.get("COOP_PASS")
+    if not username or not password:
+        raise HTTPException(
+            status_code=500,
+            detail="COOP_USER / COOP_PASS not set. Add them to .env at the repo root.",
+        )
+
+    base = "https://inventory.intranet.psfc.coop"
+    login_url = f"{base}/login/"
+    files_to_fetch = [
+        {
+            "url": f"{base}/produce_checkin_worksheet/{tomorrow_str}/",
+            "filename": f"delivery_{dow}_{tomorrow_str}_worksheet.pdf",
+            "content_type": "application/pdf",
+            "label": "Delivery worksheet",
+            "expect": "pdf",
+        },
+        {
+            "url": f"{base}/produce_basement/{tomorrow_str}/",
+            "filename": f"basement_high_count_{dow}_{tomorrow_str}.pdf",
+            "content_type": "application/pdf",
+            "label": "High count",
+            "expect": "pdf",
+        },
+        {
+            "url": f"{base}/inventory_worksheet/{today_str}/produce/0/basement/csv/",
+            "filename": f"inventory-worksheet-produce-{today_str}.csv",
+            "content_type": "text/csv",
+            "label": "Inventory",
+            "expect": "csv",
+        },
+    ]
+
+    results = []
+    errors = []
+
+    try:
+        async with httpx.AsyncClient(timeout=30.0, follow_redirects=True) as client:
+            # 1. GET login page → csrftoken cookie + csrfmiddlewaretoken form field
+            login_page = await client.get(login_url)
+            login_page.raise_for_status()
+            m = re.search(
+                r'name=["\']csrfmiddlewaretoken["\']\s+value=["\']([^"\']+)["\']',
+                login_page.text,
+            )
+            if not m:
+                raise HTTPException(status_code=502, detail="Login page: CSRF token not found")
+            csrf_token = m.group(1)
+
+            # 2. POST credentials
+            login_resp = await client.post(
+                login_url,
+                data={
+                    "csrfmiddlewaretoken": csrf_token,
+                    "next": "",
+                    "username": username,
+                    "password": password,
+                    "submit": "Log In",
+                },
+                headers={"Referer": login_url},
+            )
+            login_resp.raise_for_status()
+            # Django redirects authenticated users away from /login/; if we land back
+            # on the login page, creds were wrong.
+            if "loginform" in login_resp.text or "/login/" in str(login_resp.url):
+                raise HTTPException(status_code=401, detail="Coop login failed — check COOP_USER / COOP_PASS")
+
+            # 3. Fetch each file with the authenticated session
+            for item in files_to_fetch:
+                try:
+                    resp = await client.get(item["url"])
+                    resp.raise_for_status()
+                    content = resp.content
+                    if item["expect"] == "pdf" and not content.startswith(b"%PDF-"):
+                        errors.append(f"{item['label']}: server returned non-PDF (session expired or file missing)")
+                        continue
+                    path = storage.upload_file(item["filename"], content, item["content_type"])
+                    results.append({
+                        "label": item["label"],
+                        "filename": item["filename"],
+                        "path": path,
+                        "size": len(content),
+                    })
+                except httpx.HTTPStatusError as e:
+                    errors.append(f"{item['label']}: HTTP {e.response.status_code}")
+                except Exception as e:
+                    errors.append(f"{item['label']}: {str(e)}")
+    except httpx.ConnectError:
+        raise HTTPException(status_code=502, detail="Cannot reach coop intranet (not on wifi/VPN, or running on Cloud Run)")
+
+    if errors and not results:
+        raise HTTPException(status_code=502, detail="; ".join(errors))
+
+    return {"fetched": results, "errors": errors}
+
+
 @router.get("/local/downloads-scan")
 async def scan_downloads():
     """

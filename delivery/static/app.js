@@ -426,6 +426,37 @@ async function handleTypedUpload(event, type) {
 }
 
 
+async function fetchDailyFiles() {
+    const btn = document.getElementById('fetch-daily-btn');
+    const origText = btn.textContent;
+    btn.disabled = true;
+    btn.style.opacity = '0.5';
+    btn.textContent = '  Fetching...';
+    showToast('Fetching files from Clover...', 'info');
+    try {
+        const res = await fetch(API + '/storage/fetch-daily', { method: 'POST' });
+        if (!res.ok) {
+            const err = await res.json().catch(() => null);
+            throw new Error(err && err.detail ? err.detail : `HTTP ${res.status}`);
+        }
+        const data = await res.json();
+        const count = data.fetched ? data.fetched.length : 0;
+        const errCount = data.errors ? data.errors.length : 0;
+        if (errCount > 0) {
+            showToast(`Fetched ${count}/3 files. Errors: ${data.errors.join('; ')}`, 'error');
+        } else {
+            showToast(`Fetched all ${count} files from Clover`, 'success');
+        }
+        loadFileStatusPanel();
+    } catch (e) {
+        showToast(`Fetch failed: ${e.message}`, 'error');
+    } finally {
+        btn.disabled = false;
+        btn.style.opacity = '1';
+        btn.textContent = origText;
+    }
+}
+
 // ---- API Helpers ----
 async function apiGet(path) {
     const res = await fetch(API + path);
