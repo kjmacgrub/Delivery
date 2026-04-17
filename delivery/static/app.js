@@ -2031,6 +2031,7 @@ function renderDetail() {
         document.getElementById('delivery-summary').innerHTML =
             progressBar(rcvCases, totalCases);
     }
+    updateTitleTooltip();
 
     // Sync search input with state
     const searchInput = document.getElementById('item-search');
@@ -3692,6 +3693,7 @@ function progressBar(done, total) {
     return `
     <div class="progress-bar-summary">
         <div class="progress-bar-count${countClickable ? ' progress-bar-count-toggle' : ''}"${countClickable ? ` onclick="setShowReceived(${!showReceived})"` : ''}><span class="${done > 0 ? 'count-green' : ''}">${fmtNum(done)}</span> / ${fmtNum(total)}</div>
+        <div class="progress-bar-times" id="progress-bar-times"></div>
         <div class="progress-bar-label">
             <span class="progress-bar-title ${showReceived ? 'progress-title-received' : ''}" onclick="setShowReceived(${!showReceived})">Show Received</span>
             <span class="progress-bar-title ${showReceived ? '' : 'progress-title-expected'}" onclick="setShowReceived(${!showReceived})">Hide Received</span>
@@ -4159,18 +4161,21 @@ document.addEventListener('click', (e) => {
     }
 });
 
-// ---- Title tooltip (check-in times) ----
+// ---- Check-in times display (under summary numbers) ----
 function updateTitleTooltip() {
     const titleEl = document.getElementById('page-title');
-    if (!currentDelivery || !titleEl) {
-        if (titleEl) titleEl.title = '';
+    if (titleEl) titleEl.title = '';
+    const timesEl = document.getElementById('progress-bar-times');
+    if (!timesEl) return;
+    if (!currentDelivery) {
+        timesEl.textContent = '';
         return;
     }
     const delivery = currentDelivery;
 
     // Completed delivery — show completion time
     if (delivery.status === 'completed' && delivery.completed_at) {
-        titleEl.title = `Received at ${formatTimeOnly(delivery.completed_at)}`;
+        timesEl.textContent = `Received at ${formatTimeOnly(delivery.completed_at)}`;
         return;
     }
 
@@ -4186,15 +4191,15 @@ function updateTitleTooltip() {
         }
     }
     if (times.length === 0) {
-        titleEl.title = 'None received yet';
+        timesEl.textContent = '';
         return;
     }
     const first = formatTimeOnly(new Date(Math.min(...times)));
     const last = formatTimeOnly(new Date(Math.max(...times)));
     if (first === last) {
-        titleEl.title = `Started: ${first}`;
+        timesEl.textContent = `Started: ${first}`;
     } else {
-        titleEl.title = `First: ${first} · Latest: ${last}`;
+        timesEl.textContent = `First: ${first} · Recent: ${last}`;
     }
 }
 

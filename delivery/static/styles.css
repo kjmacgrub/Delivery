@@ -812,6 +812,18 @@ html, body {
     margin-bottom: 2px;
 }
 
+.progress-bar-times {
+    text-align: center;
+    font-size: 12px;
+    color: var(--text-secondary);
+    min-height: 14px;
+    margin-bottom: 4px;
+}
+
+.progress-bar-times:empty {
+    display: none;
+}
+
 .progress-bar-count-toggle {
     cursor: pointer;
 }
