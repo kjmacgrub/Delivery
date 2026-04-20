@@ -97,6 +97,24 @@
     background: #e0e0e0;
     color: #666;
 }
+/* Dropdown is a white popover living inside the colored header — override the
+   header's blanket `* { color: ... !important }` rules so text stays readable. */
+#app-header .date-dropdown .date-dropdown-item,
+#app-header .date-dropdown .date-dropdown-item > span:first-child {
+    color: #1a1a1a !important;
+}
+#app-header .date-dropdown .date-dropdown-item.active,
+#app-header .date-dropdown .date-dropdown-item.active > span:first-child {
+    color: #2e7d32 !important;
+}
+#app-header .date-dropdown .dd-status.active {
+    color: #2e7d32 !important;
+    background: #c8e6c9 !important;
+}
+#app-header .date-dropdown .dd-status.completed {
+    color: #555 !important;
+    background: #e0e0e0 !important;
+}
 
 /* ---- Read-only mode for history ---- */
 .viewing-history .qty-circle.pending,
