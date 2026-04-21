@@ -321,9 +321,14 @@ class PDFWorksheetParser(WorksheetParser):
             if current_block is None:
                 continue
 
+            # Recover mangled category lines where PDF dropped the space
+            # between the category code and description
+            # (e.g. "10 VEGItem" or floor-pull "20 2 *FRUITItem")
+            fixed_text = self.CATEGORY_CONCAT_FIX.sub(r'\1\2 \3', text)
+
             # Floor-pull pattern: "3 6 * FLOWERS Flowers-lancaster bouquet"
             # group(1) = cases expected (3), group(2) = pull quantity (6)
-            fm = self.FLOOR_PULL_PATTERN.match(text)
+            fm = self.FLOOR_PULL_PATTERN.match(fixed_text)
             if fm:
                 qty = int(fm.group(1))
                 pull_qty = int(fm.group(2))
@@ -340,9 +345,7 @@ class PDFWorksheetParser(WorksheetParser):
                 ))
                 continue
 
-            # Standard line item — also try to recover mangled "10 VEGItem" lines
-            # where PDF dropped the space between category code and description
-            fixed_text = self.CATEGORY_CONCAT_FIX.sub(r'\1\2 \3', text)
+            # Standard line item
             im = self.CATEGORY_PATTERN.match(fixed_text)
             if im:
                 text = fixed_text
@@ -460,8 +463,9 @@ class PDFWorksheetParser(WorksheetParser):
 
     # Pattern to recover mangled category lines where PDF dropped a space:
     # e.g. "10 VEGBrussels" → "10 VEG Brussels"
+    # or  "20 2 *FRUITPineapple" → "20 2 *FRUIT Pineapple" (floor-pull form)
     CATEGORY_CONCAT_FIX = re.compile(
-        r'^(\d+\s+)(' + '|'.join(PRODUCT_CATEGORIES) + r')([A-Z])'
+        r'^(\d+\s+(?:\d+\s*\*\s*)?)(' + '|'.join(PRODUCT_CATEGORIES) + r')([A-Z])'
     )
 
     def _match_supplier(self, text: str) -> Optional[Tuple[str, int]]:
