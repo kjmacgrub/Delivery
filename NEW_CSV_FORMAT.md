@@ -10,24 +10,62 @@ One CSV feeds both the Delivery app and the produce-processor.
 
 Sample: `~/Downloads/ken_csv_for_4-22.csv` (first draft from IT, 2026-04-21).
 
-## Current CSV columns
+## File structure
+
+Four-part layout (3-row preamble + column header + data rows):
 
 ```
-item id, name, supplier, quantity_expected, category, department,
-plu_code, growing_method, basement_location, floor_location,
-bin_size, case_size, pull_quantity,
+Line 1: DELIVERY_WORKSHEET_V1,2026-04-22
+Line 2: (generated 2026-04-21 13:08)
+Line 3: (blank)
+Line 4: item_id,item_name,supplier,department,category,plu_code,growing_method,quantity_expected,unit,case_size,bin_size,basement_location,floor_location,pull_quantity,high_count_day1,high_count_day2,high_count_day3,processing_instructions
+Line 5+: data rows
+```
+
+### Line 1: structural marker
+
+Two CSV cells:
+- **Cell 1** — format identifier with version, e.g. `DELIVERY_WORKSHEET_V1`. Bumped to `V2` when the schema changes.
+- **Cell 2** — delivery date (ISO `YYYY-MM-DD`). Redundant with the filename; authoritative if the filename gets renamed or mangled.
+
+### Line 2: generation timestamp
+
+Keep IT's current format `(generated YYYY-MM-DD HH:MM)`. Used by the app to pick the latest upload when the same delivery date has multiple files.
+
+### Line 3: blank
+
+### Line 4: column header
+
+Proposed labels (see "Asks for IT" #3 for rename rationale):
+
+```
+item_id, item_name, supplier, department, category, plu_code, growing_method,
+quantity_expected, unit, case_size, bin_size,
+basement_location, floor_location,
+pull_quantity,
 high_count_day1, high_count_day2, high_count_day3,
 processing_instructions
 ```
 
+### App validation on load
+
+1. Line 1 cell 1 matches a known `DELIVERY_WORKSHEET_V<n>` format → else reject.
+2. Line 1 cell 2 is a parseable ISO date → else reject.
+3. Line 1 cell 2 matches the date extracted from the filename → else warn, trust line 1.
+4. Line 2 parses as a generation timestamp → else warn (informational, not blocking).
+
 ## Asks for IT
 
 1. **Filename format**: `delivery_<dow>_<YYYY-MM-DD>.csv` (e.g. `delivery_wed_2026-04-22.csv`).
-2. **Line-1 marker**: replace `test` with a stable identifier like `DELIVERY_WORKSHEET_V1`; app will validate content against it.
-3. **Add a `unit` column** (each / lb / oz / bunch / …) so `case_size` is interpretable.
+2. **Line 1 marker**: `DELIVERY_WORKSHEET_V1,<delivery_date>` — replaces current `test`.
+3. **Column header renames** (consistent snake_case, clearer intent):
+    - `item id` → `item_id`
+    - `name` → `item_name`
+    - Add `unit` column (each / lb / oz / bunch / …) between `quantity_expected` and `case_size` so `case_size` is interpretable.
+    - Optional reorder: identity → classification → quantity → location → pull/processing.
 4. **`processing_instructions` format**: strict `<digit> - <text>` when populated; blank when no processing needed; plain text without digit is acceptable and handled as "unknown priority."
 5. **Confirm `high_count_day1/2/3`** is a rolling 3-business-day window starting the day after delivery.
-6. **Confirm `item id`** is stable and unique across time and across suppliers (treat as catalog key).
+6. **Confirm `item_id`** is stable and unique across time and across suppliers (treat as catalog key).
 7. **Rollout**: single CSV fully replaces all four old files. Uploaded to one bucket and consumed by both apps. Bucket choice TBD.
 
 ## App-side decisions (no IT input needed)
