@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Delivery — Reference Card</title>
+<style>
+  @page { size: letter; margin: 0.5in; }
+  body { font-family: -apple-system, BlinkMacSystemFont, "Helvetica Neue", sans-serif; font-size: 10.5pt; color: #111; line-height: 1.35; margin: 0; }
+  h1 { font-size: 18pt; margin: 0 0 2pt 0; }
+  h2 { font-size: 11pt; margin: 14pt 0 4pt 0; text-transform: uppercase; letter-spacing: 0.5pt; color: #444; border-bottom: 1px solid #ccc; padding-bottom: 2pt; }
+  .sub { color: #666; margin-bottom: 12pt; font-size: 10pt; }
+  table { border-collapse: collapse; width: 100%; margin-bottom: 4pt; }
+  td { padding: 3pt 6pt 3pt 0; vertical-align: top; }
+  td.label { color: #555; width: 28%; white-space: nowrap; }
+  td.value { font-family: "SF Mono", Menlo, monospace; font-size: 9.5pt; word-break: break-all; }
+  .note { font-size: 9pt; color: #666; margin-top: 2pt; }
+  ul, ol { margin: 4pt 0; padding-left: 18pt; }
+  li { margin-bottom: 3pt; }
+  .footer { margin-top: 16pt; padding-top: 6pt; border-top: 1px solid #ccc; font-size: 8.5pt; color: #888; }
+  tt, code { font-family: "SF Mono", Menlo, monospace; font-size: 9.5pt; }
+</style>
+</head>
+<body>
+
+<h1>Delivery</h1>
+<div class="sub">Emergency reference · current as of 2026-04-22</div>
+
+<h2>What it is</h2>
+<p>A web app used in the warehouse to check in the daily produce delivery. The delivery worksheet (a PDF from IT) is uploaded each morning; warehouse staff walk the floor marking items as received/short/over, flagging pulls destined for the retail floor, and reviewing a 3-day high-count forecast. Exceptions are captured for the buyer at end of day.</p>
+
+<h2>Where it runs</h2>
+<table>
+  <tr><td class="label">Live URL</td><td class="value">https://delivery-app-481756503401.us-east1.run.app</td></tr>
+  <tr><td class="label">Hosting</td><td class="value">Google Cloud Run — project <tt>delivery-worksheet-app</tt>, region <tt>us-east1</tt>, service <tt>delivery-app</tt></td></tr>
+  <tr><td class="label">Data backend</td><td class="value">Firebase (Firestore + Storage) in the same GCP project</td></tr>
+</table>
+
+<h2>Where the code lives</h2>
+<table>
+  <tr><td class="label">GitHub repo</td><td class="value">https://github.com/kjmacgrub/Delivery</td></tr>
+  <tr><td class="label">Local checkout</td><td class="value">/Users/km/python3/source/Delivery</td></tr>
+</table>
+
+<h2>Accounts you'd need</h2>
+<ul>
+  <li><b>GitHub</b> — owner: kjmacgrub. Add IT as collaborator to grant code access.</li>
+  <li><b>Google Cloud</b> — project <tt>delivery-worksheet-app</tt>. Controls Cloud Run deploys, Cloud Build, Secret Manager, and IAM.</li>
+  <li><b>Firebase console</b> — same project <tt>delivery-worksheet-app</tt>. Holds Firestore (delivery records), Storage (uploaded worksheet PDFs + CSVs), and security rules.</li>
+</ul>
+
+<h2>If it's broken — start here</h2>
+<ol>
+  <li><b>Site is down</b> → GCP console → Cloud Run → <tt>delivery-app</tt> → Revisions tab. Roll back to the last known-good revision if the latest is red.</li>
+  <li><b>Today's worksheet won't load</b> → Firebase console → Storage bucket <tt>delivery-worksheet-app.firebasestorage.app</tt>, path <tt>delivery-files/incoming/</tt>. Confirm today's file arrived.</li>
+  <li><b>Data missing / parse looks wrong</b> → Firestore → <tt>deliveries</tt> collection. Compare the Firestore doc to the source PDF; re-upload the PDF to trigger re-parse if needed.</li>
+  <li><b>Deploy failed</b> → GCP console → Cloud Build → History. Typical fix: re-run <tt>./deploy.sh</tt> from a clean checkout.</li>
+</ol>
+
+<h2>Who to call</h2>
+<p>Primary owner: Ken MacGruber (kjmacbcg@gmail.com). All credentials, service accounts, and deploy history route through this email.</p>
+
+<div class="footer">
+Delivery · Ref A (emergency card) · generated 2026-04-22
+</div>
+
+</body>
+</html>

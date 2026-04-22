@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Delivery — Handoff Doc</title>
+<style>
+  @page { size: letter; margin: 0.45in; }
+  body { font-family: -apple-system, BlinkMacSystemFont, "Helvetica Neue", sans-serif; font-size: 9.5pt; color: #111; line-height: 1.3; margin: 0; }
+  h1 { font-size: 16pt; margin: 0 0 1pt 0; }
+  h2 { font-size: 10pt; margin: 10pt 0 3pt 0; text-transform: uppercase; letter-spacing: 0.5pt; color: #444; border-bottom: 1px solid #ccc; padding-bottom: 2pt; }
+  .sub { color: #666; margin-bottom: 8pt; font-size: 9pt; }
+  table { border-collapse: collapse; width: 100%; margin-bottom: 3pt; font-size: 9pt; }
+  td { padding: 2pt 6pt 2pt 0; vertical-align: top; }
+  td.label { color: #555; width: 24%; white-space: nowrap; }
+  td.value { font-family: "SF Mono", Menlo, monospace; font-size: 8.5pt; word-break: break-all; }
+  ul { margin: 2pt 0; padding-left: 16pt; }
+  li { margin-bottom: 1.5pt; }
+  code, tt { font-family: "SF Mono", Menlo, monospace; font-size: 8.5pt; background: #f3f3f3; padding: 0 3pt; border-radius: 2pt; }
+  .footer { margin-top: 14pt; padding-top: 5pt; border-top: 1px solid #ccc; font-size: 8pt; color: #888; }
+  p { margin: 3pt 0; }
+</style>
+</head>
+<body>
+
+<h1>Delivery</h1>
+<div class="sub">Handoff / maintenance doc · current as of 2026-04-22</div>
+
+<h2>What it does</h2>
+<p><b>Brief:</b> Daily produce check-in web app for the warehouse team.</p>
+<p><b>General:</b> An admin uploads the daily delivery worksheet (PDF from IT) to Firebase Storage. A Python backend parses it with <code>pdfplumber</code>, extracts supplier blocks and line items (including floor-pull quantities flagged with an asterisk), and writes a structured record to Firestore. Warehouse staff open the app on phones/iPads, walk the supplier sections, and mark each item as received/short/over/return, optionally confirming pull quantities. A separate daily CSV carries basement/floor location metadata, and a second PDF carries a 3-day high-count forecast — both are parsed and joined to the worksheet. At completion, an exception report listing discrepancies + pulls is snapshotted for the buyer. (An IT-driven consolidation to a single combined CSV is in planning — see <code>NEW_CSV_FORMAT.md</code>.)</p>
+
+<h2>Tech stack</h2>
+<table>
+  <tr><td class="label">Languages</td><td>Python 3.9+ (backend), vanilla JavaScript / HTML / CSS (frontend — no build step)</td></tr>
+  <tr><td class="label">Framework</td><td>FastAPI + uvicorn; Pydantic models; Dockerfile-based container</td></tr>
+  <tr><td class="label">Libraries</td><td>pdfplumber (PDF text extraction), PyMuPDF, firebase-admin (Firestore + Storage), python-multipart</td></tr>
+  <tr><td class="label">Backend data</td><td>Google Firestore (deliveries, items, daily logs, exception reports); Firebase Storage (uploaded PDFs/CSVs)</td></tr>
+  <tr><td class="label">Frontend</td><td>Single-page app served as static assets from FastAPI; cache-buster <code>?v=__COMMIT__</code> replaced server-side with the git hash at serve time</td></tr>
+</table>
+
+<h2>Hosting &amp; remote resources</h2>
+<table>
+  <tr><td class="label">Live site</td><td class="value">https://delivery-app-481756503401.us-east1.run.app</td></tr>
+  <tr><td class="label">Cloud Run</td><td class="value">project <code>delivery-worksheet-app</code> · region <code>us-east1</code> · service <code>delivery-app</code></td></tr>
+  <tr><td class="label">Firebase project</td><td class="value">delivery-worksheet-app</td></tr>
+  <tr><td class="label">Storage bucket</td><td class="value">delivery-worksheet-app.firebasestorage.app</td></tr>
+  <tr><td class="label">Firestore</td><td class="value">(default database, same project)</td></tr>
+  <tr><td class="label">Secret Manager</td><td class="value">secret <code>firebase-service-account</code> — Firebase admin credentials, mounted into Cloud Run at runtime</td></tr>
+  <tr><td class="label">GitHub repo</td><td class="value">https://github.com/kjmacgrub/Delivery</td></tr>
+  <tr><td class="label">Local checkout</td><td class="value">/Users/km/python3/source/Delivery</td></tr>
+</table>
+
+<h2>Repo layout — files that matter</h2>
+<table>
+  <tr><td class="label"><code>delivery/api/app.py</code></td><td>FastAPI app factory; registers routers; serves the SPA static files.</td></tr>
+  <tr><td class="label"><code>delivery/api/routes/</code></td><td>HTTP handlers: <code>deliveries.py</code>, <code>items.py</code>, <code>checkin.py</code>, <code>notes.py</code>, <code>storage.py</code>, <code>daily_logs.py</code>.</td></tr>
+  <tr><td class="label"><code>delivery/parser/</code></td><td>PDF/CSV parsers: <code>pdf_parser.py</code> (main worksheet), <code>high_count_parser.py</code>, <code>inventory_parser.py</code>, <code>csv_parser.py</code>, <code>product_parser.py</code> (description → structured fields).</td></tr>
+  <tr><td class="label"><code>delivery/services/</code></td><td>Business logic + persistence: <code>delivery_service.py</code> (Firestore ops), <code>firebase_storage.py</code>, <code>daily_log_service.py</code>.</td></tr>
+  <tr><td class="label"><code>delivery/models.py</code></td><td>Pydantic data models (Delivery, SupplierEntry, LineItem, statuses, reports).</td></tr>
+  <tr><td class="label"><code>delivery/schemas.py</code></td><td>Shared schema definitions.</td></tr>
+  <tr><td class="label"><code>delivery/firebase_client.py</code></td><td>Firebase admin SDK init.</td></tr>
+  <tr><td class="label"><code>delivery/static/</code></td><td>Frontend: <code>index.html</code>, <code>app.js</code>, <code>styles.css</code>. No build step — edits picked up on hard refresh.</td></tr>
+  <tr><td class="label"><code>Dockerfile</code></td><td>Container image built by Cloud Build during <code>./deploy.sh</code>.</td></tr>
+  <tr><td class="label"><code>deploy.sh</code></td><td>One-shot deploy script (also has a <code>setup</code> subcommand for first-time project wiring).</td></tr>
+  <tr><td class="label"><code>pyproject.toml</code></td><td>Python dependencies + packaging.</td></tr>
+  <tr><td class="label"><code>firestore.rules</code> / <code>firebase.json</code></td><td>Firestore security rules and Firebase tooling config.</td></tr>
+  <tr><td class="label"><code>firebase-service-account.json</code></td><td>Service-account credentials for local runs (git-ignored in principle; not committed for prod use — Secret Manager holds prod copy).</td></tr>
+  <tr><td class="label"><code>NEW_CSV_FORMAT.md</code></td><td>In-progress transition plan for consolidated daily CSV (supersedes 4 current files).</td></tr>
+</table>
+
+<h2>Firebase / Firestore data shape</h2>
+<table>
+  <tr><td class="label">Storage paths</td><td><code>delivery-files/incoming/</code> (uploaded PDFs/CSVs awaiting parse) · <code>delivery-files/processed/</code> · <code>delivery-files/reports/</code> (exception snapshots)</td></tr>
+  <tr><td class="label">Firestore collections</td><td><code>deliveries</code> (one doc per delivery day, contains supplier entries and line items) · daily logs and exception reports as subcollections / separate collections</td></tr>
+</table>
+
+<h2>Develop &amp; deploy</h2>
+<table>
+  <tr><td class="label">Setup (once)</td><td><code>python3 -m venv .venv &amp;&amp; .venv/bin/pip install -e .</code></td></tr>
+  <tr><td class="label">Run locally</td><td><code>.venv/bin/python -m uvicorn delivery.api.app:create_app --factory --host 0.0.0.0 --port 8001 --reload</code></td></tr>
+  <tr><td class="label">Local URL</td><td><code>http://localhost:8001</code> (8000 is reserved for a different app)</td></tr>
+  <tr><td class="label">Tests</td><td><code>.venv/bin/pytest</code> — tests in <code>tests/</code> (optional dev dep)</td></tr>
+  <tr><td class="label">Deploy</td><td><code>./deploy.sh</code> — builds Docker image via Cloud Build, deploys new Cloud Run revision, routes 100% traffic.</td></tr>
+  <tr><td class="label">Version display</td><td>UI shows <code>v1.XX · &lt;commit-hash&gt;</code> from <code>VERSION_HISTORY</code> in <code>app.js</code>; cache-busters auto-injected.</td></tr>
+</table>
+
+<h2>Accounts required to maintain</h2>
+<ul>
+  <li><b>GitHub</b> (kjmacgrub/Delivery) — collaborator access for code.</li>
+  <li><b>Google Cloud</b> (project <code>delivery-worksheet-app</code>) — Cloud Run, Cloud Build, Secret Manager, IAM.</li>
+  <li><b>Firebase console</b> (same project) — Firestore, Storage, security rules.</li>
+  <li>No CI pipeline; no frontend build step; pytest is optional and run manually.</li>
+</ul>
+
+<div class="footer">
+Delivery · Ref B (handoff doc) · generated 2026-04-22 · primary contact: kjmacbcg@gmail.com
+</div>
+
+</body>
+</html>
