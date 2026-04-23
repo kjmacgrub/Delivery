@@ -1225,6 +1225,35 @@ async function showStorageFiles() {
 
         let html = '';
 
+        // Inventory first — easy to miss otherwise, and it's daily-required
+        html += `<div class="import-group">
+            <div class="import-group-title">Inventory</div>`;
+        if (inventoryFile) {
+            const invMatch = inventoryFile.name.match(/(\d{4}-\d{2}-\d{2})/);
+            const invDateStr = invMatch ? invMatch[1] : null;
+            const alreadyImported = invDateStr && invDateStr === importedInventoryDate;
+            const invDateLabel = invDateStr ? friendlyDateStr(invDateStr) : '—';
+            if (alreadyImported) {
+                html += `<div class="import-file-row import-row-done">
+                    <span class="import-type-chip import-type-inventory">Inventory</span>
+                    <span class="import-file-date">${invDateLabel}</span>
+                    <span class="import-status-ok">✓ Imported</span>
+                </div>`;
+            } else {
+                html += `<div class="import-file-row" onclick="importInventory('${inventoryFile.name}')">
+                    <span class="import-type-chip import-type-inventory">Inventory</span>
+                    <span class="import-file-date">${invDateLabel}</span>
+                    <span class="import-action-btn">Import</span>
+                </div>`;
+            }
+        } else {
+            html += `<div class="import-file-row import-row-missing">
+                <span class="import-type-chip import-type-missing">Inventory</span>
+                <span class="import-missing-text">Not uploaded</span>
+            </div>`;
+        }
+        html += `</div>`;
+
         // Date groups sorted newest first
         [...dateGroups.keys()].sort().reverse().forEach(dateStr => {
             const g = dateGroups.get(dateStr);
@@ -1283,35 +1312,6 @@ async function showStorageFiles() {
 
             html += `</div>`;
         });
-
-        // Inventory — can be a different date than delivery
-        html += `<div class="import-group">
-            <div class="import-group-title">Inventory</div>`;
-        if (inventoryFile) {
-            const invMatch = inventoryFile.name.match(/(\d{4}-\d{2}-\d{2})/);
-            const invDateStr = invMatch ? invMatch[1] : null;
-            const alreadyImported = invDateStr && invDateStr === importedInventoryDate;
-            const invDateLabel = invDateStr ? friendlyDateStr(invDateStr) : '—';
-            if (alreadyImported) {
-                html += `<div class="import-file-row import-row-done">
-                    <span class="import-type-chip import-type-inventory">Inventory</span>
-                    <span class="import-file-date">${invDateLabel}</span>
-                    <span class="import-status-ok">✓ Imported</span>
-                </div>`;
-            } else {
-                html += `<div class="import-file-row" onclick="importInventory('${inventoryFile.name}')">
-                    <span class="import-type-chip import-type-inventory">Inventory</span>
-                    <span class="import-file-date">${invDateLabel}</span>
-                    <span class="import-action-btn">Import</span>
-                </div>`;
-            }
-        } else {
-            html += `<div class="import-file-row import-row-missing">
-                <span class="import-type-chip import-type-missing">Inventory</span>
-                <span class="import-missing-text">Not uploaded</span>
-            </div>`;
-        }
-        html += `</div>`;
 
         container.innerHTML = html;
     } catch (e) {
@@ -2234,7 +2234,14 @@ function renderItemList() {
             container.innerHTML = '<div class="empty-state"><p>No inventory data</p><p class="subtitle">Parse the inventory worksheet from the import screen first</p></div>';
             return;
         }
-        const locationOrder = ['G', 'X', 'Y'];
+        const locationOrder = ['G', 'X', 'Y', 'N'];
+        const locationLabels = {
+            G: 'Green cooler',
+            X: 'Basement not refrigerated',
+            Y: 'Yellow cooler',
+            N: 'Not in basement',
+            Other: 'Other',
+        };
         const locationGroups = new Map();
         sortedGroups.forEach(group => {
             const key = group[0].raw_description.toLowerCase().replace(/\s+/g, ' ').trim();
@@ -2254,9 +2261,10 @@ function renderItemList() {
             const groups = locationGroups.get(locKey);
             const itemCount = groups.reduce((n, g) => n + g.length, 0);
             const chevronClass = isExpanded ? 'accordion-chevron expanded' : 'accordion-chevron';
+            const label = locationLabels[locKey] || locKey;
             html += `<div class="location-zone-header" onclick="toggleLocationZone('${locKey}')">
                 <span class="${chevronClass}">&#9654;</span>
-                <span class="location-zone-name">${locKey}</span>
+                <span class="location-zone-name">${label}</span>
                 <span class="location-zone-count">${itemCount}</span>
             </div>`;
             if (isExpanded) {
@@ -2643,7 +2651,7 @@ function toggleAllLocations() {
     if (expandedLocations.size > 0) {
         expandedLocations = new Set();
     } else {
-        ['G', 'X', 'Y', 'Other'].forEach(k => expandedLocations.add(k));
+        ['G', 'X', 'Y', 'N', 'Other'].forEach(k => expandedLocations.add(k));
     }
     renderItemList();
 }
