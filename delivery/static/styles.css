@@ -2425,6 +2425,10 @@ textarea {
     border-left: none;
     min-height: 44px;
     position: relative;
+    /* Used by hash-targeted scrollIntoView so the header doesn't disappear
+       under the sticky app chrome. Calibrated to clear the app header +
+       progress bar + filter rows. */
+    scroll-margin-top: 280px;
 }
 
 .supplier-accordion-header:active {

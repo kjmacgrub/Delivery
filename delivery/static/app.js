@@ -1988,10 +1988,33 @@ async function openDelivery(id) {
         expandedLocations = new Set(); // reset location accordion
         showReceived = true; // reset to show-all view
         searchQuery = ''; // reset search
+
+        // Deep-link via #supplier=<name> (e.g. from the Store Monitor):
+        // collapse everything, expand and scroll to just the named supplier.
+        const hashMatch = location.hash.match(/^#supplier=(.+)$/);
+        const hashTargetIdx = hashMatch
+            ? currentDelivery.suppliers.findIndex(
+                s => s.supplier_name === decodeURIComponent(hashMatch[1])
+            )
+            : -1;
+        if (hashTargetIdx !== -1) {
+            expandedSuppliers = new Set([hashTargetIdx]);
+        }
+
         // Reset supplier filter UI
         document.getElementById('item-receive-all-btn').innerHTML = '';
         renderDetail();
         showView('detail');
+
+        if (hashTargetIdx !== -1) {
+            // Wait for the DOM to settle, then scroll the targeted supplier
+            // into view and clear the hash so reloads aren't sticky.
+            setTimeout(() => {
+                const el = document.querySelector(`[data-supplier-idx="${hashTargetIdx}"]`);
+                if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                history.replaceState(null, '', location.pathname);
+            }, 120);
+        }
 
         // Subscribe to real-time updates for this delivery
         cleanupListeners();
@@ -2599,7 +2622,7 @@ function renderSupplierAccordion(container, flatItems) {
         const editHeader = '';
         const acceptHeader = (isExpanded && !isViewingHistory) ? `<span class="accept-column-header" title="Accept/unaccept all items" onclick="event.stopPropagation(); event.preventDefault(); shiftAcceptAll(event, ${sIdx})">Accept ${arrowSvg}</span>` : '';
         html += `
-        <div class="supplier-accordion-header ${statusClass}" onclick="toggleSupplierAccordion(${sIdx})">
+        <div class="supplier-accordion-header ${statusClass}" data-supplier-idx="${sIdx}" onclick="toggleSupplierAccordion(${sIdx})">
             ${editHeader}
             <span class="accordion-supplier-name"><span class="${chevronClass}">&#9654;</span>${supplier.supplier_name} <span class="accordion-case-count"><span class="count-green">${fmtNum(rcvCases)}</span>/${fmtNum(expCases)}</span></span>
             ${acceptHeader}
