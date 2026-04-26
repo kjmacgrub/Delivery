@@ -280,6 +280,41 @@
             </div>
         </div>
 
+        <!-- Modal: Fetch Daily Files date picker -->
+        <div id="fetch-daily-modal" class="modal hidden" onclick="this.classList.add('hidden')">
+            <div class="modal-backdrop"></div>
+            <div class="modal-content" style="max-width:420px;padding:1.5rem" onclick="event.stopPropagation()">
+                <div class="modal-header">
+                    <h2>Fetch Daily Files</h2>
+                    <button class="icon-btn" onclick="document.getElementById('fetch-daily-modal').classList.add('hidden')">&times;</button>
+                </div>
+                <div class="modal-body" style="padding-top:0.75rem">
+                    <p style="color:#64748b;font-size:13px;margin-bottom:1rem">
+                        Adjust the dates if needed. Defaults: tomorrow for delivery worksheet and basement high count, today for inventory CSV.
+                    </p>
+                    <label style="display:block;font-size:12px;font-weight:600;color:#475569;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:6px">
+                        Delivery worksheet date
+                    </label>
+                    <input type="date" id="fetch-delivery-date"
+                           style="width:100%;padding:9px 12px;border:1px solid #cbd5e1;border-radius:8px;font-size:15px;margin-bottom:1rem">
+                    <label style="display:block;font-size:12px;font-weight:600;color:#475569;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:6px">
+                        High count date
+                    </label>
+                    <input type="date" id="fetch-highcount-date"
+                           style="width:100%;padding:9px 12px;border:1px solid #cbd5e1;border-radius:8px;font-size:15px;margin-bottom:1rem">
+                    <label style="display:block;font-size:12px;font-weight:600;color:#475569;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:6px">
+                        Inventory date
+                    </label>
+                    <input type="date" id="fetch-inventory-date"
+                           style="width:100%;padding:9px 12px;border:1px solid #cbd5e1;border-radius:8px;font-size:15px;margin-bottom:1.25rem">
+                </div>
+                <div class="modal-footer" style="display:flex;gap:8px;justify-content:flex-end">
+                    <button class="btn btn-ghost" onclick="document.getElementById('fetch-daily-modal').classList.add('hidden')">Cancel</button>
+                    <button class="btn btn-primary" onclick="commitFetchDailyFiles()">Fetch</button>
+                </div>
+            </div>
+        </div>
+
         <!-- Modal: Clover Help -->
         <div id="clover-help-modal" class="modal hidden" onclick="this.classList.add('hidden')">
             <div class="modal-backdrop"></div>

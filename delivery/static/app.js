@@ -426,7 +426,36 @@ async function handleTypedUpload(event, type) {
 }
 
 
-async function fetchDailyFiles() {
+// Opens the date-picker modal pre-filled with the defaults
+// (tomorrow for delivery worksheet + basement, today for inventory).
+function fetchDailyFiles() {
+    // Use local-date components so the inputs reflect the user's local
+    // day, not UTC (toISOString() can roll over a day late at night).
+    const today = new Date();
+    const tomorrow = new Date(today.getTime() + 24 * 60 * 60 * 1000);
+    const iso = d => {
+        const y = d.getFullYear();
+        const m = String(d.getMonth() + 1).padStart(2, '0');
+        const dd = String(d.getDate()).padStart(2, '0');
+        return `${y}-${m}-${dd}`;
+    };
+    document.getElementById('fetch-delivery-date').value  = iso(tomorrow);
+    document.getElementById('fetch-highcount-date').value = iso(tomorrow);
+    document.getElementById('fetch-inventory-date').value = iso(today);
+    document.getElementById('fetch-daily-modal').classList.remove('hidden');
+}
+
+// Submits the actual fetch request with the dates from the modal.
+async function commitFetchDailyFiles() {
+    const deliveryDate  = document.getElementById('fetch-delivery-date').value;
+    const highcountDate = document.getElementById('fetch-highcount-date').value;
+    const inventoryDate = document.getElementById('fetch-inventory-date').value;
+    if (!deliveryDate || !highcountDate || !inventoryDate) {
+        showToast('All three dates are required', 'error');
+        return;
+    }
+    document.getElementById('fetch-daily-modal').classList.add('hidden');
+
     const btn = document.getElementById('fetch-daily-btn');
     const origText = btn.textContent;
     btn.disabled = true;
@@ -434,7 +463,15 @@ async function fetchDailyFiles() {
     btn.textContent = '  Fetching...';
     showToast('Fetching files from Clover...', 'info');
     try {
-        const res = await fetch(API + '/storage/fetch-daily', { method: 'POST' });
+        const res = await fetch(API + '/storage/fetch-daily', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                delivery_date:  deliveryDate,
+                highcount_date: highcountDate,
+                inventory_date: inventoryDate,
+            }),
+        });
         if (!res.ok) {
             const err = await res.json().catch(() => null);
             throw new Error(err && err.detail ? err.detail : `HTTP ${res.status}`);

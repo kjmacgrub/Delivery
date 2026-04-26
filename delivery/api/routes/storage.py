@@ -253,21 +253,46 @@ async def fetch_daily_files(request: Request):
     reach the intranet). Credentials read from COOP_USER / COOP_PASS env vars.
 
     Files fetched:
-    - Delivery worksheet (tomorrow's date)
-    - Basement high count (tomorrow's date)
-    - Inventory worksheet CSV (today's date)
+    - Delivery worksheet (delivery_date — default tomorrow)
+    - Basement high count (highcount_date — default tomorrow)
+    - Inventory worksheet CSV (inventory_date — default today)
+
+    Body (optional): {
+      "delivery_date":  "YYYY-MM-DD",
+      "highcount_date": "YYYY-MM-DD",
+      "inventory_date": "YYYY-MM-DD"
+    }
     """
     import os
     import re
     import httpx
     from datetime import date, timedelta
 
+    # Optional body — POST with no body keeps the today/tomorrow defaults.
+    try:
+        body = await request.json()
+    except Exception:
+        body = {}
+
     storage = _get_storage(request)
     today = date.today()
     tomorrow = today + timedelta(days=1)
-    today_str = today.strftime('%Y-%m-%d')
-    tomorrow_str = tomorrow.strftime('%Y-%m-%d')
-    dow = tomorrow.strftime('%a').lower()
+
+    def _parse(s):
+        try:
+            return date.fromisoformat(s) if s else None
+        except ValueError:
+            raise HTTPException(status_code=400, detail=f"Invalid date: {s!r} (need YYYY-MM-DD)")
+
+    delivery_date  = _parse(body.get("delivery_date"))  or tomorrow
+    highcount_date = _parse(body.get("highcount_date")) or tomorrow
+    inventory_date = _parse(body.get("inventory_date")) or today
+
+    delivery_str  = delivery_date.strftime('%Y-%m-%d')
+    highcount_str = highcount_date.strftime('%Y-%m-%d')
+    inventory_str = inventory_date.strftime('%Y-%m-%d')
+    delivery_dow  = delivery_date.strftime('%a').lower()
+    highcount_dow = highcount_date.strftime('%a').lower()
 
     username = os.environ.get("COOP_USER")
     password = os.environ.get("COOP_PASS")
@@ -281,22 +306,22 @@ async def fetch_daily_files(request: Request):
     login_url = f"{base}/login/"
     files_to_fetch = [
         {
-            "url": f"{base}/produce_checkin_worksheet/{tomorrow_str}/",
-            "filename": f"delivery_{dow}_{tomorrow_str}_worksheet.pdf",
+            "url": f"{base}/produce_checkin_worksheet/{delivery_str}/",
+            "filename": f"delivery_{delivery_dow}_{delivery_str}_worksheet.pdf",
             "content_type": "application/pdf",
             "label": "Delivery worksheet",
             "expect": "pdf",
         },
         {
-            "url": f"{base}/produce_basement/{tomorrow_str}/",
-            "filename": f"basement_high_count_{dow}_{tomorrow_str}.pdf",
+            "url": f"{base}/produce_basement/{highcount_str}/",
+            "filename": f"basement_high_count_{highcount_dow}_{highcount_str}.pdf",
             "content_type": "application/pdf",
             "label": "High count",
             "expect": "pdf",
         },
         {
-            "url": f"{base}/inventory_worksheet/{today_str}/produce/0/basement/csv/",
-            "filename": f"inventory-worksheet-produce-{today_str}.csv",
+            "url": f"{base}/inventory_worksheet/{inventory_str}/produce/0/basement/csv/",
+            "filename": f"inventory-worksheet-produce-{inventory_str}.csv",
             "content_type": "text/csv",
             "label": "Inventory",
             "expect": "csv",
