@@ -2655,9 +2655,12 @@ function renderSupplierAccordion(container, flatItems) {
         const statusClass = allDone ? 'supplier-complete' : '';
         const chevronClass = isExpanded ? 'accordion-chevron expanded' : 'accordion-chevron';
 
-        const arrowSvg = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><polyline points="19,12 12,19 5,12"/></svg>';
         const editHeader = '';
-        const acceptHeader = (isExpanded && !isViewingHistory) ? `<span class="accept-column-header" title="Accept/unaccept all items" onclick="event.stopPropagation(); event.preventDefault(); shiftAcceptAll(event, ${sIdx})">Accept ${arrowSvg}</span>` : '';
+        const allReceived = allDone;
+        const toggleClass = allReceived ? 'supplier-receive-toggle on' : 'supplier-receive-toggle';
+        const toggleLabel = allReceived ? 'Received' : 'Receive all';
+        const toggleTitle = allReceived ? 'Unreceive all items' : 'Receive all items';
+        const acceptHeader = (isExpanded && !isViewingHistory) ? `<button type="button" class="${toggleClass}" title="${toggleTitle}" onclick="event.stopPropagation(); event.preventDefault(); shiftAcceptAll(event, ${sIdx})"><span class="toggle-label">${toggleLabel}</span><span class="toggle-track"><span class="toggle-knob"></span></span></button>` : '';
         html += `
         <div class="supplier-accordion-header ${statusClass}" data-supplier-idx="${sIdx}" onclick="toggleSupplierAccordion(${sIdx})">
             ${editHeader}
@@ -3649,15 +3652,11 @@ async function unreceiveItem() {
 
 function shiftAcceptAll(event, supplierIdx) {
     if (isViewingHistory) return;
-    // confirm dialog provides safety — no double-click needed
     const supplier = currentDelivery.suppliers[supplierIdx];
     const pendingCount = supplier.items.filter(i => i.received_status === 'pending').length;
-    const receivedCount = supplier.items.filter(i => i.received_status !== 'pending').length;
     if (pendingCount > 0) {
-        if (!confirm(`Accept all ${pendingCount} pending items for ${supplier.supplier_name}?`)) return;
         receiveAllSupplier(supplierIdx);
-    } else if (receivedCount > 0) {
-        if (!confirm(`Unaccept all ${receivedCount} items for ${supplier.supplier_name}?`)) return;
+    } else {
         unreceiveAllSupplier(supplierIdx);
     }
 }
