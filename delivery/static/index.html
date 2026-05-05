@@ -257,6 +257,7 @@
 <input type="file" id="upload-input-delivery" accept=".pdf,.csv" style="display:none" onchange="handleTypedUpload(event,'delivery')">
                     <input type="file" id="upload-input-highcount" accept=".pdf,.csv" style="display:none" onchange="handleTypedUpload(event,'highcount')">
                     <input type="file" id="upload-input-inventory" accept=".csv" style="display:none" onchange="handleTypedUpload(event,'inventory')">
+                    <input type="file" id="upload-input-bulk" accept=".pdf,.csv" multiple style="display:none" onchange="handleBulkUpload(event)">
 
                     <div id="file-status-panel" style="margin-bottom:12px">
                         <div style="font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:#64748b;margin-bottom:8px">Today's Files</div>
@@ -267,6 +268,10 @@
                     <button class="admin-menu-btn" id="fetch-daily-btn" onclick="fetchDailyFiles()">
                         <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
                         Fetch Daily Files
+                    </button>
+                    <button class="admin-menu-btn" id="upload-all-btn" onclick="document.getElementById('upload-input-bulk').click()">
+                        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                        Upload All Files
                     </button>
                     <a class="admin-menu-btn" href="https://inventory.intranet.psfc.coop/login/" target="_blank" rel="noopener" style="text-decoration:none">
                         <img src="/static/images/clover-icon.png" alt="" width="22" height="22" style="object-fit:contain">

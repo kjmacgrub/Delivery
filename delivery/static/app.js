@@ -400,6 +400,80 @@ async function loadFileStatusPanel() {
     }
 }
 
+// Picks 3 files at once, classifies each by filename, uploads them all.
+// Detection mirrors the patterns used by the file-status panel and the
+// /local/downloads-scan endpoint.
+function _classifyDailyFile(name) {
+    const n = name.toLowerCase();
+    if (n.includes('delivery') && n.includes('worksheet') && (n.endsWith('.pdf') || n.endsWith('.csv'))) return 'delivery';
+    if (n.includes('high_count') && (n.endsWith('.pdf') || n.endsWith('.csv'))) return 'highcount';
+    if (n.includes('inventory') && n.endsWith('.csv')) return 'inventory';
+    return null;
+}
+
+async function handleBulkUpload(event) {
+    const files = Array.from(event.target.files || []);
+    event.target.value = '';
+    if (!files.length) return;
+
+    const labels = { delivery: 'Delivery worksheet', highcount: 'High count', inventory: 'Inventory' };
+    const picked = { delivery: null, highcount: null, inventory: null };
+    const unmatched = [];
+    const dupes = [];
+
+    for (const f of files) {
+        const t = _classifyDailyFile(f.name);
+        if (!t) { unmatched.push(f.name); continue; }
+        if (picked[t]) { dupes.push(f.name); continue; }
+        picked[t] = f;
+    }
+
+    if (unmatched.length) {
+        showToast(`Skipped (unrecognized name): ${unmatched.join(', ')}`, 'error');
+    }
+    if (dupes.length) {
+        showToast(`Skipped duplicate type: ${dupes.join(', ')}`, 'error');
+    }
+
+    const queue = Object.entries(picked).filter(([, f]) => f);
+    if (!queue.length) {
+        showToast('No recognizable delivery files in selection', 'error');
+        return;
+    }
+
+    const btn = document.getElementById('upload-all-btn');
+    const origHtml = btn.innerHTML;
+    btn.disabled = true;
+    btn.style.opacity = '0.5';
+    btn.textContent = '  Uploading...';
+    showToast(`Uploading ${queue.length} file${queue.length === 1 ? '' : 's'}...`, 'info');
+
+    const ok = [];
+    const failed = [];
+    for (const [type, file] of queue) {
+        try {
+            const formData = new FormData();
+            formData.append('file', file);
+            const res = await fetch('/api/v1/storage/upload', { method: 'POST', body: formData });
+            if (!res.ok) throw new Error(await res.text());
+            ok.push(labels[type]);
+        } catch (err) {
+            failed.push(`${labels[type]}: ${err.message}`);
+        }
+    }
+
+    btn.disabled = false;
+    btn.style.opacity = '1';
+    btn.innerHTML = origHtml;
+
+    if (failed.length) {
+        showToast(`Uploaded ${ok.length}/${queue.length}. Errors: ${failed.join('; ')}`, 'error');
+    } else {
+        showToast(`Uploaded all ${ok.length} files`, 'success');
+    }
+    loadFileStatusPanel();
+}
+
 async function handleTypedUpload(event, type) {
     const file = event.target.files[0];
     const existingUpdated = event.target.dataset.existingUpdated || '';
