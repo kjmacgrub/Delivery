@@ -519,6 +519,53 @@ function fetchDailyFiles() {
     document.getElementById('fetch-daily-modal').classList.remove('hidden');
 }
 
+// Opens a modal with 3 date pickers, then on submit opens 3 new tabs at
+// the direct Clover download URLs. Useful when the server-side fetch isn't
+// reachable (Cloud Run, off-VPN, etc.) but the user's browser is on the
+// coop network and signed in to Clover. Defaults to today across the board
+// since this flow is for same-day updates.
+function openCloverDownloadModal() {
+    const today = new Date();
+    const iso = d => {
+        const y = d.getFullYear();
+        const m = String(d.getMonth() + 1).padStart(2, '0');
+        const dd = String(d.getDate()).padStart(2, '0');
+        return `${y}-${m}-${dd}`;
+    };
+    const todayStr = iso(today);
+    document.getElementById('clover-dl-delivery-date').value  = todayStr;
+    document.getElementById('clover-dl-highcount-date').value = todayStr;
+    document.getElementById('clover-dl-inventory-date').value = todayStr;
+    document.getElementById('clover-download-modal').classList.remove('hidden');
+}
+
+function commitCloverDownload() {
+    const deliveryDate  = document.getElementById('clover-dl-delivery-date').value;
+    const highcountDate = document.getElementById('clover-dl-highcount-date').value;
+    const inventoryDate = document.getElementById('clover-dl-inventory-date').value;
+    if (!deliveryDate || !highcountDate || !inventoryDate) {
+        showToast('All three dates are required', 'error');
+        return;
+    }
+    const base = 'https://inventory.intranet.psfc.coop';
+    const urls = [
+        `${base}/produce_checkin_worksheet/${deliveryDate}/`,
+        `${base}/produce_basement/${highcountDate}/`,
+        `${base}/inventory_worksheet/${inventoryDate}/produce/0/basement/csv/`,
+    ];
+    document.getElementById('clover-download-modal').classList.add('hidden');
+    let blocked = 0;
+    urls.forEach(u => {
+        const w = window.open(u, '_blank', 'noopener');
+        if (!w) blocked++;
+    });
+    if (blocked > 0) {
+        showToast(`${blocked} tab${blocked === 1 ? '' : 's'} blocked — allow popups for this site, then try again`, 'error');
+    } else {
+        showToast('Opened 3 Clover tabs — once they download, use Upload All Files', 'info');
+    }
+}
+
 // Submits the actual fetch request with the dates from the modal.
 async function commitFetchDailyFiles() {
     const deliveryDate  = document.getElementById('fetch-delivery-date').value;

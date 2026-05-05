@@ -269,6 +269,10 @@
                         <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
                         Fetch Daily Files
                     </button>
+                    <button class="admin-menu-btn" id="clover-download-btn" onclick="openCloverDownloadModal()">
+                        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 3h6v6"/><path d="M10 14L21 3"/><path d="M21 14v5a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5"/></svg>
+                        Download from Clover
+                    </button>
                     <button class="admin-menu-btn" id="upload-all-btn" onclick="document.getElementById('upload-input-bulk').click()">
                         <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
                         Upload All Files
@@ -316,6 +320,41 @@
                 <div class="modal-footer" style="display:flex;gap:8px;justify-content:flex-end">
                     <button class="btn btn-ghost" onclick="document.getElementById('fetch-daily-modal').classList.add('hidden')">Cancel</button>
                     <button class="btn btn-primary" onclick="commitFetchDailyFiles()">Fetch</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Modal: Download from Clover (opens 3 tabs to direct-download URLs) -->
+        <div id="clover-download-modal" class="modal hidden" onclick="this.classList.add('hidden')">
+            <div class="modal-backdrop"></div>
+            <div class="modal-content" style="max-width:440px;padding:1.5rem" onclick="event.stopPropagation()">
+                <div class="modal-header">
+                    <h2>Download from Clover</h2>
+                    <button class="icon-btn" onclick="document.getElementById('clover-download-modal').classList.add('hidden')">&times;</button>
+                </div>
+                <div class="modal-body" style="padding-top:0.75rem">
+                    <p style="color:#64748b;font-size:13px;margin-bottom:1rem">
+                        Opens 3 browser tabs to the Clover download URLs. You must be on the coop wifi/VPN and signed in to Clover. Allow popups if prompted. Then use <strong>Upload All Files</strong> to upload the downloaded files.
+                    </p>
+                    <label style="display:block;font-size:12px;font-weight:600;color:#475569;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:6px">
+                        Delivery worksheet date
+                    </label>
+                    <input type="date" id="clover-dl-delivery-date"
+                           style="width:100%;padding:9px 12px;border:1px solid #cbd5e1;border-radius:8px;font-size:15px;margin-bottom:1rem">
+                    <label style="display:block;font-size:12px;font-weight:600;color:#475569;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:6px">
+                        High count date
+                    </label>
+                    <input type="date" id="clover-dl-highcount-date"
+                           style="width:100%;padding:9px 12px;border:1px solid #cbd5e1;border-radius:8px;font-size:15px;margin-bottom:1rem">
+                    <label style="display:block;font-size:12px;font-weight:600;color:#475569;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:6px">
+                        Inventory date
+                    </label>
+                    <input type="date" id="clover-dl-inventory-date"
+                           style="width:100%;padding:9px 12px;border:1px solid #cbd5e1;border-radius:8px;font-size:15px;margin-bottom:1.25rem">
+                </div>
+                <div class="modal-footer" style="display:flex;gap:8px;justify-content:flex-end">
+                    <button class="btn btn-ghost" onclick="document.getElementById('clover-download-modal').classList.add('hidden')">Cancel</button>
+                    <button class="btn btn-primary" onclick="commitCloverDownload()">Open Downloads</button>
                 </div>
             </div>
         </div>
