@@ -24,6 +24,9 @@ FIREBASE_STORAGE_BUCKET = os.environ.get(
 # Firebase Storage paths
 STORAGE_INCOMING = "delivery-files/incoming"
 STORAGE_PROCESSED = "delivery-files/processed"
+# Combined-CSV pipeline (NEW_CSV_FORMAT.md) — kept separate from the legacy
+# PDF/CSV pipeline so IT test posts don't pollute the production import flow.
+STORAGE_INCOMING_V2 = "delivery-files/incoming-v2"
 
 # Known supplier names (used for supplier block detection in PDF)
 # This list should be kept in sync with actual suppliers

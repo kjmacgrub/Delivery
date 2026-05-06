@@ -4,7 +4,7 @@ Ingest endpoint for the IT-supplied combined CSV.
 POST /ingest
   - Header: X-API-Key: <INGEST_API_KEY>
   - Body: multipart/form-data with field "file" (CSV)
-  - Response: { "status": "ok", "path": "delivery-files/incoming/<filename>", "size": N }
+  - Response: { "status": "ok", "path": "delivery-files/incoming-v2/<filename>", "size": N }
 
 Sanity check: file must be non-empty UTF-8 and contain a `DELIVERY_WORKSHEET_V<n>`
 marker within the first 500 bytes. Full schema validation happens at parse time.
@@ -14,6 +14,8 @@ import os
 import re
 
 from fastapi import APIRouter, File, Header, HTTPException, Request, UploadFile
+
+from delivery.config import STORAGE_INCOMING_V2
 
 router = APIRouter()
 
@@ -55,5 +57,7 @@ async def ingest(
             detail="File missing DELIVERY_WORKSHEET_V<n> marker in preamble",
         )
 
-    path = storage.upload_file(file.filename, content, "text/csv")
+    path = f"{STORAGE_INCOMING_V2}/{file.filename}"
+    blob = storage.bucket.blob(path)
+    blob.upload_from_string(content, content_type="text/csv")
     return {"status": "ok", "path": path, "size": len(content)}
