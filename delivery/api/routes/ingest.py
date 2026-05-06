@@ -57,7 +57,7 @@ async def ingest(
             detail="File missing DELIVERY_WORKSHEET_V<n> marker in preamble",
         )
 
-    path = f"{STORAGE_INCOMING_V2}/{file.filename}"
-    blob = storage.bucket.blob(path)
-    blob.upload_from_string(content, content_type="text/csv")
+    path = storage.upload_file(
+        file.filename, content, "text/csv", prefix=STORAGE_INCOMING_V2
+    )
     return {"status": "ok", "path": path, "size": len(content)}

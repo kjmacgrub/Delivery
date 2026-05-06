@@ -4,12 +4,24 @@ Firebase Storage service for listing and downloading delivery files.
 
 import json
 import os
+import uuid
 from pathlib import Path
 from typing import List, Optional
 from datetime import datetime
 
 from delivery.config import STORAGE_INCOMING, STORAGE_PROCESSED, TEMP_DIR
 from delivery.models import StorageFile
+
+
+def _new_download_token_metadata() -> dict:
+    """Metadata that lets the Firebase Storage console "Download" button work.
+
+    Files uploaded via the Admin SDK don't get a download token automatically
+    (only client-SDK uploads do), so the console can't construct a download
+    URL without one. Stamping a UUID here makes admin-uploaded files
+    inspectable from the console like any other file.
+    """
+    return {"firebaseStorageDownloadTokens": uuid.uuid4().hex}
 
 
 class FirebaseStorageService:
@@ -70,10 +82,21 @@ class FirebaseStorageService:
 
         return new_path
 
-    def upload_file(self, filename: str, content: bytes, content_type: str) -> str:
-        """Upload a file to the incoming folder in Firebase Storage."""
-        path = f"{STORAGE_INCOMING}/{filename}"
+    def upload_file(
+        self,
+        filename: str,
+        content: bytes,
+        content_type: str,
+        prefix: str = STORAGE_INCOMING,
+    ) -> str:
+        """Upload a file to Firebase Storage under the given folder prefix.
+
+        Stamps a Firebase download token in metadata so the Storage console's
+        Download button works on admin-uploaded files.
+        """
+        path = f"{prefix}/{filename}"
         blob = self.bucket.blob(path)
+        blob.metadata = _new_download_token_metadata()
         blob.upload_from_string(content, content_type=content_type)
         return path
 
