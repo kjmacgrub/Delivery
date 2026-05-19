@@ -1256,7 +1256,8 @@ async function showStorageFiles() {
                 if (!dateGroups.has(dateStr)) dateGroups.set(dateStr, { delivery: null, highCount: null });
                 const g = dateGroups.get(dateStr);
                 if (lname.includes('high_count')) g.highCount = f;
-                else g.delivery = f;
+                else if (lname.includes('delivery') && lname.includes('worksheet')) g.delivery = f;
+                // else: skip — processing reports etc. share the date-in-filename pattern but aren't delivery worksheets
             }
         });
 
