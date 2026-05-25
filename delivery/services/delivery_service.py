@@ -10,7 +10,9 @@ from pathlib import Path
 from typing import Optional, List
 
 from delivery.parser.pdf_parser import PDFWorksheetParser
+from delivery.parser.csv_parser import CSVWorksheetParser
 from delivery.parser.product_parser import ProductDescriptionParser
+from delivery.services.csv_snapshot_service import CSVSnapshotService
 from delivery.models import (
     Delivery, DeliveryStatus, DeliverySummary,
     SupplierEntry, SupplierStatus,
@@ -35,6 +37,8 @@ class DeliveryService:
 
     def __init__(self, firestore_client=None):
         self.pdf_parser = PDFWorksheetParser()
+        self.csv_parser = CSVWorksheetParser()
+        self.snapshot_service = CSVSnapshotService(firestore_client=firestore_client)
         self._db = firestore_client
         # In-memory cache
         self._cache: dict = {}
@@ -89,7 +93,7 @@ class DeliveryService:
         if path.suffix.lower() == '.pdf':
             raw = self.pdf_parser.parse(file_path)
         elif path.suffix.lower() == '.csv':
-            raise NotImplementedError("CSV parser not yet implemented")
+            raw = self.csv_parser.parse(file_path)
         else:
             raise ValueError(f"Unsupported file type: {path.suffix}")
 
@@ -115,6 +119,26 @@ class DeliveryService:
 
         # Persist
         self._save_delivery(delivery)
+        return delivery
+
+    def consume_csv(self, local_path: str, source_path: str) -> Delivery:
+        """Parse a v2 CSV, persist as a Delivery, and write its snapshot.
+
+        Called by the freshness/import flow when a fresh CSV should be loaded.
+        Snapshot write follows delivery save — if it fails, the delivery still
+        exists but the in-process check will treat the day as "no snapshot"
+        (only app-only fields contribute). That's an acceptable failure mode;
+        a missing snapshot is recoverable by re-consuming the same CSV.
+        """
+        raw = self.csv_parser.parse(local_path)
+        delivery = self._raw_to_delivery(raw)
+        delivery.source_filename = Path(local_path).name
+        delivery.firebase_path = source_path
+        delivery.parsed_at = datetime.now(timezone.utc)
+        self._save_delivery(delivery)
+
+        raw["source_filename"] = delivery.source_filename
+        self.snapshot_service.write_snapshot(raw, source_path=source_path)
         return delivery
 
     def get_delivery(self, delivery_id: str) -> Optional[Delivery]:
@@ -600,7 +624,10 @@ class DeliveryService:
             supplier_id = str(uuid.uuid4())[:8]
             items = []
             for it in sb['items']:
-                item_id = str(uuid.uuid4())[:8]
+                # v2 CSV provides a canonical item_id; PDF flow does not, so we
+                # fall back to a UUID. The snapshot/diff logic relies on this id
+                # matching the CSV's item_id when v2 is used.
+                item_id = (it.get('item_id') or '').strip() or str(uuid.uuid4())[:8]
                 items.append(LineItem(
                     id=item_id,
                     supplier_entry_id=supplier_id,

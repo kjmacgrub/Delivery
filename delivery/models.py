@@ -54,7 +54,7 @@ class SupplierStatus(str, Enum):
 
 class LineItemBase(BaseModel):
     """Core line item fields from parsing."""
-    quantity_expected: int = Field(ge=0)
+    quantity_expected: float = Field(ge=0)
     category: str
     raw_description: str
     product_type: str = ""
@@ -101,7 +101,7 @@ class SetPullRequest(BaseModel):
 class SupplierEntryBase(BaseModel):
     """Core supplier entry fields."""
     supplier_name: str
-    expected_cases: int
+    expected_cases: float
     block_sequence: int
 
 
@@ -121,7 +121,7 @@ class DeliveryHeaderModel(BaseModel):
     delivery_date: Optional[date] = None
     day_number: Optional[int] = None
     week_number: Optional[int] = None
-    total_cases_expected: int = 0
+    total_cases_expected: float = 0
 
 
 class DeliveryBase(BaseModel):
@@ -130,7 +130,7 @@ class DeliveryBase(BaseModel):
     delivery_date: Optional[date] = None
     day_number: Optional[int] = None
     week_number: Optional[int] = None
-    total_cases_expected: int = 0
+    total_cases_expected: float = 0
     source_filename: str = ""
     firebase_path: Optional[str] = None
 
@@ -152,7 +152,7 @@ class DeliverySummary(BaseModel):
     id: str
     day_of_week: str
     delivery_date: Optional[date]
-    total_cases_expected: int
+    total_cases_expected: float
     source_filename: str
     status: DeliveryStatus
     parsed_at: Optional[datetime]
