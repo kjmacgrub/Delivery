@@ -141,6 +141,33 @@ def csv_consume(request: Request, body: ConsumeRequest) -> dict:
     }
 
 
+@router.get("/csv-current")
+def csv_current(request: Request) -> dict:
+    """Return the current v2 CSV's text + metadata.
+
+    Used by the produce-processor (cross-origin) so both apps share one
+    source of truth on which CSV is current. 404 if incoming-v2/ is empty.
+    """
+    storage = request.app.state.storage_service
+    if storage is None:
+        raise HTTPException(status_code=503, detail="Storage not configured")
+
+    candidate = pick_current_csv(storage.bucket)
+    if candidate is None:
+        raise HTTPException(status_code=404, detail="No CSV in incoming-v2/")
+
+    blob = storage.bucket.blob(candidate.path)
+    text = blob.download_as_text()
+    return {
+        "text": text,
+        "path": candidate.path,
+        "filename": candidate.filename,
+        "delivery_date": candidate.delivery_date.isoformat(),
+        "generated_at": candidate.generated_at.isoformat() if candidate.generated_at else None,
+        "version": candidate.version,
+    }
+
+
 @router.post("/csv-bulk-receive")
 def csv_bulk_receive(request: Request, body: BulkReceiveRequest) -> dict:
     """Mark all remaining PENDING items as received OK, archive, and complete.
