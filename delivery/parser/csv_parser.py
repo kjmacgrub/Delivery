@@ -9,6 +9,7 @@ csv_metadata block with format version, generation timestamp, and warnings.
 
 import csv
 import io
+import math
 import re
 from datetime import date, datetime
 from pathlib import Path
@@ -159,8 +160,11 @@ class CSVWorksheetParser(WorksheetParser):
 
 
 def _row_to_item(row: dict, line_seq: int) -> dict:
-    qty = _safe_float(row.get("quantity_expected"))
-    qty_out: float | int = int(qty) if qty.is_integer() else qty
+    # IT occasionally ships fractional quantity_expected (e.g. 0.8). Round up
+    # so the warehouse never expects fewer cases than IT's float implies.
+    # Tracked upstream — drop the ceil when IT confirms integer-only quantities.
+    qty_raw = _safe_float(row.get("quantity_expected"))
+    qty_out = math.ceil(qty_raw)
 
     pull_qty = _safe_int(row.get("pull_quantity"))
     basement = (row.get("basement_location") or "").strip()
