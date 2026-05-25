@@ -4314,8 +4314,37 @@ document.addEventListener('DOMContentLoaded', async () => {
     await initApp();
 });
 
+async function checkCsvFreshness() {
+    // CSV_IMPORT_POLICY.md §7 — on-visit decision tree.
+    // Auto-consumes a fresh CSV when safe; warns the user when an in-process
+    // day blocks the new CSV (the §8 modal is the proper UX for that case).
+    try {
+        const result = await apiGet('/csv-freshness');
+        if (result.action === 'load-silent') {
+            showToast(`Loading new worksheet for ${result.csv.delivery_date}...`, 'info');
+            await fetch(API + '/csv-consume', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ source_path: result.csv.path }),
+            });
+            showToast(`Loaded worksheet for ${result.csv.delivery_date}`, 'success');
+        } else if (result.action === 'prompt') {
+            // TODO §8 — modal with "Mark all received & load new worksheet" / Cancel.
+            const open = result.loaded.open_item_count;
+            showToast(
+                `New worksheet ready for ${result.csv.delivery_date}; current day still has ${open} items pending`,
+                'error'
+            );
+        }
+        // 'noop' and 'no-csv' fall through with no UI change.
+    } catch (e) {
+        console.warn('CSV freshness check failed:', e);
+    }
+}
+
 async function initApp() {
     try {
+        await checkCsvFreshness();
         const data = await apiGet('/deliveries');
         availableDeliveries = data.deliveries || [];
 
