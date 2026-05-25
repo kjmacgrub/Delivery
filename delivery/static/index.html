@@ -213,6 +213,23 @@
             </div>
         </div>
 
+        <!-- Modal: CSV Import (new worksheet available while current is in progress) -->
+        <div id="csv-import-modal" class="modal hidden">
+            <div class="modal-backdrop"></div>
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h2>New worksheet available</h2>
+                </div>
+                <div class="modal-body">
+                    <p id="csv-import-body"></p>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-secondary" onclick="cancelCsvImport()">Cancel</button>
+                    <button class="btn btn-success" onclick="confirmCsvImport()">Mark all received &amp; load new worksheet</button>
+                </div>
+            </div>
+        </div>
+
         <!-- View: Daily Logs -->
         <div id="view-dailylogs" class="view">
             <div id="dailylogs-content" class="card-list">

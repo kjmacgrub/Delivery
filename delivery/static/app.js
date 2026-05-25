@@ -4314,10 +4314,14 @@ document.addEventListener('DOMContentLoaded', async () => {
     await initApp();
 });
 
+// Holds the freshness response while the §8 modal is open, so the confirm
+// handler knows which delivery to bulk-receive and which CSV to load next.
+let pendingCsvImport = null;
+
 async function checkCsvFreshness() {
     // CSV_IMPORT_POLICY.md §7 — on-visit decision tree.
-    // Auto-consumes a fresh CSV when safe; warns the user when an in-process
-    // day blocks the new CSV (the §8 modal is the proper UX for that case).
+    // Auto-consumes a fresh CSV when safe; shows the §8 modal when an
+    // in-process day blocks the new CSV.
     try {
         const result = await apiGet('/csv-freshness');
         if (result.action === 'load-silent') {
@@ -4329,16 +4333,59 @@ async function checkCsvFreshness() {
             });
             showToast(`Loaded worksheet for ${result.csv.delivery_date}`, 'success');
         } else if (result.action === 'prompt') {
-            // TODO §8 — modal with "Mark all received & load new worksheet" / Cancel.
+            pendingCsvImport = result;
             const open = result.loaded.open_item_count;
-            showToast(
-                `New worksheet ready for ${result.csv.delivery_date}; current day still has ${open} items pending`,
-                'error'
-            );
+            const itemCount = result.loaded.item_count;
+            document.getElementById('csv-import-body').innerHTML =
+                `A new worksheet is available for <strong>${result.csv.delivery_date}</strong>.<br>` +
+                `The current worksheet (<strong>${result.loaded.delivery_date}</strong>) has ${itemCount} items, ` +
+                `<strong>${open}</strong> still unreceived.<br><br>` +
+                `Mark all remaining items as received and load the new worksheet?`;
+            document.getElementById('csv-import-modal').classList.remove('hidden');
         }
         // 'noop' and 'no-csv' fall through with no UI change.
     } catch (e) {
         console.warn('CSV freshness check failed:', e);
+    }
+}
+
+function cancelCsvImport() {
+    document.getElementById('csv-import-modal').classList.add('hidden');
+    pendingCsvImport = null;
+}
+
+async function confirmCsvImport() {
+    if (!pendingCsvImport) return;
+    const { csv, loaded } = pendingCsvImport;
+    const confirmBtn = document.querySelector('#csv-import-modal .btn-success');
+    confirmBtn.disabled = true;
+    try {
+        const bulkResp = await fetch(API + '/csv-bulk-receive', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ delivery_id: loaded.delivery_id }),
+        });
+        if (!bulkResp.ok) throw new Error(`bulk-receive failed: ${bulkResp.status}`);
+        const bulk = await bulkResp.json();
+
+        const consumeResp = await fetch(API + '/csv-consume', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ source_path: csv.path }),
+        });
+        if (!consumeResp.ok) throw new Error(`consume failed: ${consumeResp.status}`);
+
+        document.getElementById('csv-import-modal').classList.add('hidden');
+        pendingCsvImport = null;
+        showToast(
+            `Previous worksheet archived (${bulk.items_marked} bulk-received). Loaded ${csv.delivery_date}.`,
+            'success'
+        );
+        // Reload deliveries view to surface the newly-consumed worksheet.
+        await initApp();
+    } catch (e) {
+        showToast(`CSV import failed: ${e.message}`, 'error');
+        confirmBtn.disabled = false;
     }
 }
 
