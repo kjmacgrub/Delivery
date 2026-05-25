@@ -72,11 +72,12 @@ processing_instructions
 
 ## Rollout
 
-Single CSV fully replaces all four legacy files. **Hard cutover — no overlap period.**
+Single CSV replaces all four legacy files.
 
-- **Bucket**: the Delivery Firebase Storage bucket (same one currently used by `delivery-files/incoming/`). Both apps will read from there. Exact path within the bucket TBD.
-- **Trigger**: IT begins uploading to the agreed-upon path only when we ask. On that same day, both apps are switched to read from the new path.
+- **Bucket**: the Delivery Firebase Storage bucket. Path: `delivery-files/incoming-v2/`. Both apps read from there (the produce-processor reads cross-bucket).
+- **Trigger**: IT begins uploading to `incoming-v2/` only when we ask. On that same day, both apps are switched to read from the new path.
 - The four legacy files are currently user-generated (not produced by IT), so we control the cutover end-to-end without coordination risk.
+- **Import policy and PDF wean** — see [`CSV_IMPORT_POLICY.md`](./CSV_IMPORT_POLICY.md). That doc is the prevailing source for when to load a new CSV, how to handle in-process days, and the PDF fallback during the transition period. The original intent here was a hard cutover; the policy doc relaxes that to CSV-first with a short PDF safety net until the CSV pipeline has proven stable.
 
 ## App-side decisions (no IT input needed)
 
