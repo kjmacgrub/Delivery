@@ -9,7 +9,6 @@ csv_metadata block with format version, generation timestamp, and warnings.
 
 import csv
 import io
-import math
 import re
 from datetime import date, datetime
 from pathlib import Path
@@ -160,13 +159,21 @@ class CSVWorksheetParser(WorksheetParser):
 
 
 def _row_to_item(row: dict, line_seq: int) -> dict:
-    # IT occasionally ships fractional quantity_expected (e.g. 0.8). Round up
-    # so the warehouse never expects fewer cases than IT's float implies.
-    # Tracked upstream — drop the ceil when IT confirms integer-only quantities.
-    qty_raw = _safe_float(row.get("quantity_expected"))
-    qty_out = math.ceil(qty_raw)
+    qty = _safe_float(row.get("quantity_expected"))
+    qty_out: float | int = int(qty) if qty.is_integer() else qty
 
     pull_qty = _safe_int(row.get("pull_quantity"))
+    # Clamp the displayed pull to the bin's shelf capacity: never pull more
+    # than fits in the bin. A blank/zero/non-numeric bin_size carries no
+    # capacity info, so the pull is shown as-is.
+    bin_raw = (row.get("bin_size") or "").strip()
+    bin_capacity = _safe_float(bin_raw)
+    if bin_capacity > 0 and pull_qty > bin_capacity:
+        pull_qty = int(bin_capacity)
+    # Never pull more than was expected/received.
+    if pull_qty > qty:
+        pull_qty = int(qty)
+
     basement = (row.get("basement_location") or "").strip()
     if basement == "N":
         basement = ""
