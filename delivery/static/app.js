@@ -2143,6 +2143,17 @@ function renderItemList() {
     const delivery = currentDelivery;
     if (!delivery) return;
 
+    // A legitimately empty worksheet (e.g. a Sunday with no scheduled
+    // deliveries) loads fine but has zero items — say so plainly instead of a
+    // filter-dependent "All items received!" / "No items yet".
+    const worksheetItemCount = delivery.suppliers.reduce(
+        (sum, s) => sum + (s.items ? s.items.length : 0), 0);
+    if (worksheetItemCount === 0) {
+        const container = document.getElementById('flat-item-list');
+        container.innerHTML = `<div class="empty-state"><p>No deliveries scheduled</p></div>`;
+        return;
+    }
+
     // Flatten all items with supplier references
     let flatItems = [];
     delivery.suppliers.forEach((supplier, sIdx) => {

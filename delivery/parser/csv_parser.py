@@ -95,9 +95,12 @@ class CSVWorksheetParser(WorksheetParser):
 
     def parse_string(self, content: str, source_filename: str = "") -> dict:
         lines = content.splitlines()
-        if len(lines) < 7:
+        # 5-line preamble (lines 0-4) + header on line 6 (index 5). A
+        # header-only file with zero data rows is valid — e.g. a Sunday with
+        # no scheduled deliveries — and parses to an empty worksheet.
+        if len(lines) < 6:
             raise CSVParseError(
-                "File too short — expected at least 7 lines (6-line preamble + header)"
+                "File too short — expected at least 6 lines (5-line preamble + header)"
             )
 
         pre = read_preamble(content)
@@ -114,11 +117,13 @@ class CSVWorksheetParser(WorksheetParser):
                     f"line-1 date {delivery_date.isoformat()!r} — trusting line 1"
                 )
 
-        rows = list(csv.DictReader(io.StringIO("\n".join(lines[5:]))))
-        if rows:
-            missing = set(EXPECTED_COLUMNS) - set(rows[0].keys())
-            if missing:
-                raise CSVParseError(f"CSV missing required columns: {sorted(missing)}")
+        reader = csv.DictReader(io.StringIO("\n".join(lines[5:])))
+        # Validate the header columns from the header row itself, so a
+        # legitimately empty (no-delivery) worksheet is still schema-checked.
+        missing = set(EXPECTED_COLUMNS) - set(reader.fieldnames or [])
+        if missing:
+            raise CSVParseError(f"CSV missing required columns: {sorted(missing)}")
+        rows = list(reader)
 
         items_by_supplier: dict[str, list] = {}
         for line_seq, row in enumerate(rows):
