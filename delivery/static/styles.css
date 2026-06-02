@@ -2712,6 +2712,15 @@ textarea {
     line-height: 1.4;
 }
 
+.version-date {
+    margin-left: auto;
+    padding-left: 12px;
+    font-size: 12px;
+    color: var(--text-secondary);
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+
 /* ---- No Active Delivery Screen ---- */
 .no-delivery-screen {
     display: flex;

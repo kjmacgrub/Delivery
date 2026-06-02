@@ -10,44 +10,49 @@ document.addEventListener('gesturestart', e => e.preventDefault());
 document.addEventListener('gesturechange', e => e.preventDefault());
 
 // ---- Version History ----
+// date = when the change first shipped (ISO). Add the date when bumping.
 const VERSION_HISTORY = [
-    { version: 'v1.43', description: 'Street button in header, supplier name in modal, UX polish and label updates' },
-    { version: 'v1.42', description: 'Remove landing page; go straight to import when no active delivery' },
-    { version: 'v1.41', description: 'Cache busters use commit hash; version number only bumps on request' },
-    { version: 'v1.41', description: 'Confirmed label stacked above checkbox, pushed right of Floor Pull label' },
-    { version: 'v1.40', description: 'Pull confirmed checkbox sits next to Floor Pull label, steppers stay aligned' },
-    { version: 'v1.39', description: 'Pull confirmed checkbox moves inline above + button in modal' },
-    { version: 'v1.38', description: 'Bold supplier headings in Live Report' },
-    { version: 'v1.37', description: 'Remove Switch Delivery from menu; import or continue only' },
-    { version: 'v1.36', description: 'Suppliers pill toggles expand/collapse; remove Expand All pill' },
-    { version: 'v1.35', description: 'Suppliers accordion is the default view' },
-    { version: 'v1.34', description: 'Multi button shares centered position with Expand All' },
-    { version: 'v1.33', description: 'Sort bar: Suppliers/Items/Cases order, centered Expand All, Multi filter' },
-    { version: 'v1.32', description: 'Adjustment rows show quantity and status label for all types' },
-    { version: 'v1.31', description: 'Remove summary stat lines from all reports; show item detail only' },
-    { version: 'v1.30', description: 'Live Report pulls are interactive: tappable rows to confirm/unconfirm' },
-    { version: 'v1.29', description: 'Report item detail: names and supplier shown below case totals' },
-    { version: 'v1.28', description: 'Case-centric reports: show aggregate case totals instead of item rows' },
-    { version: 'v1.27', description: 'Pulls included in completion modal and completed delivery reports' },
-    { version: 'v1.26', description: 'Live Report section headings; rename View Reports to View Past Deliveries' },
-    { version: 'v1.25', description: 'Combined Live Report (adjustments + pulls) in hamburger menu' },
-    { version: 'v1.24', description: 'Continue Delivery option in hamburger menu' },
-    { version: 'v1.23', description: 'Delivery-first nav: auto-open active delivery, hamburger admin menu' },
-    { version: 'v1.22', description: 'Floor Pull inline with Qty Received; pull sheet syncs to item list' },
-    { version: 'v1.21', description: 'Manual floor pull stepper + Pull Sheet screen' },
-    { version: 'v1.20', description: 'Add commit hash to version display' },
-    { version: 'v1.19', description: 'Single-item unreceive, landing page polish, friendly filenames' },
-    { version: 'v1.12', description: 'Adjustments rename, pull confirmation, supplier sort, UI polish' },
-    { version: 'v1.06', description: 'Adjustments rename, notes in reports, header cleanup' },
-    { version: 'v1.02', description: 'Pull confirmation, auto-detect suppliers, live adjustments, cross-supplier view' },
-    { version: 'v1.01', description: 'Landing page refinements, inline reports, navigation fixes' },
-    { version: 'v1.00', description: 'Landing page, app title, version history' },
-    { version: 'v0.29', description: 'Firestore real-time listeners for live cross-iPad updates' },
-    { version: 'v0.28', description: 'Supplier accordion, progress bars, expand/collapse, report deletion' },
-    { version: 'v0.27', description: 'Pull quantity, reports viewer, layout redesign, UX improvements' },
-    { version: 'v0.26', description: 'Bulk receive/unreceive, Receive All, Delivery Complete flow' },
-    { version: 'v0.25', description: 'Fix floor-pull quantities and merge duplicate supplier blocks' },
-    { version: 'v0.24', description: 'Initial delivery worksheet parser, API, and iPad check-in UI' },
+    { version: 'v1.47', date: '2026-06-02', description: 'Clickable Clover item ID in the edit panel; dated changelog entries' },
+    { version: 'v1.46', date: '2026-05-31', description: 'Handle empty (no-delivery) worksheets instead of erroring' },
+    { version: 'v1.45', date: '2026-05-29', description: 'Floor pull capped at bin size and expected quantity' },
+    { version: 'v1.44', date: '2026-05-25', description: 'Combined CSV: auto-import newest worksheet on visit, bulk-receive prompt, /csv-current for the produce processor' },
+    { version: 'v1.43', date: '2026-02-21', description: 'Street button in header, supplier name in modal, UX polish and label updates' },
+    { version: 'v1.42', date: '2026-02-21', description: 'Remove landing page; go straight to import when no active delivery' },
+    { version: 'v1.41', date: '2026-02-20', description: 'Cache busters use commit hash; version number only bumps on request' },
+    { version: 'v1.41', date: '2026-02-20', description: 'Confirmed label stacked above checkbox, pushed right of Floor Pull label' },
+    { version: 'v1.40', date: '2026-02-20', description: 'Pull confirmed checkbox sits next to Floor Pull label, steppers stay aligned' },
+    { version: 'v1.39', date: '2026-02-20', description: 'Pull confirmed checkbox moves inline above + button in modal' },
+    { version: 'v1.38', date: '2026-02-20', description: 'Bold supplier headings in Live Report' },
+    { version: 'v1.37', date: '2026-02-20', description: 'Remove Switch Delivery from menu; import or continue only' },
+    { version: 'v1.36', date: '2026-02-20', description: 'Suppliers pill toggles expand/collapse; remove Expand All pill' },
+    { version: 'v1.35', date: '2026-02-20', description: 'Suppliers accordion is the default view' },
+    { version: 'v1.34', date: '2026-02-20', description: 'Multi button shares centered position with Expand All' },
+    { version: 'v1.33', date: '2026-02-20', description: 'Sort bar: Suppliers/Items/Cases order, centered Expand All, Multi filter' },
+    { version: 'v1.32', date: '2026-02-20', description: 'Adjustment rows show quantity and status label for all types' },
+    { version: 'v1.31', date: '2026-02-20', description: 'Remove summary stat lines from all reports; show item detail only' },
+    { version: 'v1.30', date: '2026-02-20', description: 'Live Report pulls are interactive: tappable rows to confirm/unconfirm' },
+    { version: 'v1.29', date: '2026-02-20', description: 'Report item detail: names and supplier shown below case totals' },
+    { version: 'v1.28', date: '2026-02-20', description: 'Case-centric reports: show aggregate case totals instead of item rows' },
+    { version: 'v1.27', date: '2026-02-20', description: 'Pulls included in completion modal and completed delivery reports' },
+    { version: 'v1.26', date: '2026-02-20', description: 'Live Report section headings; rename View Reports to View Past Deliveries' },
+    { version: 'v1.25', date: '2026-02-20', description: 'Combined Live Report (adjustments + pulls) in hamburger menu' },
+    { version: 'v1.24', date: '2026-02-20', description: 'Continue Delivery option in hamburger menu' },
+    { version: 'v1.23', date: '2026-02-20', description: 'Delivery-first nav: auto-open active delivery, hamburger admin menu' },
+    { version: 'v1.22', date: '2026-02-20', description: 'Floor Pull inline with Qty Received; pull sheet syncs to item list' },
+    { version: 'v1.21', date: '2026-02-20', description: 'Manual floor pull stepper + Pull Sheet screen' },
+    { version: 'v1.20', date: '2026-02-20', description: 'Add commit hash to version display' },
+    { version: 'v1.19', date: '2026-02-18', description: 'Single-item unreceive, landing page polish, friendly filenames' },
+    { version: 'v1.12', date: '2026-02-18', description: 'Adjustments rename, pull confirmation, supplier sort, UI polish' },
+    { version: 'v1.06', date: '2026-02-18', description: 'Adjustments rename, notes in reports, header cleanup' },
+    { version: 'v1.02', date: '2026-02-18', description: 'Pull confirmation, auto-detect suppliers, live adjustments, cross-supplier view' },
+    { version: 'v1.01', date: '2026-02-17', description: 'Landing page refinements, inline reports, navigation fixes' },
+    { version: 'v1.00', date: '2026-02-17', description: 'Landing page, app title, version history' },
+    { version: 'v0.29', date: '2026-02-17', description: 'Firestore real-time listeners for live cross-iPad updates' },
+    { version: 'v0.28', date: '2026-02-17', description: 'Supplier accordion, progress bars, expand/collapse, report deletion' },
+    { version: 'v0.27', date: '2026-02-17', description: 'Pull quantity, reports viewer, layout redesign, UX improvements' },
+    { version: 'v0.26', date: '2026-02-17', description: 'Bulk receive/unreceive, Receive All, Delivery Complete flow' },
+    { version: 'v0.25', date: '2026-02-17', description: 'Fix floor-pull quantities and merge duplicate supplier blocks' },
+    { version: 'v0.24', date: '2026-02-17', description: 'Initial delivery worksheet parser, API, and iPad check-in UI' },
 ];
 
 // ---- Firebase Real-time ----
@@ -4138,10 +4143,12 @@ function playFireworks(onComplete) {
 
 function showVersionHistory() {
     const container = document.getElementById('version-list');
+    const fmtDate = d => d ? new Date(d + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '';
     container.innerHTML = VERSION_HISTORY.map((entry, idx) => `
         <div class="version-entry${idx === 0 ? ' version-current' : ''}">
             <span class="version-number">${entry.version}</span>
             <span class="version-desc">${entry.description}</span>
+            <span class="version-date">${fmtDate(entry.date)}</span>
         </div>
     `).join('');
     document.getElementById('version-modal').classList.remove('hidden');
