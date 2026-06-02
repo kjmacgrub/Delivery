@@ -3348,6 +3348,19 @@ textarea {
     color: var(--text-secondary);
 }
 
+.ie-title-itemid {
+    margin-left: 8px;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--primary);
+    text-decoration: none;
+    font-variant-numeric: tabular-nums;
+}
+
+.ie-title-itemid:hover {
+    text-decoration: underline;
+}
+
 .ie-title-note {
     position: absolute;
     top: 0;

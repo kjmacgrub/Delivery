@@ -1570,6 +1570,19 @@ function cleanupInlineEditState() {
     delete item._ieOriginal;
 }
 
+// Open a Clover item page in a separate browser window (not just a tab).
+// Passing window features forces a popup window; centered ~1200x900.
+function openCloverItem(event, itemId) {
+    event.preventDefault();
+    event.stopPropagation();
+    const url = `https://inventory.intranet.psfc.coop/item/${itemId}/`;
+    const w = Math.min(1200, screen.availWidth);
+    const h = Math.min(900, screen.availHeight);
+    const left = Math.max(0, (screen.availWidth - w) / 2);
+    const top = Math.max(0, (screen.availHeight - h) / 2);
+    window.open(url, '_blank', `width=${w},height=${h},left=${left},top=${top},noopener,noreferrer`);
+}
+
 function renderInlineEditPanel(item) {
     const si = item.supplierIdx, ii = item.itemIdx;
     const pullQty = item._iePullQty ?? 0;
@@ -1583,11 +1596,18 @@ function renderInlineEditPanel(item) {
     const itemNote = item._ieItemNote || '';
 
     const supplierName = currentDelivery.suppliers[si].supplier_name || item.supplierName || '';
+    // Show the Clover item ID to the right of the supplier, linked into the
+    // Clover catalog. Only real Clover IDs are numeric; PDF-flow items use a
+    // UUID and have no Clover page, so the ID is omitted for those.
+    const itemId = (item.id || '').trim();
+    const itemIdHtml = /^\d+$/.test(itemId)
+        ? `<a class="ie-title-itemid" href="https://inventory.intranet.psfc.coop/item/${itemId}/" title="Open in Clover" onclick="openCloverItem(event, '${itemId}')">${itemId}</a>`
+        : '';
     document.getElementById('ie-overlay').innerHTML = `
     <div class="inline-edit-panel">
         <div class="ie-title">
             <span class="ie-title-item${oosConfirmed ? ' ie-oos-struck' : ''}">${item.raw_description}</span>
-            <span class="ie-title-supplier">${supplierName}</span>
+            <span class="ie-title-supplier">${supplierName}${itemIdHtml}</span>
             <div class="ie-title-note">
                 <span class="ie-title-note-label">note</span>
                 <textarea class="ie-title-note-input" rows="2" placeholder="Add note..." oninput="ieUpdateItemNote(${si}, ${ii}, this.value)">${escapeAttr(itemNote)}</textarea>
