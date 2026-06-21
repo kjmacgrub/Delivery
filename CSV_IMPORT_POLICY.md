@@ -63,7 +63,8 @@ On every page load, each app:
    - **`loadedDate` is empty** → load `csvDate` silently.
    - **`csvDate > loadedDate`**:
      - If `loadedDate` is **not in process** → load `csvDate` silently, archive the empty/untouched prior day (no-op if it was empty).
-     - If `loadedDate` **is in process** → show the bulk-action prompt (§8).
+     - If `loadedDate` **is in process** and `loadedDate` **is older than today** → the loaded day is stale (left open from a prior day). Archive it *as-is* (unreceived items stay unreceived) and load `csvDate` silently. Do **not** mark the stale day's items received. (Server action `load-archive`; endpoint `POST /csv-archive-complete`.)
+     - If `loadedDate` **is in process** and `loadedDate` **is today** → keep the loaded day; ignore the new CSV (server action `prompt`). Today's active work is never auto-replaced.
    - **`csvDate == loadedDate`**:
      - If `csvDate` matches `loadedDate` but the file content differs from the loaded snapshot (same-day re-send by IT) → out of scope for v1. Treat as no-op. Document as a known limitation; revisit if it happens in practice.
    - **`csvDate < loadedDate`** → no-op. (Shouldn't happen unless IT uploads a backdated file.)

@@ -4387,9 +4387,13 @@ document.addEventListener('DOMContentLoaded', async () => {
 
 async function checkCsvFreshness() {
     // CSV_IMPORT_POLICY.md §7 — on-visit decision tree.
-    // Auto-consumes a fresh CSV when safe. When the currently loaded day is
-    // in process the backend returns 'prompt'; we silently ignore the new CSV
-    // (leave the in-process day loaded) rather than interrupting with a dialog.
+    // Auto-consumes a fresh CSV when safe:
+    //   'load-silent'  — newer CSV, current day untouched → load it.
+    //   'load-archive' — newer CSV, current day is in process but is OLDER than
+    //                    today → archive the stale day as-is and load the new one.
+    //   'prompt'       — newer CSV, but the current (today's) day is in process →
+    //                    leave it loaded, ignore the new CSV.
+    //   'noop'/'no-csv'— nothing to do.
     try {
         const result = await apiGet('/csv-freshness');
         if (result.action === 'load-silent') {
@@ -4400,8 +4404,26 @@ async function checkCsvFreshness() {
                 body: JSON.stringify({ source_path: result.csv.path }),
             });
             showToast(`Loaded worksheet for ${result.csv.delivery_date}`, 'success');
+        } else if (result.action === 'load-archive') {
+            const oldDate = result.loaded.delivery_date;
+            showToast(`Archiving ${oldDate} and loading ${result.csv.delivery_date}...`, 'info');
+            // Archive the stale day first; only load the new CSV if it succeeds.
+            const archiveRes = await fetch(API + '/csv-archive-complete', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ delivery_id: result.loaded.delivery_id }),
+            });
+            if (!archiveRes.ok) {
+                throw new Error(`Archive failed (${archiveRes.status}); keeping ${oldDate}`);
+            }
+            await fetch(API + '/csv-consume', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ source_path: result.csv.path }),
+            });
+            showToast(`Archived ${oldDate}; loaded worksheet for ${result.csv.delivery_date}`, 'success');
         }
-        // 'prompt' (current day in process), 'noop', and 'no-csv' all fall
+        // 'prompt' (today's day in process), 'noop', and 'no-csv' all fall
         // through with no import and no UI change.
     } catch (e) {
         console.warn('CSV freshness check failed:', e);

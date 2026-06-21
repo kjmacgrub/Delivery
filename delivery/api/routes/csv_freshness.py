@@ -32,7 +32,7 @@ def csv_freshness(request: Request) -> dict:
 
     Response shape:
         {
-          "action": "load-silent" | "prompt" | "noop" | "no-csv",
+          "action": "load-silent" | "load-archive" | "prompt" | "noop" | "no-csv",
           "csv":    {path, filename, delivery_date, generated_at, version} | null,
           "loaded": {delivery_id, delivery_date, status, in_process, in_process_reasons,
                      item_count, open_item_count} | null,
@@ -91,11 +91,21 @@ def csv_freshness(request: Request) -> dict:
     loaded_info = {**loaded_info, "in_process": diff["in_process"], "in_process_reasons": diff["reasons"]}
 
     if diff["in_process"]:
+        # An in-process day is only protected while it's still *today's* day. If
+        # the loaded day is older than today, it's a stale day left open — archive
+        # it as-is and load the newer worksheet rather than sitting on stale data.
+        if loaded_date < date_type.today():
+            return {
+                "action": "load-archive",
+                "csv": csv_info,
+                "loaded": loaded_info,
+                "reason": "Newer CSV available; current in-process day is older than today — archive it and load the new day",
+            }
         return {
             "action": "prompt",
             "csv": csv_info,
             "loaded": loaded_info,
-            "reason": "Newer CSV available; current day is in process",
+            "reason": "Newer CSV available; current day (today) is in process — keeping it",
         }
 
     return {
@@ -138,6 +148,46 @@ def csv_consume(request: Request, body: ConsumeRequest) -> dict:
         "delivery_date": delivery.delivery_date.isoformat() if delivery.delivery_date else None,
         "item_count": sum(len(s.items) for s in delivery.suppliers),
         "source_path": body.source_path,
+    }
+
+
+@router.post("/csv-archive-complete")
+def csv_archive_complete(request: Request, body: BulkReceiveRequest) -> dict:
+    """Archive a delivery to its daily log AS-IS, then mark it COMPLETED.
+
+    Unlike /csv-bulk-receive (§8), this does NOT touch item received status —
+    unreceived items stay unreceived in the archive. Used to close out a stale
+    older in-process day before auto-loading a newer worksheet (CSV_IMPORT_POLICY.md
+    §7, "load-archive"). Archive happens BEFORE the status mutation per §9 — if the
+    archive write fails, nothing else runs and the caller must not load the new CSV.
+    """
+    delivery_service = request.app.state.delivery_service
+    log_service = getattr(request.app.state, "daily_log_service", None)
+    if delivery_service is None:
+        raise HTTPException(status_code=503, detail="Delivery service not configured")
+
+    delivery = delivery_service.get_delivery(body.delivery_id)
+    if delivery is None:
+        raise HTTPException(status_code=404, detail=f"Delivery not found: {body.delivery_id}")
+
+    # §9: archive first.
+    if log_service is not None:
+        try:
+            log_service.snapshot_delivery(delivery)
+        except Exception as e:
+            log.exception("Archive failed before archive-complete on %s", body.delivery_id)
+            raise HTTPException(status_code=500, detail=f"Archive failed: {e}")
+
+    now = datetime.now(timezone.utc)
+    delivery.status = DeliveryStatus.COMPLETED
+    if not delivery.completed_at:
+        delivery.completed_at = now
+    delivery_service._save_delivery(delivery)
+
+    return {
+        "delivery_id": delivery.id,
+        "delivery_date": delivery.delivery_date.isoformat() if delivery.delivery_date else None,
+        "archived": log_service is not None,
     }
 
 
