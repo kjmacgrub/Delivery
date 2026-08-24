@@ -317,11 +317,16 @@ html, body {
 
 .header-link-text {
     color: #000;
-    font-size: 15px;
+    font-size: 11px;
     font-weight: 600;
+    line-height: 1.15;
+    letter-spacing: 0.01em;
     text-decoration: none;
-    padding: 8px 10px;
+    padding: 6px 10px;
     white-space: nowrap;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
 }
 
 .icon-btn:active {
