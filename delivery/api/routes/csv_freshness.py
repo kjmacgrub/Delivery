@@ -11,7 +11,7 @@ from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
 
 from delivery.models import DeliveryStatus, ReceivedStatus, SupplierStatus
-from delivery.services.csv_picker import pick_current_csv
+from delivery.services.csv_picker import cleanup_old_csvs, pick_current_csv
 
 
 router = APIRouter()
@@ -142,6 +142,13 @@ def csv_consume(request: Request, body: ConsumeRequest) -> dict:
     except Exception as e:
         log.exception("consume_csv failed for %s", body.source_path)
         raise HTTPException(status_code=500, detail=f"Failed to consume CSV: {e}")
+
+    # Clean up deliveries and incoming-v2/ CSVs older than 7 days
+    try:
+        delivery_service.cleanup_old_deliveries()
+        cleanup_old_csvs(storage.bucket)
+    except Exception:
+        log.exception("7-day cleanup failed after consuming %s", body.source_path)
 
     return {
         "delivery_id": delivery.id,
