@@ -213,11 +213,6 @@ html, body {
     position: relative;
 }
 
-.menu-btn {
-    color: var(--text);
-    flex-shrink: 0;
-}
-
 #header-brand-text {
     position: absolute;
     left: 50%;
@@ -2757,51 +2752,6 @@ textarea {
     font-size: 15px;
     color: var(--text-secondary);
     margin-bottom: 12px;
-}
-
-/* ---- Admin Menu Modal ---- */
-.admin-modal-content {
-    max-height: 60vh;
-}
-
-.admin-modal-body {
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-    padding-top: 8px;
-}
-
-.admin-menu-btn {
-    display: flex;
-    align-items: center;
-    gap: 16px;
-    padding: 16px 20px;
-    background: var(--bg);
-    border: none;
-    border-radius: var(--radius);
-    font-size: 17px;
-    font-weight: 600;
-    color: var(--text);
-    cursor: pointer;
-    -webkit-tap-highlight-color: transparent;
-    width: 100%;
-    text-align: left;
-    transition: background 0.15s;
-}
-
-.admin-menu-btn:active {
-    background: var(--border);
-}
-
-.admin-menu-btn--highlight {
-    background: #f0fdf4;
-    border: 2px solid #10b981;
-    color: #065f46;
-    font-weight: 700;
-}
-
-.admin-menu-btn--highlight:active {
-    background: #dcfce7;
 }
 
 /* ---- Change Alerts ---- */

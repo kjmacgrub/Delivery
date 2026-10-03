@@ -22,13 +22,6 @@
         <!-- Header -->
         <header id="app-header">
             <div id="header-brand" class="header-brand">
-                <button id="menu-btn" class="icon-btn menu-btn" onclick="openAdminModal()" aria-label="Menu" data-tooltip="Files">
-                    <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-                        <line x1="3" y1="6" x2="21" y2="6"/>
-                        <line x1="3" y1="12" x2="21" y2="12"/>
-                        <line x1="3" y1="18" x2="21" y2="18"/>
-                    </svg>
-                </button>
                 <button id="reports-btn" class="icon-btn hidden" onclick="showDailyLogs()" aria-label="Reports" data-tooltip="Reports" style="position:relative">
                     <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                         <path d="M16 3H5a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2V8z"/>
@@ -235,91 +228,6 @@
                 </div>
                 <div class="modal-body">
                     <div id="version-list" class="version-list"></div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Modal: Admin Menu -->
-        <div id="admin-modal" class="modal hidden">
-            <div class="modal-backdrop" onclick="closeAdminModal()"></div>
-            <div class="modal-content admin-modal-content">
-                <div class="modal-header">
-                    <h2>Menu</h2>
-                    <button class="icon-btn" onclick="closeAdminModal()">&times;</button>
-                </div>
-                <div class="modal-body admin-modal-body">
-
-<input type="file" id="upload-input-delivery" accept=".pdf,.csv" style="display:none" onchange="handleTypedUpload(event,'delivery')">
-                    <input type="file" id="upload-input-highcount" accept=".pdf,.csv" style="display:none" onchange="handleTypedUpload(event,'highcount')">
-                    <input type="file" id="upload-input-inventory" accept=".csv" style="display:none" onchange="handleTypedUpload(event,'inventory')">
-
-                    <div id="file-status-panel" style="margin-bottom:12px">
-                        <div style="font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:#64748b;margin-bottom:8px">Today's Files</div>
-                        <div id="file-status-rows" style="display:flex;flex-direction:column;gap:8px">
-                            <div style="color:#94a3b8;font-size:14px">Loading...</div>
-                        </div>
-                    </div>
-                    <button class="admin-menu-btn" id="fetch-daily-btn" onclick="fetchDailyFiles()">
-                        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-                        Fetch Daily Files
-                    </button>
-                    <a class="admin-menu-btn" href="https://inventory.intranet.psfc.coop/login/" target="_blank" rel="noopener" style="text-decoration:none">
-                        <img src="/static/images/clover-icon.png" alt="" width="22" height="22" style="object-fit:contain">
-                        Open Clover
-                    </a>
-                                        <button class="admin-menu-btn" onclick="closeAdminModal(); loadDeliveries()">
-                        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 17H7v-7h2m4 7h-2V7h2m4 10h-2v-4h2"/><rect x="2" y="2" width="20" height="20" rx="2"/></svg>
-                        Manage Deliveries
-                    </button>
-                </div>
-            </div>
-        </div>
-
-        <!-- Modal: Fetch Daily Files date picker -->
-        <div id="fetch-daily-modal" class="modal hidden" onclick="this.classList.add('hidden')">
-            <div class="modal-backdrop"></div>
-            <div class="modal-content" style="max-width:420px;padding:1.5rem" onclick="event.stopPropagation()">
-                <div class="modal-header">
-                    <h2>Fetch Daily Files</h2>
-                    <button class="icon-btn" onclick="document.getElementById('fetch-daily-modal').classList.add('hidden')">&times;</button>
-                </div>
-                <div class="modal-body" style="padding-top:0.75rem">
-                    <p style="color:#64748b;font-size:13px;margin-bottom:1rem">
-                        Adjust the dates if needed. Defaults: tomorrow for delivery worksheet and basement high count, today for inventory CSV.
-                    </p>
-                    <label style="display:block;font-size:12px;font-weight:600;color:#475569;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:6px">
-                        Delivery worksheet date
-                    </label>
-                    <input type="date" id="fetch-delivery-date"
-                           style="width:100%;padding:9px 12px;border:1px solid #cbd5e1;border-radius:8px;font-size:15px;margin-bottom:1rem">
-                    <label style="display:block;font-size:12px;font-weight:600;color:#475569;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:6px">
-                        High count date
-                    </label>
-                    <input type="date" id="fetch-highcount-date"
-                           style="width:100%;padding:9px 12px;border:1px solid #cbd5e1;border-radius:8px;font-size:15px;margin-bottom:1rem">
-                    <label style="display:block;font-size:12px;font-weight:600;color:#475569;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:6px">
-                        Inventory date
-                    </label>
-                    <input type="date" id="fetch-inventory-date"
-                           style="width:100%;padding:9px 12px;border:1px solid #cbd5e1;border-radius:8px;font-size:15px;margin-bottom:1.25rem">
-                </div>
-                <div class="modal-footer" style="display:flex;gap:8px;justify-content:flex-end">
-                    <button class="btn btn-ghost" onclick="document.getElementById('fetch-daily-modal').classList.add('hidden')">Cancel</button>
-                    <button class="btn btn-primary" onclick="commitFetchDailyFiles()">Fetch</button>
-                </div>
-            </div>
-        </div>
-
-        <!-- Modal: Clover Help -->
-        <div id="clover-help-modal" class="modal hidden" onclick="this.classList.add('hidden')">
-            <div class="modal-backdrop"></div>
-            <div class="modal-content" style="max-width:600px;padding:1.5rem" onclick="event.stopPropagation()">
-                <div class="modal-header">
-                    <h2 id="clover-help-title">Where to find this in Clover</h2>
-                    <button class="icon-btn" onclick="document.getElementById('clover-help-modal').classList.add('hidden')">&times;</button>
-                </div>
-                <div class="modal-body" style="text-align:center;padding-top:1rem">
-                    <img id="clover-help-img" src="" alt="Clover screenshot" style="max-width:100%;border-radius:8px;box-shadow:0 4px 20px rgba(0,0,0,0.15)">
                 </div>
             </div>
         </div>
