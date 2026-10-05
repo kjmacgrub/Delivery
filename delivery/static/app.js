@@ -4117,10 +4117,10 @@ function updateTitleTooltip() {
     }
     const first = formatTimeOnly(new Date(Math.min(...times)));
     const last = formatTimeOnly(new Date(Math.max(...times)));
-    if (first === last) {
+    if (times.length === 1) {
         timesEl.textContent = `Started: ${first}`;
     } else {
-        timesEl.textContent = `First: ${first} · Recent: ${last}`;
+        timesEl.textContent = `Started: ${first} · Last: ${last}`;
     }
 }
 
