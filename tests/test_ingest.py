@@ -101,3 +101,22 @@ def test_same_filename_does_not_overwrite(client):
     assert paths[1] != paths[0]
     assert store.uploads[0][1] == GOOD
     assert store.uploads[1][1] == second
+
+
+INVENTORY = (
+    "﻿delivery_Fri-2026-10-23\n(generated 2026-10-23 03:33)\n \n"
+    "DELIVERY_WORKSHEET_V1\n\"\"\nitem_id,item_name,type\n1,Apple,produce\n2,Sponge,inventory\n"
+).encode("utf-8")
+
+
+def test_inventory_file_routed_to_its_own_folder(client):
+    from delivery.config import STORAGE_INCOMING_INVENTORY
+    c, store = client
+    r = post(c, INVENTORY)
+    assert r.status_code == 200, r.text
+    assert r.json()["kind"] == "inventory"
+    assert r.json()["path"] == f"{STORAGE_INCOMING_INVENTORY}/delivery_Fri-2026-10-23"
+    # Worksheet with the same name still lands in incoming-v2, untouched by the above.
+    r2 = post(c, GOOD)
+    assert r2.json()["kind"] == "worksheet"
+    assert r2.json()["path"] == f"{STORAGE_INCOMING_V2}/delivery_Fri-2026-10-23"

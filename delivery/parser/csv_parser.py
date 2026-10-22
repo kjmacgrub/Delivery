@@ -81,6 +81,25 @@ def read_preamble(text: str) -> dict:
     }
 
 
+# IT's second nightly file (full-store inventory) shares the worksheet preamble
+# but adds a `type` column (values: produce / inventory). That column is how
+# the ingest endpoint and the CSV picker tell it apart from the worksheet.
+INVENTORY_COLUMN = "type"
+
+
+def read_header_columns(text: str) -> list:
+    """Column names from line 6 (the data header), or [] if the text is shorter."""
+    lines = text.splitlines()
+    if len(lines) < 6:
+        return []
+    return [c.strip().strip('"').lstrip("\ufeff") for c in lines[5].split(",")]
+
+
+def is_inventory_file(text: str) -> bool:
+    """True if the header carries the inventory-file `type` column."""
+    return INVENTORY_COLUMN in read_header_columns(text)
+
+
 class CSVWorksheetParser(WorksheetParser):
     """Parse the combined IT-supplied CSV into the worksheet shape."""
 

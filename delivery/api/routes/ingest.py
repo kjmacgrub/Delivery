@@ -12,6 +12,10 @@ marker within the first 500 bytes. Full schema validation happens at parse time.
 Files that fail the sanity check are kept in delivery-files/rejected/ (prefixed
 with the UTC receive time) so they can be inspected, and the 422 response says so.
 
+IT's second nightly file (full-store inventory, extra `type` column, same
+preamble) is routed to delivery-files/incoming-inventory/ instead, so the
+worksheet picker never considers it. The response carries "kind": "inventory".
+
 An upload whose filename already exists in incoming-v2/ never overwrites the
 earlier file: it is stored as `<filename>__<UTC receive time>` instead. The CSV
 picker chooses by preamble (delivery date, then generation time), not filename,
@@ -25,7 +29,8 @@ from datetime import datetime, timezone
 
 from fastapi import APIRouter, File, Header, HTTPException, Request, UploadFile
 
-from delivery.config import STORAGE_INCOMING_V2, STORAGE_REJECTED
+from delivery.config import STORAGE_INCOMING_INVENTORY, STORAGE_INCOMING_V2, STORAGE_REJECTED
+from delivery.parser.csv_parser import is_inventory_file
 
 log = logging.getLogger(__name__)
 router = APIRouter()
@@ -98,11 +103,18 @@ async def ingest(
             "File missing DELIVERY_WORKSHEET_V<n> marker in preamble",
         )
 
+    # The data header sits on line 6, well inside the first 2 KB.
+    if is_inventory_file(content[:2048].decode("utf-8", errors="replace")):
+        prefix, kind = STORAGE_INCOMING_INVENTORY, "inventory"
+    else:
+        prefix, kind = STORAGE_INCOMING_V2, "worksheet"
+
     name = _safe_name(file.filename)
-    if storage.file_exists(f"{STORAGE_INCOMING_V2}/{name}"):
+    if storage.file_exists(f"{prefix}/{name}"):
         # Same filename as an earlier upload — keep both.
         name = f"{name}__{_utc_stamp()}"
         log.info("ingest: filename already present, storing as %s", name)
 
-    path = storage.upload_file(name, content, "text/csv", prefix=STORAGE_INCOMING_V2)
-    return {"status": "ok", "path": path, "size": len(content)}
+    path = storage.upload_file(name, content, "text/csv", prefix=prefix)
+    log.info("ingest: stored %s file at %s (%d bytes)", kind, path, len(content))
+    return {"status": "ok", "kind": kind, "path": path, "size": len(content)}

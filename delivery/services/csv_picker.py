@@ -17,7 +17,7 @@ from datetime import date, datetime, timedelta
 from typing import Optional
 
 from delivery.config import STORAGE_INCOMING_V2
-from delivery.parser.csv_parser import CSVParseError, read_preamble
+from delivery.parser.csv_parser import CSVParseError, is_inventory_file, read_preamble
 
 
 log = logging.getLogger(__name__)
@@ -42,7 +42,13 @@ def _read_candidate(blob) -> Optional[CSVCandidate]:
     # The DELIVERY_WORKSHEET_V<n> marker in the preamble is the real format check.
     try:
         head = blob.download_as_bytes(start=0, end=PREAMBLE_BYTES - 1)
-        pre = read_preamble(head.decode("utf-8", errors="replace"))
+        text = head.decode("utf-8", errors="replace")
+        if is_inventory_file(text):
+            # Same preamble as the worksheet, but it's the full-store inventory
+            # file — never a worksheet candidate, whatever its generation time.
+            log.info("CSV picker: skipping %s — inventory file (has `type` column)", blob.name)
+            return None
+        pre = read_preamble(text)
     except CSVParseError as e:
         log.warning("CSV picker: skipping %s — %s", blob.name, e)
         return None

@@ -29,6 +29,9 @@ STORAGE_PROCESSED = "delivery-files/processed"
 STORAGE_INCOMING_V2 = "delivery-files/incoming-v2"
 # Uploads to /ingest that failed the preamble sanity check (kept for inspection)
 STORAGE_REJECTED = "delivery-files/rejected"
+# IT's second nightly file: same preamble, full-store rows, extra `type` column.
+# Kept out of incoming-v2/ so the worksheet picker never sees it.
+STORAGE_INCOMING_INVENTORY = "delivery-files/incoming-inventory"
 
 # Known supplier names (used for supplier block detection in PDF)
 # This list should be kept in sync with actual suppliers
