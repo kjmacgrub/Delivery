@@ -100,6 +100,10 @@ class FirebaseStorageService:
         blob.upload_from_string(content, content_type=content_type)
         return path
 
+    def file_exists(self, path: str) -> bool:
+        """True if a blob already exists at the given full storage path."""
+        return self.bucket.blob(path).exists()
+
     def get_latest_file(self) -> Optional[StorageFile]:
         """Get the most recently uploaded file in incoming."""
         files = self.list_incoming_files()

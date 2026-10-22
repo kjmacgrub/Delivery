@@ -27,6 +27,8 @@ STORAGE_PROCESSED = "delivery-files/processed"
 # Combined-CSV pipeline (NEW_CSV_FORMAT.md) — kept separate from the legacy
 # PDF/CSV pipeline so IT test posts don't pollute the production import flow.
 STORAGE_INCOMING_V2 = "delivery-files/incoming-v2"
+# Uploads to /ingest that failed the preamble sanity check (kept for inspection)
+STORAGE_REJECTED = "delivery-files/rejected"
 
 # Known supplier names (used for supplier block detection in PDF)
 # This list should be kept in sync with actual suppliers

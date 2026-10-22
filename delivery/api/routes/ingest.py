@@ -8,15 +8,26 @@ POST /ingest
 
 Sanity check: file must be non-empty UTF-8 and contain a `DELIVERY_WORKSHEET_V<n>`
 marker within the first 500 bytes. Full schema validation happens at parse time.
+
+Files that fail the sanity check are kept in delivery-files/rejected/ (prefixed
+with the UTC receive time) so they can be inspected, and the 422 response says so.
+
+An upload whose filename already exists in incoming-v2/ never overwrites the
+earlier file: it is stored as `<filename>__<UTC receive time>` instead. The CSV
+picker chooses by preamble (delivery date, then generation time), not filename,
+so both files remain candidates.
 """
 
+import logging
 import os
 import re
+from datetime import datetime, timezone
 
 from fastapi import APIRouter, File, Header, HTTPException, Request, UploadFile
 
-from delivery.config import STORAGE_INCOMING_V2
+from delivery.config import STORAGE_INCOMING_V2, STORAGE_REJECTED
 
+log = logging.getLogger(__name__)
 router = APIRouter()
 
 _API_KEY = os.environ.get("INGEST_API_KEY")
@@ -28,6 +39,36 @@ def _authenticate(api_key: str) -> None:
         raise HTTPException(status_code=503, detail="Ingest API not configured")
     if api_key != _API_KEY:
         raise HTTPException(status_code=401, detail="Invalid API key")
+
+
+def _utc_stamp() -> str:
+    return datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+
+
+def _safe_name(filename: str) -> str:
+    name = (filename or "upload").split("/")[-1].split("\\")[-1]
+    return name or "upload"
+
+
+def _reject(storage, filename: str, content: bytes, reason: str) -> None:
+    """Keep the rejected upload for inspection, then raise 422."""
+    name = _safe_name(filename)
+    kept = f"{_utc_stamp()}_{name}"
+    try:
+        path = storage.upload_file(
+            kept, content, "application/octet-stream", prefix=STORAGE_REJECTED
+        )
+    except Exception as e:  # noqa: BLE001 — never mask the 422 with a storage error
+        log.warning("ingest: could not save rejected upload %s — %s", name, e)
+        path = None
+    log.warning(
+        "ingest: rejected %s (%d bytes): %s%s",
+        name, len(content), reason, f" — kept at {path}" if path else "",
+    )
+    detail = reason
+    if path:
+        detail += f". File kept for inspection at {path}"
+    raise HTTPException(status_code=422, detail=detail)
 
 
 @router.post("/ingest")
@@ -49,15 +90,19 @@ async def ingest(
     try:
         head = content[:500].decode("utf-8")
     except UnicodeDecodeError:
-        raise HTTPException(status_code=422, detail="File is not valid UTF-8")
+        _reject(storage, file.filename, content, "File is not valid UTF-8")
 
     if not _MARKER_RE.search(head):
-        raise HTTPException(
-            status_code=422,
-            detail="File missing DELIVERY_WORKSHEET_V<n> marker in preamble",
+        _reject(
+            storage, file.filename, content,
+            "File missing DELIVERY_WORKSHEET_V<n> marker in preamble",
         )
 
-    path = storage.upload_file(
-        file.filename, content, "text/csv", prefix=STORAGE_INCOMING_V2
-    )
+    name = _safe_name(file.filename)
+    if storage.file_exists(f"{STORAGE_INCOMING_V2}/{name}"):
+        # Same filename as an earlier upload — keep both.
+        name = f"{name}__{_utc_stamp()}"
+        log.info("ingest: filename already present, storing as %s", name)
+
+    path = storage.upload_file(name, content, "text/csv", prefix=STORAGE_INCOMING_V2)
     return {"status": "ok", "path": path, "size": len(content)}
