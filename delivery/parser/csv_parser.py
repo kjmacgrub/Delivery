@@ -82,9 +82,12 @@ def read_preamble(text: str) -> dict:
 
 
 # IT's second nightly file (full-store inventory) shares the worksheet preamble
-# but adds a `type` column (values: produce / inventory). That column is how
-# the ingest endpoint and the CSV picker tell it apart from the worksheet.
-INVENTORY_COLUMN = "type"
+# and adds a `type` column whose values are "produce" or "inventory". The
+# produce worksheet may carry the same column too, with every row "produce".
+# So the column alone proves nothing: a file is the inventory file only if at
+# least one row has a type other than produce.
+TYPE_COLUMN = "type"
+PRODUCE_TYPE = "produce"
 
 
 def read_header_columns(text: str) -> list:
@@ -96,8 +99,21 @@ def read_header_columns(text: str) -> list:
 
 
 def is_inventory_file(text: str) -> bool:
-    """True if the header carries the inventory-file `type` column."""
-    return INVENTORY_COLUMN in read_header_columns(text)
+    """True if the `type` column is present and any row's type is not produce.
+
+    Give this the whole file to be sure. On a truncated prefix (the picker's
+    preamble read) it can only say True if a non-produce row happens to fall
+    inside the prefix; it never returns True for a produce-only file.
+    """
+    if TYPE_COLUMN not in read_header_columns(text):
+        return False
+    lines = text.splitlines()
+    reader = csv.DictReader(lines[5:])
+    for row in reader:
+        value = (row.get(TYPE_COLUMN) or "").strip().lower()
+        if value and value != PRODUCE_TYPE:
+            return True
+    return False
 
 
 class CSVWorksheetParser(WorksheetParser):

@@ -44,9 +44,11 @@ def _read_candidate(blob) -> Optional[CSVCandidate]:
         head = blob.download_as_bytes(start=0, end=PREAMBLE_BYTES - 1)
         text = head.decode("utf-8", errors="replace")
         if is_inventory_file(text):
-            # Same preamble as the worksheet, but it's the full-store inventory
-            # file — never a worksheet candidate, whatever its generation time.
-            log.info("CSV picker: skipping %s — inventory file (has `type` column)", blob.name)
+            # Best-effort backstop: /ingest routes the inventory file elsewhere,
+            # but if one sits here and a non-produce `type` row shows up within
+            # the preamble bytes, it's not a worksheet candidate. A produce-only
+            # file is never skipped by this check.
+            log.info("CSV picker: skipping %s — inventory file (non-produce `type` rows)", blob.name)
             return None
         pre = read_preamble(text)
     except CSVParseError as e:

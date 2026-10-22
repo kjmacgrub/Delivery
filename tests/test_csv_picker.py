@@ -6,7 +6,8 @@ from delivery.services import csv_picker
 
 PRE = "﻿delivery_Thu-2026-10-22\n(generated 2026-10-22 {gen})\n \nDELIVERY_WORKSHEET_V1\n\"\"\n"
 WORKSHEET = (PRE.format(gen="03:30") + "item_id,item_name\n1,Apple\n").encode()
-INVENTORY = (PRE.format(gen="14:25") + "item_id,item_name,type\n1,Apple,produce\n").encode()
+INVENTORY = (PRE.format(gen="14:25") + "item_id,item_name,type\n9,Sponge,inventory\n1,Apple,produce\n").encode()
+PRODUCE_TYPED = (PRE.format(gen="03:31") + "item_id,item_name,type\n1,Apple,produce\n2,Kale,produce\n").encode()
 
 
 class FakeBlob:
@@ -42,3 +43,12 @@ def test_only_inventory_file_means_no_candidate():
     t = datetime(2026, 10, 22, 18, 25, tzinfo=timezone.utc)
     bucket = FakeBucket([FakeBlob("delivery-files/incoming-v2/x", INVENTORY, t)])
     assert csv_picker.pick_current_csv(bucket) is None
+
+
+def test_produce_file_with_type_column_is_picked():
+    t = datetime(2026, 10, 23, 7, 30, tzinfo=timezone.utc)
+    bucket = FakeBucket([
+        FakeBlob("delivery-files/incoming-v2/delivery_Fri-2026-10-23", PRODUCE_TYPED, t),
+    ])
+    pick = csv_picker.pick_current_csv(bucket)
+    assert pick is not None and pick.filename == "delivery_Fri-2026-10-23"

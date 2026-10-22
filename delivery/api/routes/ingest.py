@@ -12,9 +12,11 @@ marker within the first 500 bytes. Full schema validation happens at parse time.
 Files that fail the sanity check are kept in delivery-files/rejected/ (prefixed
 with the UTC receive time) so they can be inspected, and the 422 response says so.
 
-IT's second nightly file (full-store inventory, extra `type` column, same
-preamble) is routed to delivery-files/incoming-inventory/ instead, so the
-worksheet picker never considers it. The response carries "kind": "inventory".
+IT's second nightly file (full-store inventory, same preamble, `type` column
+with non-produce rows) is routed to delivery-files/incoming-inventory/ instead,
+so the worksheet picker never considers it. The response carries "kind":
+"inventory". A produce worksheet that merely carries a `type` column (all rows
+produce) is still a worksheet and goes to incoming-v2/.
 
 An upload whose filename already exists in incoming-v2/ never overwrites the
 earlier file: it is stored as `<filename>__<UTC receive time>` instead. The CSV
@@ -103,8 +105,8 @@ async def ingest(
             "File missing DELIVERY_WORKSHEET_V<n> marker in preamble",
         )
 
-    # The data header sits on line 6, well inside the first 2 KB.
-    if is_inventory_file(content[:2048].decode("utf-8", errors="replace")):
+    # Classify on the whole file: inventory only if some row's type isn't produce.
+    if is_inventory_file(content.decode("utf-8", errors="replace")):
         prefix, kind = STORAGE_INCOMING_INVENTORY, "inventory"
     else:
         prefix, kind = STORAGE_INCOMING_V2, "worksheet"
