@@ -161,3 +161,17 @@ def test_produce_only_copy_keeps_quoted_fields_and_blank_type():
     # No type column: the file is returned untouched.
     plain = text.replace(",type", "").replace(",produce", "").replace(",inventory", "")
     assert produce_only_copy(plain) == plain
+
+
+def test_non_produce_copy_is_the_complement():
+    from delivery.parser.csv_parser import non_produce_copy, produce_only_copy
+    text = (
+        "\ufeffdelivery_Tue-2026-10-27\n(generated 2026-10-27 03:31)\n \n"
+        "DELIVERY_WORKSHEET_V1\n\"\"\n"
+        "item_id,item_name,type\n"
+        "1,Apple,produce\n2,Sponge,inventory\n3,Mystery,\n"
+    )
+    assert non_produce_copy(text).splitlines()[6:] == ["2,Sponge,inventory", "3,Mystery,"]
+    assert produce_only_copy(text).splitlines()[6:] == ["1,Apple,produce"]
+    plain = "\ufeffdelivery_Tue-2026-10-27\n(generated 2026-10-27 03:31)\n \nDELIVERY_WORKSHEET_V1\n\"\"\nitem_id,item_name\n1,Apple\n"
+    assert non_produce_copy(plain).splitlines() == plain.splitlines()[:6]

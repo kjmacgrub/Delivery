@@ -125,11 +125,23 @@ def produce_only_copy(text: str) -> str:
     through the csv module so quoted fields survive. The full file is kept
     as-is in incoming-inventory/ — this is a copy, not a move.
     """
+    return _rows_of_type(text, keep_produce=True)
+
+
+def non_produce_copy(text: str) -> str:
+    """The same file with every produce row dropped: the grocery side of
+    the store (everything the Delivery worksheet does not track). A file
+    without a `type` column has no grocery rows, so only its preamble and
+    header are returned."""
+    return _rows_of_type(text, keep_produce=False)
+
+
+def _rows_of_type(text: str, keep_produce: bool) -> str:
     columns = read_header_columns(text)
-    if TYPE_COLUMN not in columns:
-        return text
-    type_idx = columns.index(TYPE_COLUMN)
     lines = text.splitlines()
+    if TYPE_COLUMN not in columns:
+        return text if keep_produce else "\n".join(lines[:6]) + "\n"
+    type_idx = columns.index(TYPE_COLUMN)
     out = io.StringIO()
     out.write("\n".join(lines[:6]) + "\n")
     writer = csv.writer(out, lineterminator="\n")
@@ -137,7 +149,7 @@ def produce_only_copy(text: str) -> str:
         if not row:
             continue
         value = row[type_idx].strip().lower() if type_idx < len(row) else ""
-        if value == PRODUCE_TYPE:
+        if (value == PRODUCE_TYPE) == keep_produce:
             writer.writerow(row)
     return out.getvalue()
 

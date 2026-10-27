@@ -52,3 +52,15 @@ def test_produce_file_with_type_column_is_picked():
     ])
     pick = csv_picker.pick_current_csv(bucket)
     assert pick is not None and pick.filename == "delivery_Fri-2026-10-23"
+
+
+def test_inventory_folder_pick_keeps_the_inventory_file():
+    t = datetime(2026, 10, 22, 7, 30, tzinfo=timezone.utc)
+    bucket = FakeBucket([
+        FakeBlob("delivery-files/incoming-inventory/delivery_Thu-2026-10-22", INVENTORY, t),
+        FakeBlob("delivery-files/incoming-v2/delivery_Thu-2026-10-22", WORKSHEET, t),
+    ])
+    pick = csv_picker.pick_current_inventory_csv(bucket)
+    assert pick is not None
+    assert pick.path == "delivery-files/incoming-inventory/delivery_Thu-2026-10-22"
+    assert csv_picker.pick_current_csv(bucket).path == "delivery-files/incoming-v2/delivery_Thu-2026-10-22"
