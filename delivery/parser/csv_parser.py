@@ -116,6 +116,32 @@ def is_inventory_file(text: str) -> bool:
     return False
 
 
+def produce_only_copy(text: str) -> str:
+    """The same file with every non-produce row dropped.
+
+    IT sends one nightly file holding the whole store, with produce rows
+    tagged in the `type` column. The worksheet is the produce subset of it.
+    Preamble and header lines are kept verbatim; data rows are re-emitted
+    through the csv module so quoted fields survive. The full file is kept
+    as-is in incoming-inventory/ — this is a copy, not a move.
+    """
+    columns = read_header_columns(text)
+    if TYPE_COLUMN not in columns:
+        return text
+    type_idx = columns.index(TYPE_COLUMN)
+    lines = text.splitlines()
+    out = io.StringIO()
+    out.write("\n".join(lines[:6]) + "\n")
+    writer = csv.writer(out, lineterminator="\n")
+    for row in csv.reader(lines[6:]):
+        if not row:
+            continue
+        value = row[type_idx].strip().lower() if type_idx < len(row) else ""
+        if value == PRODUCE_TYPE:
+            writer.writerow(row)
+    return out.getvalue()
+
+
 class CSVWorksheetParser(WorksheetParser):
     """Parse the combined IT-supplied CSV into the worksheet shape."""
 

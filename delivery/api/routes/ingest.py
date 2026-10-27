@@ -12,11 +12,12 @@ marker within the first 500 bytes. Full schema validation happens at parse time.
 Files that fail the sanity check are kept in delivery-files/rejected/ (prefixed
 with the UTC receive time) so they can be inspected, and the 422 response says so.
 
-IT's second nightly file (full-store inventory, same preamble, `type` column
-with non-produce rows) is routed to delivery-files/incoming-inventory/ instead,
-so the worksheet picker never considers it. The response carries "kind":
-"inventory". A produce worksheet that merely carries a `type` column (all rows
-produce) is still a worksheet and goes to incoming-v2/.
+IT's full-store file (same preamble, `type` column with non-produce rows) is
+stored whole in delivery-files/incoming-inventory/, where the worksheet picker
+never looks, and a produce-only copy of it (same filename) is stored in
+incoming-v2/ as that day's worksheet. The response carries "kind": "inventory"
+and "produce_path". A produce worksheet that merely carries a `type` column
+(all rows produce) is still a worksheet and goes to incoming-v2/ unchanged.
 
 An upload whose filename already exists in incoming-v2/ never overwrites the
 earlier file: it is stored as `<filename>__<UTC receive time>` instead. The CSV
@@ -32,7 +33,7 @@ from datetime import datetime, timezone
 from fastapi import APIRouter, File, Header, HTTPException, Request, UploadFile
 
 from delivery.config import STORAGE_INCOMING_INVENTORY, STORAGE_INCOMING_V2, STORAGE_REJECTED
-from delivery.parser.csv_parser import is_inventory_file
+from delivery.parser.csv_parser import is_inventory_file, produce_only_copy
 
 log = logging.getLogger(__name__)
 router = APIRouter()
@@ -106,17 +107,33 @@ async def ingest(
         )
 
     # Classify on the whole file: inventory only if some row's type isn't produce.
-    if is_inventory_file(content.decode("utf-8", errors="replace")):
+    text = content.decode("utf-8", errors="replace")
+    if is_inventory_file(text):
         prefix, kind = STORAGE_INCOMING_INVENTORY, "inventory"
     else:
         prefix, kind = STORAGE_INCOMING_V2, "worksheet"
 
     name = _safe_name(file.filename)
+    path = _store(storage, name, content, prefix)
+    log.info("ingest: stored %s file at %s (%d bytes)", kind, path, len(content))
+    result = {"status": "ok", "kind": kind, "path": path, "size": len(content)}
+
+    if kind == "inventory":
+        # The worksheet is the produce subset of the full-store file.
+        produce = produce_only_copy(text).encode("utf-8")
+        produce_path = _store(storage, name, produce, STORAGE_INCOMING_V2)
+        log.info(
+            "ingest: stored produce-only worksheet at %s (%d bytes)",
+            produce_path, len(produce),
+        )
+        result["produce_path"] = produce_path
+    return result
+
+
+def _store(storage, name: str, content: bytes, prefix: str) -> str:
+    """Upload under prefix/, never overwriting a same-named earlier file."""
     if storage.file_exists(f"{prefix}/{name}"):
         # Same filename as an earlier upload — keep both.
         name = f"{name}__{_utc_stamp()}"
-        log.info("ingest: filename already present, storing as %s", name)
-
-    path = storage.upload_file(name, content, "text/csv", prefix=prefix)
-    log.info("ingest: stored %s file at %s (%d bytes)", kind, path, len(content))
-    return {"status": "ok", "kind": kind, "path": path, "size": len(content)}
+        log.info("ingest: filename already present in %s, storing as %s", prefix, name)
+    return storage.upload_file(name, content, "text/csv", prefix=prefix)
