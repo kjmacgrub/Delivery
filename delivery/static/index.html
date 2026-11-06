@@ -29,7 +29,19 @@
                     </svg>
                     <span id="reports-badge" class="header-badge hidden"></span>
                 </button>
-                <a href="https://produce-processor.netlify.app" class="icon-btn header-link-text" aria-label="Produce Processor" data-tooltip="Produce Processor"><span>Produce</span><span>Processing</span></a>
+                <div class="other-apps" style="position:relative;">
+                    <button id="other-apps-btn" class="other-apps-btn" onclick="toggleOtherApps(event)" aria-label="Other apps" aria-haspopup="menu" aria-expanded="false">
+                        Other Apps
+                        <svg id="other-apps-caret" class="other-apps-caret" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>
+                    </button>
+                    <div id="other-apps-menu" class="other-apps-menu hidden" role="menu">
+                        <div class="other-apps-title">Other Apps</div>
+                        <a role="menuitem" class="other-apps-item" href="https://produce-processor.netlify.app">
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20V10"/><path d="M12 10c0-4 3-7 7-7 0 4-3 7-7 7z"/><path d="M12 14c0-4-3-7-7-7 0 4 3 7 7 7z"/></svg>
+                            <span>Produce Processing</span>
+                        </a>
+                    </div>
+                </div>
                 <span id="header-brand-text" onclick="goHome()">Daily Delivery</span>
                 <span id="julian-day" class="julian-day"></span>
             </div>

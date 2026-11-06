@@ -4082,6 +4082,37 @@ document.addEventListener('click', (e) => {
     }
 });
 
+// ---- Other Apps dropdown (header, top left) ----
+// Links open in the same tab: the Produce Processing app has the same button,
+// so one tap there brings the user straight back here.
+function toggleOtherApps(event) {
+    event.stopPropagation();
+    const menu = document.getElementById('other-apps-menu');
+    if (menu.classList.contains('hidden')) {
+        closeDateDropdown();
+        menu.classList.remove('hidden');
+        document.getElementById('other-apps-caret').classList.add('open');
+        document.getElementById('other-apps-btn').setAttribute('aria-expanded', 'true');
+    } else {
+        closeOtherApps();
+    }
+}
+
+function closeOtherApps() {
+    const menu = document.getElementById('other-apps-menu');
+    if (!menu) return;
+    menu.classList.add('hidden');
+    document.getElementById('other-apps-caret').classList.remove('open');
+    document.getElementById('other-apps-btn').setAttribute('aria-expanded', 'false');
+}
+
+document.addEventListener('click', (e) => {
+    const menu = document.getElementById('other-apps-menu');
+    if (menu && !menu.classList.contains('hidden') && !e.target.closest('.other-apps')) {
+        closeOtherApps();
+    }
+});
+
 // ---- Check-in times display (under summary numbers) ----
 function updateTitleTooltip() {
     const titleEl = document.getElementById('page-title');

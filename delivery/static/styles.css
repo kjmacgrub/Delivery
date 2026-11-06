@@ -328,6 +328,83 @@ html, body {
     background: rgba(0,122,255,0.1);
 }
 
+/* ---- Other Apps (header, top left) — matches the Produce Processing app ---- */
+.other-apps-btn {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    background: rgba(255,255,255,0.18);
+    border: 1.5px solid currentColor;
+    color: var(--text);
+    border-radius: 999px;
+    padding: 6px 12px 6px 15px;
+    font-size: 14px;
+    font-weight: 700;
+    font-family: inherit;
+    line-height: 1.2;
+    white-space: nowrap;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+}
+.other-apps-btn:active {
+    opacity: 0.7;
+}
+.other-apps-caret {
+    transition: transform 0.15s;
+}
+.other-apps-caret.open {
+    transform: rotate(180deg);
+}
+.other-apps-menu {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    z-index: 10000;
+    width: 260px;
+    box-sizing: border-box;
+    background: #fff;
+    border-radius: 16px;
+    padding: 12px;
+    margin-top: 6px;
+    box-shadow: 0 10px 40px rgba(0,0,0,0.3);
+}
+.other-apps-menu.hidden {
+    display: none;
+}
+/* The week-color header forces its text color onto every descendant;
+   the dropdown is a white panel, so give it back its own colors. */
+#app-header .other-apps-menu,
+#app-header .other-apps-menu * {
+    color: #1e293b !important;
+}
+.other-apps-title {
+    font-size: 11px;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    padding: 4px 8px 8px;
+    color: #94a3b8 !important;
+}
+.other-apps-item {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 14px 16px;
+    background: #f8fafc;
+    border-radius: 12px;
+    text-decoration: none;
+    font-size: 17px;
+    font-weight: 700;
+    -webkit-tap-highlight-color: transparent;
+}
+.other-apps-item svg {
+    color: #0f766e !important;
+    flex-shrink: 0;
+}
+.other-apps-item:active {
+    background: #e2e8f0;
+}
+
 .header-badge {
     position: absolute;
     top: 6px;
